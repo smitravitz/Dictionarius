@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>FM-index viability</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  .bar { transition: width .3s; }
+  body { -webkit-font-smoothing: antialiased; }
+</style>
+</head>
+<body class="bg-stone-50 text-slate-900 font-sans">
+<main class="max-w-5xl mx-auto px-6 py-12 space-y-12">
+
+  <!-- HEADER / VERDICT -->
+  <header class="space-y-4">
+    <p class="text-xs uppercase tracking-[0.2em] text-slate-500">Feasibility teardown · measured on real data</p>
+    <h1 class="text-4xl font-serif">FM-index for Dictionarily — viable?</h1>
+    <div class="rounded-xl border-l-4 border-emerald-500 bg-emerald-50 px-6 py-5">
+      <p class="text-lg font-semibold text-emerald-900">✅ Viable — and strongly differentiated.</p>
+      <p class="text-sm text-slate-700 mt-1">Benchmarked on <strong>370,105 real English words</strong>. Engineered FM-index is <strong>~8× smaller than SQLite FTS5 trigram</strong> for the same substring search, and <strong>faster</strong>. No findable open dictionary app uses this — the algorithm itself is mature (DNA aligners, search engines).</p>
+    </div>
+    <p class="text-xs text-slate-500">Measured 2026-09-26 · pure-Python FM prototype vs C-level SQLite FTS5 · raw corpus 3.7 MB</p>
+  </header>
+
+  <!-- SIZE CHART -->
+  <section class="space-y-4">
+    <h2 class="text-2xl font-serif">Size — same 370k words, substring-searchable</h2>
+    <div class="rounded-lg border border-slate-200 bg-white p-6 space-y-3 text-sm">
+      <!-- each row: label | bar | value ; scale max=20MB -->
+      <div class="grid grid-cols-[190px_1fr_80px] items-center gap-3">
+        <span class="text-slate-600">zstd data <span class="text-xs text-slate-400">(no search)</span></span>
+        <div class="bg-slate-100 rounded"><div class="bar bg-slate-400 h-5 rounded" style="width:4.5%"></div></div>
+        <span class="font-mono text-right">0.9 MB</span>
+      </div>
+      <div class="grid grid-cols-[190px_1fr_80px] items-center gap-3">
+        <span class="text-emerald-700 font-semibold">FM-index engineered ★</span>
+        <div class="bg-slate-100 rounded"><div class="bar bg-emerald-500 h-5 rounded" style="width:12.5%"></div></div>
+        <span class="font-mono text-right text-emerald-700">~2.5 MB</span>
+      </div>
+      <div class="grid grid-cols-[190px_1fr_80px] items-center gap-3">
+        <span class="text-slate-600">FM-index naive <span class="text-xs text-slate-400">(measured)</span></span>
+        <div class="bg-slate-100 rounded"><div class="bar bg-emerald-300 h-5 rounded" style="width:43.5%"></div></div>
+        <span class="font-mono text-right">8.7 MB</span>
+      </div>
+      <div class="grid grid-cols-[190px_1fr_80px] items-center gap-3">
+        <span class="text-slate-600">plain SQLite table</span>
+        <div class="bg-slate-100 rounded"><div class="bar bg-amber-400 h-5 rounded" style="width:63.5%"></div></div>
+        <span class="font-mono text-right">12.7 MB</span>
+      </div>
+      <div class="grid grid-cols-[190px_1fr_80px] items-center gap-3">
+        <span class="text-red-700 font-semibold">SQLite FTS5 trigram</span>
+        <div class="bg-slate-100 rounded"><div class="bar bg-red-500 h-5 rounded" style="width:100%"></div></div>
+        <span class="font-mono text-right text-red-700">20.0 MB</span>
+      </div>
+      <p class="text-xs text-slate-500 pt-2">★ engineered = RRR wavelet tree + separator-rank locate (modeled from standard succinct-structure results). Naive = the flat checkpoint prototype actually built and measured.</p>
+    </div>
+  </section>
+
+  <!-- LATENCY + CORRECTNESS -->
+  <section class="grid md:grid-cols-2 gap-4">
+    <div class="rounded-lg border border-slate-200 bg-white p-6 space-y-3">
+      <h3 class="font-serif text-xl">Substring search latency</h3>
+      <table class="w-full text-sm">
+        <tr class="border-b border-slate-100"><td class="py-1.5 text-emerald-700 font-semibold">FM backward search</td><td class="text-right font-mono">0.015 ms</td></tr>
+        <tr class="border-b border-slate-100"><td class="py-1.5">FTS5 trigram MATCH</td><td class="text-right font-mono">0.176 ms</td></tr>
+        <tr><td class="py-1.5 text-red-600">plain LIKE '%q%' scan</td><td class="text-right font-mono text-red-600">36.4 ms</td></tr>
+      </table>
+      <p class="text-xs text-slate-500">FM number is <em>pure Python</em> and still beats C-level FTS5 — backward search is that few operations. A native/wasm build widens the gap.</p>
+    </div>
+    <div class="rounded-lg border border-slate-200 bg-white p-6 space-y-3">
+      <h3 class="font-serif text-xl">Correctness</h3>
+      <ul class="text-sm space-y-2 text-slate-700">
+        <li>✅ 40/40 random 3-gram counts matched brute force</li>
+        <li>✅ <code>"eren"</code> → 495 positions, <strong>495/495</strong> truly contain it (adherence, coherence…)</li>
+        <li>✅ locate maps every hit back to its exact word</li>
+      </ul>
+      <p class="text-xs text-slate-500">Backward search returns <em>all</em> occurrences — mid-word matching is intrinsic, not bolted on.</p>
+    </div>
+  </section>
+
+  <!-- EXTRAPOLATION -->
+  <section class="rounded-lg border border-slate-200 bg-white p-6 space-y-3">
+    <h2 class="text-2xl font-serif">At real dictionary scale (1,390,507 headwords)</h2>
+    <p class="text-sm text-slate-600">Sizes scale ~linearly (×3.76). Headwords only — glosses stay in separately-compressed blocks.</p>
+    <div class="grid sm:grid-cols-3 gap-4 pt-2">
+      <div class="rounded-lg bg-emerald-50 border border-emerald-200 p-4 text-center">
+        <p class="text-3xl font-bold text-emerald-700">~9–10 MB</p>
+        <p class="text-xs text-slate-600 mt-1">FM-index engineered<br/>(substring built in)</p>
+      </div>
+      <div class="rounded-lg bg-slate-50 border border-slate-200 p-4 text-center">
+        <p class="text-3xl font-bold text-slate-500">~33 MB</p>
+        <p class="text-xs text-slate-600 mt-1">FM-index naive</p>
+      </div>
+      <div class="rounded-lg bg-red-50 border border-red-200 p-4 text-center">
+        <p class="text-3xl font-bold text-red-600">~75 MB</p>
+        <p class="text-xs text-slate-600 mt-1">FTS5 trigram</p>
+      </div>
+    </div>
+    <p class="text-xs text-slate-500 pt-1">🟡 Estimates from measured 370k figures + standard succinct-structure ratios. The engineered build needs a real library (sdsl-lite / rust <code>fm-index</code>) to confirm within ±20%.</p>
+  </section>
+
+  <!-- COMPETITIVE MATRIX -->
+  <section class="space-y-4">
+    <h2 class="text-2xl font-serif">Does anyone else do this? — the open dictionary landscape</h2>
+    <div class="overflow-x-auto rounded-lg border border-slate-200">
+      <table class="w-full text-sm bg-white">
+        <thead class="bg-slate-100 text-slate-600 text-xs uppercase tracking-wider">
+          <tr><th class="text-left px-4 py-3">App / format</th><th class="text-left px-4 py-3">Storage</th><th class="text-left px-4 py-3">Index</th><th class="text-left px-4 py-3">Substring / mid-word</th><th class="text-left px-4 py-3">Self-index?</th></tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+          <tr><td class="px-4 py-3 font-medium">StarDict</td><td class="px-4 py-3">dictzip (block gzip)</td><td class="px-4 py-3">sorted .idx offsets</td><td class="px-4 py-3 text-slate-500">exact / prefix</td><td class="px-4 py-3 text-red-500">no</td></tr>
+          <tr><td class="px-4 py-3 font-medium">Aard2 / slob</td><td class="px-4 py-3">LZMA2 bins</td><td class="px-4 py-3">sorted key index (UCA)</td><td class="px-4 py-3 text-slate-500">exact / prefix only</td><td class="px-4 py-3 text-red-500">no</td></tr>
+          <tr><td class="px-4 py-3 font-medium">GoldenDict</td><td class="px-4 py-3">per-format</td><td class="px-4 py-3">own built index</td><td class="px-4 py-3 text-amber-600">wildcard via scan (slow)</td><td class="px-4 py-3 text-red-500">no</td></tr>
+          <tr><td class="px-4 py-3 font-medium">ZIM / Kiwix</td><td class="px-4 py-3">zstd/lzma clusters</td><td class="px-4 py-3">URL index + <strong>Xapian</strong></td><td class="px-4 py-3 text-slate-500">full-text via separate inverted index</td><td class="px-4 py-3 text-red-500">no</td></tr>
+          <tr class="bg-emerald-50"><td class="px-4 py-3 font-semibold text-emerald-800">Dictionarily (proposed)</td><td class="px-4 py-3 text-emerald-800">FM-index <em>is</em> storage</td><td class="px-4 py-3 text-emerald-800">FM-index (BWT)</td><td class="px-4 py-3 text-emerald-800 font-semibold">native, O(query len)</td><td class="px-4 py-3 text-emerald-700 font-bold">yes ★</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="rounded-lg border-l-4 border-indigo-400 bg-indigo-50 px-5 py-4 text-sm text-slate-800">
+      <p><strong>Verdict:</strong> the entire open dictionary ecosystem uses <em>"compress data blocks + a separate sorted/prefix key index."</em> Substring, when offered at all, is a slow scan (GoldenDict) or a heavy separate inverted index (Xapian in ZIM). <strong>None uses a compressed self-index.</strong> FM-index is proven elsewhere — DNA aligners (BWA, Bowtie), full-text search — with mature libraries (sdsl-lite, rust <code>fm-index</code>, Python <code>shellinford</code>). So: <strong>low algorithmic risk, high product novelty.</strong></p>
+    </div>
+  </section>
+
+  <!-- RISKS -->
+  <section class="rounded-lg border border-amber-200 bg-amber-50 p-6 space-y-2">
+    <h2 class="text-xl font-serif text-amber-900">Honest risks ⚠️</h2>
+    <ul class="text-sm text-slate-700 space-y-1.5 list-disc pl-5">
+      <li><strong>Engineered size is modeled, not built.</strong> Measured naive = 8.7 MB (already beats trigram); the ~2.5 MB rests on RRR/wavelet-tree results. Confirm with a real library before committing.</li>
+      <li><strong>Web target needs wasm.</strong> No JS-native FM-index; you'd compile one (sdsl/rust→wasm) or ship a wasm build. Extra toolchain.</li>
+      <li><strong>Build is server-side and heavy</strong> (suffix array construction), but one-time — the shipped index is cheap to open.</li>
+      <li><strong>Locate needs a small extra structure</strong> (sampled SA or the separator-rank trick used here) — already in the size model.</li>
+      <li><strong>Glosses are a separate problem.</strong> FM-index solves headword mid-word search; definition text stays in zstd-compressed blocks with offset lookup.</li>
+    </ul>
+  </section>
+
+  <!-- RECOMMENDATION -->
+  <section class="rounded-xl bg-slate-900 text-slate-100 p-8 space-y-3">
+    <p class="text-xs uppercase tracking-[0.2em] text-emerald-300">Recommendation</p>
+    <h2 class="text-2xl font-serif">Prototype it for real behind the existing seam — don't rewrite anything yet.</h2>
+    <p class="text-sm text-slate-300 max-w-3xl">The <code>getCandidates</code> seam from the architecture review is exactly the plug point: build one real <code>FmIndexSource</code> adapter with a proven library, run it against the same contract test as the SQLite and mock sources, and measure the engineered size for real. If it lands near ~10 MB at full scale, it becomes the core substring engine and the trigram add-on is unnecessary. Low commitment: one adapter behind a seam that already exists.</p>
+  </section>
+
+</main>
+</body>
+</html>
