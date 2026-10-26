@@ -1,0 +1,5 @@
+# Benchmark-only dependencies (nothing here ships in the app).
+numpy>=2.0
+pydivsufsort>=0.0.20   # C-backed suffix array construction (BWT)
+zstandard>=0.25        # zstd compression + trained dictionaries
+wordfreq>=3.1          # English word frequencies for gloss tiering
