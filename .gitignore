@@ -1,0 +1,15 @@
+# dependencies & build output
+node_modules/
+dist/
+coverage/
+
+# benchmark data is downloaded, never committed (see bench/README.md)
+bench/data/
+*.db
+__pycache__/
+*.pyc
+
+# editors & OS
+.DS_Store
+.vscode/
+.idea/

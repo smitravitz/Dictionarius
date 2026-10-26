@@ -1,0 +1,22 @@
+{
+  "name": "dictionarily",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Fully offline, open-source dictionary with instant mid-word search, powered by an FM-index. Web, PWA, iOS, Android, F-Droid.",
+  "license": "GPL-3.0-or-later",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/smitravitz/dictionarily.git"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
+  }
+}
