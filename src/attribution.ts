@@ -12,8 +12,32 @@ const KNOWN_LICENSES: Record<string, { label: string; url: string }> = {
   },
 };
 
+/** MediaWiki page URL: spaces -> underscores, then percent-encode (so '#'
+ *  can't become a fragment), keeping '/' literal as MediaWiki does. */
+function mediaWikiPage(base: string, title: string): string {
+  const path = encodeURIComponent(title.replace(/ /g, "_")).replace(/%2F/g, "/");
+  return `${base}${path}`;
+}
+
+/** Known sources -> how to build the page for a headword (where its author
+ *  history lives). Sources not listed here are credited by name only. */
+const KNOWN_SOURCES: Record<string, (headword: string) => string> = {
+  Wiktionary: (headword) => mediaWikiPage("https://en.wiktionary.org/wiki/", headword),
+};
+
 /**
- * Build the credit line required by share-alike licenses (e.g. CC-BY-SA).
+ * Link to the entry's page on its source, or null when the source has no known
+ * page scheme. Derived from the headword at display time, so no URL is stored
+ * per entry.
+ */
+export function sourcePageUrl(entry: Entry): string | null {
+  const pageFor = KNOWN_SOURCES[entry.attribution.source];
+  return pageFor ? pageFor(entry.headword) : null;
+}
+
+/**
+ * Build the credit line required by share-alike licenses (e.g. CC-BY-SA):
+ * source (linked to the entry's page when known) + license (linked when known).
  * Throws if attribution is incomplete — an entry must never be shown or shared
  * without crediting its source and license.
  */
@@ -23,9 +47,11 @@ export function attributionNotice(entry: Entry): string {
     throw new Error("Entry is missing required attribution (source and license).");
   }
 
+  const page = sourcePageUrl(entry);
+  const credit = page ? `${source} (${page})` : source;
   const known = KNOWN_LICENSES[license];
   if (known) {
-    return `From ${source} — ${known.label} (${known.url})`;
+    return `From ${credit} — ${known.label} (${known.url})`;
   }
-  return `From ${source} — ${license}`;
+  return `From ${credit} — ${license}`;
 }
