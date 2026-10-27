@@ -4,10 +4,12 @@ import { normalize } from "./normalize";
 /**
  * Type-ahead results, ranked and produced lazily, a page at a time.
  *
- * Order: the exact match, then words starting with the query, then words
- * containing it mid-word. Within each tier: most frequent first, ties
- * alphabetical (= word id order). Asking for the next page never enumerates
- * the whole result set, so a 1-letter query costs the same as a 6-letter one.
+ * Order: the exact match first; then every other match by score (word
+ * frequency), where words that start with the query get a head start of
+ * `prefixBonus` on the Zipf scale. Ties: prefix before mid-word, then
+ * alphabetical (= word id order). So a common word containing the query
+ * ("criticism" for "ism") can outrank a rare word starting with it ("Ismay").
+ * Asking for the next page never enumerates the whole result set.
  */
 
 export type Tier = "exact" | "prefix" | "midword";
@@ -35,9 +37,17 @@ export interface CompleterOptions {
   /** Search the index's hot list (top-ranked words as one string) first, so
    *  mid-word results for common fragments are instant. */
   useHot: boolean;
+  /** Head start (Zipf) for words that start with the query: 1.5 means a prefix
+   *  match beats a mid-word match up to ~30x more frequent. */
+  prefixBonus: number;
 }
 
-const DEFAULTS: CompleterOptions = { locateLimit: 10_000, scanBudget: 20_000, useHot: true };
+const DEFAULTS: CompleterOptions = {
+  locateLimit: 10_000,
+  scanBudget: 20_000,
+  useHot: true,
+  prefixBonus: 1.5,
+};
 const BLOCK_SHIFT = 5; // 32 ids per tree leaf
 
 /** Frequency ranks + a max tree over blocks of ids, shared by all cursors. */
@@ -138,21 +148,108 @@ function loadHot(index: HeadwordIndex, freq: Uint16Array): Hot | null {
   };
 }
 
-/**
- * Mid-word matches come in two ranked runs: those in the hot list (found by
- * string search, instant), then the rest (all ranked below every hot word),
- * found by locating every occurrence (small sets) or a budgeted scan in rank
- * order (large sets).
- */
-const enum Stage {
-  Exact,
-  Prefix,
-  MidwordStart,
-  MidwordHot,
-  MidwordRest,
-  MidwordList,
-  MidwordScan,
+/** A stream ran out of work budget; ask again on the next call. */
+const WAIT = -2;
+/** A stream has no more ids. */
+const END = -1;
+
+const enum Midword {
+  Start,
+  Hot,
+  Rest,
+  List,
+  Scan,
   Done,
+}
+
+/**
+ * Words containing the query anywhere except at the start, in rank order.
+ * Two ranked runs: words in the hot list (found by string search, instant),
+ * then the rest, which all rank below every hot word: located in full and
+ * sorted (small sets) or scanned in rank order under a work budget (large).
+ */
+class MidwordStream {
+  private stage = Midword.Start;
+  private hotFrom = 0; // where the next hot-list search starts
+  private list: number[] = [];
+  private listPos = 0;
+  private scan: RankedIds | null = null;
+
+  constructor(
+    private readonly index: HeadwordIndex,
+    private readonly ranks: Ranks,
+    private readonly hot: Hot | null,
+    private readonly options: CompleterOptions,
+    private readonly query: string,
+    private readonly occurrences: number,
+    private readonly isPrefixMatch: (id: number) => boolean,
+  ) {}
+
+  /** Next id, END, or WAIT when `budget.left` is used up. */
+  next(budget: { left: number }): number {
+    for (;;) {
+      switch (this.stage) {
+        case Midword.Start:
+          if (this.occurrences === 0) this.stage = Midword.Done;
+          else this.stage = this.hot ? Midword.Hot : Midword.Rest;
+          break;
+
+        case Midword.Hot: {
+          const hot = this.hot!;
+          const at = hot.text.indexOf(this.query, this.hotFrom);
+          if (at < 0) {
+            this.stage = hot.ids.length < this.index.size ? Midword.Rest : Midword.Done;
+            break;
+          }
+          const entry = lastAtOrBefore(hot.starts, at);
+          // Resume after this word, so a word matching twice appears once.
+          this.hotFrom = entry + 1 < hot.starts.length ? hot.starts[entry + 1] : hot.text.length;
+          const id = hot.ids[entry];
+          if (!this.isPrefixMatch(id)) return id;
+          break;
+        }
+
+        case Midword.Rest:
+          if (this.occurrences <= this.options.locateLimit) {
+            const { freq } = this.ranks;
+            this.list = this.index
+              .wordsContaining(this.query)
+              .filter((id) => !this.isPrefixMatch(id) && !this.hot?.contains(id))
+              .sort((a, b) => freq[b] - freq[a] || a - b);
+            this.stage = Midword.List;
+          } else {
+            this.scan = new RankedIds(this.ranks, 0, this.index.size);
+            this.stage = Midword.Scan;
+          }
+          break;
+
+        case Midword.List:
+          if (this.listPos < this.list.length) return this.list[this.listPos++];
+          this.stage = Midword.Done;
+          break;
+
+        case Midword.Scan: {
+          if (budget.left-- <= 0) return WAIT;
+          const id = this.scan!.next();
+          if (id < 0) {
+            this.stage = Midword.Done;
+            break;
+          }
+          if (
+            !this.isPrefixMatch(id) &&
+            !this.hot?.contains(id) && // already returned from the hot list
+            this.index.key(id).includes(this.query)
+          ) {
+            return id;
+          }
+          break;
+        }
+
+        case Midword.Done:
+          return END;
+      }
+    }
+  }
 }
 
 export class ResultCursor {
@@ -161,28 +258,34 @@ export class ResultCursor {
   /** How many times the query occurs anywhere inside headwords. */
   readonly occurrences: number;
 
-  private stage: Stage;
+  private exactPending: boolean;
+  private finished: boolean;
   private readonly exactId: number | null;
   private readonly prefixStart: number;
   private readonly prefix: RankedIds | null;
-  private midwordList: number[] = [];
-  private midwordPos = 0;
-  private midwordScan: RankedIds | null = null;
-  private hotFrom = 0; // where the next hot-list search starts
+  private readonly midword: MidwordStream | null;
+  private readonly bonus: number;
+  private readonly scanBudget: number;
+  // The next id of each stream, once pulled: an id, END, or undefined (not pulled).
+  private prefixHead: number | undefined;
+  private midwordHead: number | undefined;
 
   constructor(
     private readonly index: HeadwordIndex,
     private readonly ranks: Ranks,
-    private readonly hot: Hot | null,
-    private readonly options: CompleterOptions,
+    hot: Hot | null,
+    options: CompleterOptions,
     /** the normalized query */
     readonly query: string,
   ) {
+    this.bonus = Math.round(options.prefixBonus * 100);
+    this.scanBudget = options.scanBudget;
     if (query === "") {
-      this.stage = Stage.Done;
+      this.exactPending = false;
+      this.finished = true;
       this.exactId = null;
       this.prefixStart = this.prefixCount = this.occurrences = 0;
-      this.prefix = null;
+      this.prefix = this.midword = null;
       return;
     }
     const { start, count } = index.prefix(query);
@@ -193,88 +296,48 @@ export class ResultCursor {
     // The exact key sorts first among words that start with it.
     const from = this.exactId === null ? start : start + 1;
     this.prefix = new RankedIds(ranks, from, start + count);
-    this.stage = Stage.Exact;
+    this.midword = new MidwordStream(index, ranks, hot, options, query, this.occurrences, (id) =>
+      this.isPrefixMatch(id),
+    );
+    this.exactPending = true;
+    this.finished = false;
   }
 
   /** True once every match has been returned. */
   get done(): boolean {
-    return this.stage === Stage.Done;
+    return this.finished;
   }
 
   /** Up to `n` more results. May return fewer (even none) before `done` when a
    *  large mid-word scan hits its work budget; call again to continue. */
   next(n: number): Suggestion[] {
     const out: Suggestion[] = [];
-    let budget = this.options.scanBudget;
-    while (out.length < n && this.stage !== Stage.Done) {
-      switch (this.stage) {
-        case Stage.Exact:
-          if (this.exactId !== null) out.push(this.suggestion(this.exactId, "exact"));
-          this.stage = Stage.Prefix;
-          break;
-
-        case Stage.Prefix: {
-          const id = this.prefix!.next();
-          if (id < 0) this.stage = Stage.MidwordStart;
-          else out.push(this.suggestion(id, "prefix"));
-          break;
-        }
-
-        case Stage.MidwordStart:
-          if (this.occurrences === 0) this.stage = Stage.Done;
-          else this.stage = this.hot ? Stage.MidwordHot : Stage.MidwordRest;
-          break;
-
-        case Stage.MidwordHot: {
-          const hot = this.hot!;
-          const at = hot.text.indexOf(this.query, this.hotFrom);
-          if (at < 0) {
-            this.stage = hot.ids.length < this.index.size ? Stage.MidwordRest : Stage.Done;
-            break;
-          }
-          const entry = lastAtOrBefore(hot.starts, at);
-          // Resume after this word, so a word matching twice appears once.
-          this.hotFrom = entry + 1 < hot.starts.length ? hot.starts[entry + 1] : hot.text.length;
-          const id = hot.ids[entry];
-          if (!this.isPrefixMatch(id)) out.push(this.suggestion(id, "midword"));
-          break;
-        }
-
-        case Stage.MidwordRest:
-          if (this.occurrences <= this.options.locateLimit) {
-            const { freq } = this.ranks;
-            this.midwordList = this.index
-              .wordsContaining(this.query)
-              .filter((id) => !this.isPrefixMatch(id) && !this.hot?.contains(id))
-              .sort((a, b) => freq[b] - freq[a] || a - b);
-            this.stage = Stage.MidwordList;
-          } else {
-            this.midwordScan = new RankedIds(this.ranks, 0, this.index.size);
-            this.stage = Stage.MidwordScan;
-          }
-          break;
-
-        case Stage.MidwordList:
-          if (this.midwordPos < this.midwordList.length) {
-            out.push(this.suggestion(this.midwordList[this.midwordPos++], "midword"));
-          } else {
-            this.stage = Stage.Done;
-          }
-          break;
-
-        case Stage.MidwordScan: {
-          if (budget-- <= 0) return out; // yield; the caller asks again
-          const id = this.midwordScan!.next();
-          if (id < 0) this.stage = Stage.Done;
-          else if (
-            !this.isPrefixMatch(id) &&
-            !this.hot?.contains(id) && // already returned from the hot list
-            this.index.key(id).includes(this.query)
-          ) {
-            out.push(this.suggestion(id, "midword"));
-          }
-          break;
-        }
+    if (this.finished) return out;
+    if (this.exactPending) {
+      this.exactPending = false;
+      if (this.exactId !== null) out.push(this.suggestion(this.exactId, "exact"));
+    }
+    const budget = { left: this.scanBudget };
+    while (out.length < n) {
+      if (this.prefixHead === undefined) this.prefixHead = this.prefix!.next();
+      if (this.midwordHead === undefined) {
+        const id = this.midword!.next(budget);
+        if (id === WAIT) return out; // decide later, once the mid-word head is known
+        this.midwordHead = id;
+      }
+      const p = this.prefixHead;
+      const m = this.midwordHead;
+      if (p === END && m === END) {
+        this.finished = true;
+        break;
+      }
+      const { freq } = this.ranks;
+      if (m === END || (p !== END && freq[p] + this.bonus >= freq[m])) {
+        out.push(this.suggestion(p, "prefix"));
+        this.prefixHead = undefined;
+      } else {
+        out.push(this.suggestion(m, "midword"));
+        this.midwordHead = undefined;
       }
     }
     return out;

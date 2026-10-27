@@ -128,9 +128,10 @@ the separator after the last word.
 
 `FREQ` holds a **rank score**: the word's [wordfreq](https://github.com/rspeer/wordfreq)
 Zipf frequency (the highest among its display forms), minus **1.0 per extra
-word** in a multi-word entry. wordfreq scores a phrase at roughly its rarest
-word's frequency (`of a` = 7.08, as common as `of`), so without the penalty
-phrases crowd out real words. A known word never drops below 0.01, so it still
+part** as wordfreq splits it (spaces and hyphens), and 1.0 more for an affix
+(`-something`, `anti-`). wordfreq scores a phrase or compound at roughly its
+rarest part's frequency (`of a` = 7.08 like `of`; `going-to` = 5.93 like
+`going`), so without the penalty they crowd out real words. A known word never drops below 0.01, so it still
 outranks words with no frequency data (0).
 
 **Rank order** = score descending, then word ID ascending (alphabetical). The
@@ -149,8 +150,10 @@ still found through the FM-index.
 
 A word has a `VIDS` entry only when its display forms differ from its
 normalized key (capitals, diacritics, variants such as `résumé` / `Resume`).
-Forms are listed plain-key first if the plain key is itself a headword. With no
-entry, the display form is the normalized key.
+Forms are listed most frequent first by wordfreq (so `Hawaii` comes before
+`Hawaiʻi` and `Hawai`i`); ties put the plain key first, then code-point order.
+The first form is the one to show. With no entry, the display form is the
+normalized key.
 
 ## Versioning
 
