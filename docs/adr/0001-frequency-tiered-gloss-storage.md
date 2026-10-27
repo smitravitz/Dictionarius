@@ -44,7 +44,8 @@ to look up *any* word, including rare ones (the main reason to open a dictionary
 Ship a **frequency-tiered** data model:
 
 - **Core bundle (~15 MB, ships with the app):**
-  - FM-index over **all ~1.39M headwords** (~9.5 MB) — every word searchable,
+  - FM-index over **all ~1.39M headwords** (~9.5 MB projected; measured
+    10.7 MB download / 26.8 MB in memory, see Update) — every word searchable,
     instant mid-word matching, fully offline.
   - Full definitions for the **top 50,000 headwords by word frequency**
     (~5.7 MB) — ~100% of text-frequency lookups.
@@ -93,9 +94,25 @@ words), so 50k buys headroom against that skew at a trivial +1.9 MB over 20k.
   🟡 full-scale absolute tail size is extrapolated from the Webster proxy and
   must be re-measured on the real Kaikki dump.
 
+### Update 2026-10-27 — headword index measured on real data
+
+Built from the English Wiktionary raw extract (11.1M lines, all languages,
+filtered to English) with `scripts/build_fm_index.py`, format v1:
+
+- 1,499,161 English headwords → **1,357,380 unique search keys** (case and
+  diacritic variants share a key; 294,617 keys keep display forms).
+- Index: **26.8 MB in memory, 10.7 MB gzip download.** BWT 15.4 MB, rank
+  tables 3.7 MB, frequencies 2.6 MB, display forms 5.1 MB.
+- The earlier ~9.5 MB figure was an *engineered* (compressed-BWT) projection;
+  format v1 keeps the BWT uncompressed so the app can search it without
+  decoding. The core is therefore ~16 MB to download and ~32 MB in memory
+  (with the projected 5.7 MB of core definitions), not ~15 MB. The decision
+  stands; only the number moved.
+
 ## Open questions (resolve before build)
 
 1. **Tail host:** GitHub Releases vs CDN vs IPFS (FLOSS-friendly, durable).
 2. **Block granularity:** frequency band size (requests vs compression tradeoff).
 3. **Cache store format:** appendable, same gloss-block format as core.
 4. **Re-measure on real Kaikki** to replace the Webster proxy tail figure.
+   *Headword index done (Update above); definitions still to measure.*
