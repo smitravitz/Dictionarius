@@ -21,7 +21,7 @@ non-breaking space. No Wiktionary content.
 
 ```bash
 python scripts/build_fm_index.py test/fixtures/headwords-sample.words.json \
-  --out test/fixtures/headwords-sample
+  --out test/fixtures/headwords-sample --hot 3000
 ```
 
 The build verifies itself against brute force before writing the golden file.

@@ -14,6 +14,7 @@ const HEADER_SIZE = 96;
 const SECTION_SIZE = 16;
 const SEP = 0x01;
 const FLAG_FREQ = 1;
+const FLAG_HOT = 2;
 
 const utf8 = new TextEncoder();
 const utf8Decode = new TextDecoder("utf-8", { fatal: true });
@@ -32,11 +33,16 @@ interface Sections {
   variantIds: Uint32Array; // ascending ids that have display forms
   variantOffsets: Uint32Array;
   variantBlob: Uint8Array; // per id: UTF-8 forms separated by 0x00
+  hotKeys: Uint8Array | null; // keys of the top-ranked words, each ending in SEP
 }
 
 export class HeadwordIndex {
+  private hotTextCache: string | null = null;
+
   private constructor(
     readonly size: number,
+    /** Words in the hot list (top-ranked words; 0 if the file has none). */
+    readonly hotCount: number,
     private readonly n: number,
     private readonly blockShift: number,
     private readonly superShift: number,
@@ -93,7 +99,9 @@ export class HeadwordIndex {
     denseSymbols.forEach((c, d) => (denseOf[c] = d));
     sparseSymbols.forEach((c, s) => (sparseOf[c] = s));
 
-    return new HeadwordIndex(numWords, n, u32(24), u32(28), {
+    const flags = u32(12);
+    const hasHot = (flags & FLAG_HOT) !== 0;
+    return new HeadwordIndex(numWords, hasHot ? u32(92) : 0, n, u32(24), u32(28), {
       C: view("C", Uint32Array),
       bwt: view("BWT", Uint8Array),
       denseOf,
@@ -103,11 +111,24 @@ export class HeadwordIndex {
       blockRank: view("BLOCK", Uint16Array),
       sparseOffsets: view("SOFF", Uint32Array),
       sparsePositions: view("SPOS", Uint32Array),
-      freq: u32(12) & FLAG_FREQ ? view("FREQ", Uint16Array) : null,
+      freq: flags & FLAG_FREQ ? view("FREQ", Uint16Array) : null,
       variantIds: view("VIDS", Uint32Array),
       variantOffsets: view("VOFF", Uint32Array),
       variantBlob: view("VBLOB", Uint8Array),
+      hotKeys: hasHot ? view("HOTK", Uint8Array) : null,
     });
+  }
+
+  /**
+   * Keys of the `hotCount` top-ranked words, in rank order, each followed by
+   * "\u0001". Searching this text finds mid-word matches already ranked.
+   * Decoded on first use; "" when the file has no hot list.
+   */
+  hotText(): string {
+    if (this.hotTextCache === null) {
+      this.hotTextCache = this.s.hotKeys ? utf8Decode.decode(this.s.hotKeys) : "";
+    }
+    return this.hotTextCache;
   }
 
   /** How a word is written: e.g. ["resume", "résumé"] or ["London"]. Never empty. */
