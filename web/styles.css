@@ -1,0 +1,392 @@
+/* Dictionarily — tokens
+   India paper, dictionary ink, pencil, hairline, and proofreader's magenta
+   for the one thing that matters: where the typed fragment sits in a word. */
+:root {
+  color-scheme: light dark;
+  --paper: #f3f5f8;
+  --ink: #13213a;
+  --pencil: #5e6a80;
+  --hairline: #d6dce5;
+  --proof: #b5179e;
+  --proof-wash: #fbeaf7;
+
+  --font-word: "Literata Variable", "Literata", Georgia, "Times New Roman", serif;
+  --font-ui: "Atkinson Hyperlegible Next", system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  --pad: 1.25rem;
+  --row: 52px; /* matches ROW_HEIGHT in results-list.ts */
+  --seam-x: 120px; /* set from main.ts: a share of the row width */
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0e1420;
+    --ink: #e6eaf2;
+    --pencil: #8e9ab0;
+    --hairline: #243049;
+    --proof: #f06bd9;
+    --proof-wash: #2a1630;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #0e1420;
+  --ink: #e6eaf2;
+  --pencil: #8e9ab0;
+  --hairline: #243049;
+  --proof: #f06bd9;
+  --proof-wash: #2a1630;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: 1rem;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+  -webkit-text-size-adjust: 100%;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* ---------------------------------------------------------------- layout */
+
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  max-width: 44rem;
+  margin: 0 auto;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom)
+    env(safe-area-inset-left);
+}
+
+.masthead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem var(--pad) 0;
+}
+
+.wordmark {
+  margin: 0;
+  font-family: var(--font-word);
+  font-size: 1.125rem;
+  font-style: italic;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+
+.status {
+  margin: 0;
+  color: var(--pencil);
+  font-size: 0.8125rem;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------------------------------------------------------------- search */
+
+.search {
+  padding: 1.5rem var(--pad) 0.5rem;
+}
+
+.search input {
+  width: 100%;
+  padding: 0.25rem 0 0.5rem;
+  border: 0;
+  border-bottom: 1.5px solid var(--hairline);
+  border-radius: 0;
+  background: transparent;
+  color: var(--ink);
+  caret-color: var(--proof);
+  font-family: var(--font-word);
+  font-size: 1.75rem;
+  font-variation-settings: "opsz" 36;
+  outline: none;
+  appearance: none;
+}
+
+.search input:focus-visible {
+  border-bottom-color: var(--proof);
+  box-shadow: 0 1px 0 var(--proof);
+}
+
+.search input::placeholder {
+  color: var(--pencil);
+}
+
+/* The browser's clear button, redrawn as a pencil-coloured cross. */
+.search input::-webkit-search-cancel-button {
+  width: 1.125rem;
+  height: 1.125rem;
+  margin-left: 0.75rem;
+  background: var(--pencil);
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 18'%3E%3Cpath d='M3 3l12 12M15 3L3 15' stroke='black' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E")
+    center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 18'%3E%3Cpath d='M3 3l12 12M15 3L3 15' stroke='black' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E")
+    center / contain no-repeat;
+}
+
+.search input::-webkit-search-cancel-button:hover {
+  background: var(--proof);
+}
+
+.summary {
+  min-height: 1.75rem;
+  margin: 0;
+  padding: 0 var(--pad) 0.5rem;
+  color: var(--pencil);
+  font-size: 0.8125rem;
+}
+
+/* ----------------------------------------------------------------- intro */
+
+.intro {
+  padding: 1.5rem var(--pad);
+}
+
+.intro p {
+  max-width: 24ch;
+  margin: 0 0 1.25rem;
+  font-family: var(--font-word);
+  font-size: 1.3125rem;
+  line-height: 1.4;
+  font-variation-settings: "opsz" 24;
+  text-wrap: balance;
+}
+
+.examples {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* The ellipsis shows where the piece sits in the words it finds. */
+.examples button {
+  min-height: 44px;
+  padding: 0.4rem 0.9rem;
+  border: 1px solid var(--hairline);
+  border-radius: 0.375rem;
+  background: transparent;
+  color: var(--proof);
+  font-family: var(--font-word);
+  font-size: 1.0625rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.examples button:hover {
+  background: var(--proof-wash);
+}
+
+button:focus-visible,
+a:focus-visible {
+  outline: 2px solid var(--proof);
+  outline-offset: 2px;
+}
+
+/* ------------------------------------------------------- results dropdown */
+
+.frame {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  border-top: 1px solid var(--hairline);
+}
+
+/* The signature: one hairline through every row, at the typed fragment. */
+.seam {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: calc(var(--pad) + var(--seam-x));
+  width: 1.5px;
+  background: var(--proof);
+  opacity: 0.45;
+  pointer-events: none;
+  transform-origin: top;
+  animation: seam-draw 0.28s ease-out;
+}
+
+@keyframes seam-draw {
+  from {
+    transform: scaleY(0);
+  }
+}
+
+.scroller {
+  position: absolute;
+  inset: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+  scrollbar-width: thin;
+}
+
+.scroller.dragging {
+  cursor: grabbing;
+}
+
+.list {
+  position: relative;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.list > li {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  display: grid;
+  grid-template-columns: var(--seam-x) auto minmax(0, 1fr);
+  align-items: center;
+  height: var(--row);
+  padding: 0 var(--pad);
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.word {
+  font-family: var(--font-word);
+  font-size: 1.3125rem;
+  font-variation-settings: "opsz" 24;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.word:hover {
+  background: color-mix(in srgb, var(--proof-wash) 55%, transparent);
+}
+
+.word[aria-selected="true"] {
+  background: var(--proof-wash);
+  box-shadow: inset 3px 0 0 var(--proof);
+}
+
+/* Text before the fragment hugs the seam; long beginnings fade out at the left. */
+.before {
+  display: flex;
+  justify-content: flex-end;
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 1.5rem);
+  mask-image: linear-gradient(to right, transparent, #000 1.5rem);
+}
+
+.before > span,
+.frag,
+.after {
+  white-space: pre;
+}
+
+.frag {
+  padding: 0;
+  background: none;
+  color: var(--proof);
+  font-weight: 650;
+}
+
+.after {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.foot {
+  grid-column: 2 / 4;
+  padding-left: 0.625rem;
+  color: var(--pencil);
+  font-size: 0.8125rem;
+}
+
+/* ----------------------------------------------------------------- entry */
+
+.entry {
+  flex: 1;
+  padding: 1.5rem var(--pad);
+}
+
+.entry-word {
+  margin: 0 0 0.25rem;
+  font-family: var(--font-word);
+  font-size: 2.5rem;
+  font-weight: 600;
+  line-height: 1.15;
+  letter-spacing: -0.015em;
+  font-variation-settings: "opsz" 72;
+  overflow-wrap: anywhere;
+}
+
+.entry-forms {
+  margin: 0 0 1.25rem;
+  color: var(--pencil);
+}
+
+.entry-note {
+  margin: 0 0 0.75rem;
+}
+
+.entry-link {
+  color: var(--proof);
+  font-weight: 700;
+}
+
+/* ---------------------------------------------------------------- credit */
+
+.credit {
+  margin-top: auto;
+  padding: 0.75rem var(--pad);
+  border-top: 1px solid var(--hairline);
+  color: var(--pencil);
+  font-size: 0.75rem;
+}
+
+.credit a {
+  color: inherit;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .seam {
+    animation: none;
+  }
+}
+
+@media (min-width: 48rem) {
+  .masthead {
+    padding-top: 2rem;
+  }
+  .search input {
+    font-size: 2.125rem;
+  }
+}
