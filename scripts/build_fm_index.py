@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build Dictionarily's headword index (an FM-index) from dictionary data.
+"""Build Dictionarius's headword index (an FM-index) from dictionary data.
 
 Reads headwords from a Kaikki/Wiktionary JSONL dump, a JSON file, or a plain
 word list; normalizes them exactly like the app's search box; and writes:

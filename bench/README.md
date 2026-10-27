@@ -1,6 +1,6 @@
 # Benchmarks
 
-Reproducible measurements behind Dictionarily's design decisions. Nothing in
+Reproducible measurements behind Dictionarius's design decisions. Nothing in
 this folder ships in the app.
 
 ## Run them

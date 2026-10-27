@@ -1,5 +1,5 @@
 {
-  "name": "dictionarily",
+  "name": "dictionarius",
   "version": "0.1.0",
   "private": true,
   "description": "Fully offline, open-source dictionary with instant mid-word search, powered by an FM-index. Web, PWA, iOS, Android, F-Droid.",
@@ -7,7 +7,7 @@
   "type": "module",
   "repository": {
     "type": "git",
-    "url": "https://github.com/smitravitz/dictionarily.git"
+    "url": "https://github.com/smitravitz/dictionarius.git"
   },
   "scripts": {
     "dev": "vite",

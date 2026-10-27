@@ -1,6 +1,6 @@
 # CONTEXT — domain glossary
 
-The shared vocabulary for Dictionarily. Code, tests, and ADRs use these terms
+The shared vocabulary for Dictionarius. Code, tests, and ADRs use these terms
 exactly, so names line up across the codebase. Add a term here the first time a
 decision or module makes it load-bearing.
 

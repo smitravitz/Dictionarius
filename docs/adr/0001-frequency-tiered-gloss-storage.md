@@ -7,7 +7,7 @@
 
 ## Context and problem statement
 
-Dictionarily ships a full English dictionary (~1,390,507 headwords, per the Kaikki
+Dictionarius ships a full English dictionary (~1,390,507 headwords, per the Kaikki
 extraction of English Wiktionary) that must run offline on the web, as a PWA,
 and on iOS / Android / F-Droid, on low-end hardware ("runs on a potato").
 

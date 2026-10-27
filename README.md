@@ -1,6 +1,6 @@
-# Dictionarily 📖
+# Dictionarius 📖
 
-[![CI](https://github.com/smitravitz/dictionarily/actions/workflows/ci.yml/badge.svg)](https://github.com/smitravitz/dictionarily/actions/workflows/ci.yml)
+[![CI](https://github.com/smitravitz/dictionarius/actions/workflows/ci.yml/badge.svg)](https://github.com/smitravitz/dictionarius/actions/workflows/ci.yml)
 
 Fully offline, open-source dictionary with **instant mid-word search** — find a word by any fragment, not just its prefix (`eren` → `serene`, `coherent`, `adherence`).
 
@@ -10,7 +10,7 @@ Powered by an **FM-index** (a compressed self-index where the search index *is* 
 
 ## Why it's different
 
-The open dictionary ecosystem (StarDict, Aard2, ZIM) does prefix/exact lookup over block-compressed data with a separate key index. Dictionarily instead makes **substring search *be* the storage** via an FM-index — measured **~2.3× smaller and faster than SQLite FTS5 trigram** on the same data, and projected smaller still with an engineered succinct index.
+The open dictionary ecosystem (StarDict, Aard2, ZIM) does prefix/exact lookup over block-compressed data with a separate key index. Dictionarius instead makes **substring search *be* the storage** via an FM-index — measured **~2.3× smaller and faster than SQLite FTS5 trigram** on the same data, and projected smaller still with an engineered succinct index.
 
 ## How it stays small 🥔
 
