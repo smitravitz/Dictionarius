@@ -40,6 +40,12 @@ jobs:
     name: Browser tests (Playwright, desktop + phone)
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    # Playwright's own image ships the browsers, so nothing is downloaded at
+    # test time (`playwright install` hung on the runner). Keep the tag in step
+    # with @playwright/test in package.json.
+    container:
+      image: mcr.microsoft.com/playwright:v1.63.0-noble
+      options: --user 1001
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -47,9 +53,6 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      # The tests run headless, so the small headless-only Chromium is enough.
-      - run: npx playwright install --with-deps --only-shell chromium
-        timeout-minutes: 5
       - run: npm run test:e2e
       - uses: actions/upload-artifact@v7
         if: failure()
