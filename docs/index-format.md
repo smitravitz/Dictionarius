@@ -41,7 +41,7 @@ normalized query string. Normalized headwords never contain bytes below 0x20.
 |---|---|---|---|
 | 0 | 8 bytes | `magic` | ASCII `DICTFMv1` |
 | 8 | u32 | `version` | `1` |
-| 12 | u32 | `flags` | bit 0 = `FREQ` section present |
+| 12 | u32 | `flags` | bit 0 = `FREQ` present, bit 1 = `HOTK` present |
 | 16 | u32 | `n` | length of `T` in bytes |
 | 20 | u32 | `numWords` | `k` |
 | 24 | u32 | `blockShift` | `8` (rank block = 256 positions) |
@@ -50,7 +50,10 @@ normalized query string. Normalized headwords never contain bytes below 0x20.
 | 36 | u32 | `numSparse` | `S`, symbols with position lists |
 | 40 | u32 | `numSections` | entries in the section table |
 | 44 | 48 bytes | `normId` | ASCII, NUL-padded |
-| 92 | 4 bytes | reserved | zero |
+| 92 | u32 | `numHot` | words in the hot list (0 when `HOTK` is absent) |
+
+Files written before the hot list existed have zero at offset 92 and flag bit 1
+clear, so they still load; search just skips the fast path.
 
 ## Section table (offset 96)
 
@@ -69,10 +72,11 @@ normalized query string. Normalized headwords never contain bytes below 0x20.
 | `SSYM` | u8 | `S` | the sparse symbols |
 | `SOFF` | u32 | `S + 1` | offsets into `SPOS` per sparse symbol |
 | `SPOS` | u32 | total | ascending BWT positions of each sparse symbol |
-| `FREQ` | u16 | `k` | word frequency, Zipf × 100 (0 = unknown); only if flag bit 0 |
+| `FREQ` | u16 | `k` | rank score × 100 (0 = unknown); only if flag bit 0. See *Ranking* |
 | `VIDS` | u32 | `V` | ascending word IDs that have display forms |
 | `VOFF` | u32 | `V + 1` | offsets into `VBLOB` |
 | `VBLOB` | u8 | total | per word: its display forms, UTF-8, separated by 0x00 |
+| `HOTK` | u8 | total | keys of the first `numHot` words in rank order, each followed by `SEP`; only if flag bit 1 |
 
 A byte value that never occurs in the BWT is in neither `DSYM` nor `SSYM`.
 Dense vs sparse is chosen per symbol to minimize size: a symbol is dense when
@@ -119,6 +123,27 @@ Why these work: the rows that start with `SEP` are sorted by the word that
 follows, and the shortest such suffix, `SEP TERM`, sorts first. So row
 `C[SEP] + 1 + i` is the separator in front of word `i`, and row `C[SEP] + 0` is
 the separator after the last word.
+
+## Ranking
+
+`FREQ` holds a **rank score**: the word's [wordfreq](https://github.com/rspeer/wordfreq)
+Zipf frequency (the highest among its display forms), minus **1.0 per extra
+word** in a multi-word entry. wordfreq scores a phrase at roughly its rarest
+word's frequency (`of a` = 7.08, as common as `of`), so without the penalty
+phrases crowd out real words. A known word never drops below 0.01, so it still
+outranks words with no frequency data (0).
+
+**Rank order** = score descending, then word ID ascending (alphabetical). The
+app can rebuild it in one pass with a counting sort over `FREQ`.
+
+## Hot list
+
+`HOTK` holds the keys of the first `numHot` words in rank order (default
+200,000), each terminated by `SEP`. Entry `i` is the word at rank position `i`,
+so its ID is the `i`-th ID in rank order and isn't stored. A plain string
+search over this text yields mid-word matches already ranked, which makes the
+first results for a fragment like `tion` instant. Words beyond the hot list are
+still found through the FM-index.
 
 ## Display forms
 

@@ -1,10 +1,11 @@
 {
  "file": {
-  "sha256": "16f5fc3b3c020f01da9259e97b5efd430f205a9f112a3f839a53f2ea2dfebe84",
+  "sha256": "a4c2ced2992680ef556f8bdd0f6d0700e489a756cf4fb6b19de9b42cce8f4bf8",
   "version": 1,
   "normId": "nfd-strip-diacritic-lower-trim/v1",
   "n": 166591,
-  "numWords": 17067
+  "numWords": 17067,
+  "numHot": 3000
  },
  "normalize": [
   [
@@ -60,87 +61,47 @@
    "ǆemal"
   ],
   [
-   "Aulnager",
-   "aulnager"
+   "Weighlock",
+   "weighlock"
   ],
   [
-   "Broadish",
-   "broadish"
+   "Telemechanic",
+   "telemechanic"
   ],
   [
-   "BRABBLEMENT",
-   "brabblement"
+   "Outrage",
+   "outrage"
   ],
   [
-   "INCAPABLENESS",
-   "incapableness"
+   "Ingrately",
+   "ingrately"
   ],
   [
-   "Curtal",
-   "curtal"
+   "Picturer",
+   "picturer"
   ],
   [
-   "Threadiness",
-   "threadiness"
+   "MESSIEURS",
+   "messieurs"
   ],
   [
-   "Whiteflaw",
-   "whiteflaw"
+   "Ooze leather",
+   "ooze leather"
   ],
   [
-   "Snowstorm",
-   "snowstorm"
+   "FINOS",
+   "finos"
   ],
   [
-   "GROANFUL",
-   "groanful"
+   "Apathetically",
+   "apathetically"
   ],
   [
-   "Expertness",
-   "expertness"
+   "AMPHOTERIC",
+   "amphoteric"
   ]
  ],
  "exact": [
-  {
-   "q": "prohibition",
-   "id": 11928
-  },
-  {
-   "q": "theosophize",
-   "id": 15233
-  },
-  {
-   "q": "oscillatory",
-   "id": 10435
-  },
-  {
-   "q": "recoction",
-   "id": 12452
-  },
-  {
-   "q": "skringe",
-   "id": 13880
-  },
-  {
-   "q": "exorable",
-   "id": 5389
-  },
-  {
-   "q": "flowery-kirtled",
-   "id": 5814
-  },
-  {
-   "q": "inharmoniously",
-   "id": 7737
-  },
-  {
-   "q": "inconvertibility",
-   "id": 7556
-  },
-  {
-   "q": "anticausodic",
-   "id": 781
-  },
   {
    "q": "flitch",
    "id": 5790
@@ -162,23 +123,63 @@
    "id": 16717
   },
   {
-   "q": "whereofqzx",
+   "q": "whereof",
+   "id": 16719
+  },
+  {
+   "q": "premerit",
+   "id": 11786
+  },
+  {
+   "q": "wofulness",
+   "id": 16834
+  },
+  {
+   "q": "foundershaft",
+   "id": 5958
+  },
+  {
+   "q": "subduction",
+   "id": 14602
+  },
+  {
+   "q": "serpens",
+   "id": 13587
+  },
+  {
+   "q": "prolification",
+   "id": 11935
+  },
+  {
+   "q": "polyzoon",
+   "id": 11592
+  },
+  {
+   "q": "primality",
+   "id": 11858
+  },
+  {
+   "q": "suberone",
+   "id": 14606
+  },
+  {
+   "q": "eurasianqzx",
    "id": null
   },
   {
-   "q": "premeritqzx",
+   "q": "sallowqzx",
    "id": null
   },
   {
-   "q": "wofulnessqzx",
+   "q": "tennoqzx",
    "id": null
   },
   {
-   "q": "foundershaftqzx",
+   "q": "jugeqzx",
    "id": null
   },
   {
-   "q": "subductionqzx",
+   "q": "unlawedqzx",
    "id": null
   }
  ],
@@ -189,9 +190,9 @@
    "count": 1555
   },
   {
-   "q": "r",
-   "start": 12295,
-   "count": 748
+   "q": "b",
+   "start": 1274,
+   "count": 855
   },
   {
    "q": "in",
@@ -199,82 +200,66 @@
    "count": 526
   },
   {
-   "q": "bi",
-   "start": 1601,
-   "count": 106
+   "q": "co",
+   "start": 2852,
+   "count": 598
   },
   {
-   "q": "hex",
-   "start": 6938,
-   "count": 10
+   "q": "woo",
+   "start": 16845,
+   "count": 16
   },
   {
-   "q": "ame",
-   "start": 560,
-   "count": 9
+   "q": "tus",
+   "start": 15793,
+   "count": 4
   },
   {
-   "q": "appr",
-   "start": 898,
-   "count": 13
+   "q": "chaf",
+   "start": 2513,
+   "count": 3
   },
   {
-   "q": "palin",
-   "start": 10689,
-   "count": 2
-  },
-  {
-   "q": "outmou",
-   "start": 10501,
+   "q": "salaa",
+   "start": 13088,
    "count": 1
   },
   {
-   "q": "outstret",
-   "start": 10517,
+   "q": "outlie",
+   "start": 10498,
+   "count": 1
+  },
+  {
+   "q": "eastern ",
+   "start": 4719,
    "count": 1
   }
  ],
  "substring": [
   {
-   "q": "c",
-   "occurrences": 6791,
-   "wordCount": 5769
+   "q": "r",
+   "occurrences": 10988,
+   "wordCount": 9014
   },
   {
-   "q": "sm",
-   "occurrences": 332,
-   "wordCount": 332
+   "q": "s",
+   "occurrences": 9083,
+   "wordCount": 6995
   },
   {
-   "q": "or",
-   "occurrences": 1439,
-   "wordCount": 1403
+   "q": "s",
+   "occurrences": 9083,
+   "wordCount": 6995
   },
   {
-   "q": "ut",
-   "occurrences": 374,
-   "wordCount": 371
+   "q": "d",
+   "occurrences": 4525,
+   "wordCount": 4083
   },
   {
-   "q": "ar",
-   "occurrences": 1409,
-   "wordCount": 1381
-  },
-  {
-   "q": "me",
-   "occurrences": 898,
-   "wordCount": 882
-  },
-  {
-   "q": "ctuar",
-   "occurrences": 4,
-   "wordCount": 4,
-   "wordIds": [
-    204,
-    9720,
-    13129,
-    16229
-   ]
+   "q": "ary",
+   "occurrences": 108,
+   "wordCount": 108
   },
   {
    "q": "ss",
@@ -297,11 +282,33 @@
    "wordCount": 725
   },
   {
-   "q": "moeomer",
+   "q": "oeomer",
    "occurrences": 1,
    "wordCount": 1,
    "wordIds": [
     7052
+   ]
+  },
+  {
+   "q": "rfect",
+   "occurrences": 6,
+   "wordCount": 6,
+   "wordIds": [
+    7411,
+    11034,
+    11035,
+    11036,
+    11834,
+    11837
+   ]
+  },
+  {
+   "q": "roble",
+   "occurrences": 2,
+   "wordCount": 2,
+   "wordIds": [
+    11888,
+    12905
    ]
   },
   {
@@ -321,12 +328,12 @@
    "word": "craft"
   },
   {
-   "id": 4960,
-   "word": "enchoric"
+   "id": 4709,
+   "word": "earning"
   },
   {
-   "id": 5341,
-   "word": "exchange editor"
+   "id": 4960,
+   "word": "enchoric"
   },
   {
    "id": 5684,
@@ -353,12 +360,12 @@
    "word": "rapidity"
   },
   {
-   "id": 12905,
-   "word": "roble"
+   "id": 14015,
+   "word": "sodic"
   },
   {
-   "id": 16616,
-   "word": "water plant"
+   "id": 14118,
+   "word": "sowter"
   },
   {
    "id": 16743,
@@ -370,24 +377,6 @@
   }
  ],
  "display": [
-  {
-   "id": 8993,
-   "forms": [
-    "Mammonism"
-   ]
-  },
-  {
-   "id": 3026,
-   "forms": [
-    "Compendium"
-   ]
-  },
-  {
-   "id": 8924,
-   "forms": [
-    "Magnet"
-   ]
-  },
   {
    "id": 2780,
    "forms": [
@@ -429,17 +418,27 @@
    "forms": [
     "Caesar"
    ]
+  },
+  {
+   "id": 11767,
+   "forms": [
+    "Prefect"
+   ]
+  },
+  {
+   "id": 2167,
+   "forms": [
+    "CAITIFF"
+   ]
+  },
+  {
+   "id": 9803,
+   "forms": [
+    "Myolemma"
+   ]
   }
  ],
  "freq": [
-  {
-   "id": 3275,
-   "zipf100": 0
-  },
-  {
-   "id": 15492,
-   "zipf100": 0
-  },
   {
    "id": 8925,
    "zipf100": 0
@@ -471,6 +470,88 @@
   {
    "id": 3407,
    "zipf100": 0
+  },
+  {
+   "id": 1003,
+   "zipf100": 482
+  },
+  {
+   "id": 6619,
+   "zipf100": 0
+  }
+ ],
+ "rank": [
+  {
+   "rank": 0,
+   "id": 7472
+  },
+  {
+   "rank": 1,
+   "id": 7271
+  },
+  {
+   "rank": 2,
+   "id": 8045
+  },
+  {
+   "rank": 1170,
+   "id": 5442
+  },
+  {
+   "rank": 1853,
+   "id": 11894
+  },
+  {
+   "rank": 2781,
+   "id": 14021
+  },
+  {
+   "rank": 2999,
+   "id": 12133
+  },
+  {
+   "rank": 3000,
+   "id": 12765
+  },
+  {
+   "rank": 3001,
+   "id": 12771
+  },
+  {
+   "rank": 5189,
+   "id": 8333
+  },
+  {
+   "rank": 5540,
+   "id": 3732
+  },
+  {
+   "rank": 6953,
+   "id": 16371
+  },
+  {
+   "rank": 8243,
+   "id": 123
+  },
+  {
+   "rank": 10097,
+   "id": 3871
+  },
+  {
+   "rank": 11831,
+   "id": 7189
+  },
+  {
+   "rank": 12895,
+   "id": 9189
+  },
+  {
+   "rank": 14112,
+   "id": 11366
+  },
+  {
+   "rank": 17066,
+   "id": 17066
   }
  ]
 }

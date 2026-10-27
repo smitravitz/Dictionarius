@@ -9,7 +9,8 @@ const FIXTURE = "test/fixtures/headwords-sample";
 // independently of the FM-index, so these tests check the loader against an
 // outside source of truth.
 interface Golden {
-  file: { numWords: number; normId: string };
+  file: { numWords: number; normId: string; numHot?: number }; // older builds: no numHot
+  rank?: { rank: number; id: number }[];
   exact: { q: string; id: number | null }[];
   prefix: { q: string; start: number | null; count: number }[];
   substring: { q: string; occurrences: number; wordCount: number; wordIds?: number[] }[];
@@ -91,6 +92,16 @@ function describeAgainstGolden(name: string, base: string) {
     it("reports word frequency on the Zipf scale", () => {
       for (const { id, zipf100 } of golden.freq) {
         expect(index.frequency(id), String(id)).toBeCloseTo(zipf100 / 100, 6);
+      }
+    });
+
+    it("exposes the hot list: the top-ranked words' keys, in rank order", () => {
+      const numHot = golden.file.numHot ?? 0; // files built before the hot list: none
+      expect(index.hotCount).toBe(numHot);
+      const entries = index.hotText().split("\u0001"); // every entry ends with SEP
+      expect(entries).toHaveLength(numHot + 1);
+      for (const { rank, id } of golden.rank ?? []) {
+        if (rank < numHot) expect(entries[rank], `rank ${rank}`).toBe(index.key(id));
       }
     });
 

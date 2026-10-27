@@ -58,9 +58,16 @@ MAGIC = b"DICTFMv1"
 FORMAT_VERSION = 1
 NORM_ID = "nfd-strip-diacritic-lower-trim/v1"
 FLAG_FREQ = 1
+FLAG_HOT = 2
 TERM, SEP = 0x00, 0x01
 BLOCK_SHIFT, SUPER_SHIFT = 8, 16
-HEADER = struct.Struct("<8s9I48s4x")  # 96 bytes
+HEADER = struct.Struct("<8s9I48sI")  # 96 bytes; the last u32 is numHot
+DEFAULT_HOT = 200_000
+
+# wordfreq scores a phrase at about its rarest word's frequency ("of a" = 7.08,
+# like "of"), which floods results with phrases. Subtract this much Zipf per
+# extra word so phrases rank below comparable single words.
+PHRASE_PENALTY = 1.0
 SECTION = struct.Struct("<8sII")  # name, offset, byteLength
 
 
@@ -192,7 +199,8 @@ def display_forms(key, forms):
 
 
 def word_frequencies(keys, forms_by_key):
-    """Zipf frequency x 100 per word (max over its display forms); 0 = unknown."""
+    """Rank score x 100 per word: Zipf frequency (max over its display forms),
+    minus PHRASE_PENALTY per extra word. 0 = unknown; known words stay >= 1."""
     from wordfreq import zipf_frequency
 
     freq = np.zeros(len(keys), dtype="<u2")
@@ -202,8 +210,17 @@ def word_frequencies(keys, forms_by_key):
             log(f"  frequencies: {i:,}/{len(keys):,} ({time.time() - started:.0f}s)")
         candidates = forms_by_key[key] | {key}
         best = max(zipf_frequency(f, "en") for f in candidates)
+        if best > 0:
+            best = max(0.01, best - PHRASE_PENALTY * (len(key.split()) - 1))
         freq[i] = round(best * 100)
     return freq
+
+
+def rank_order(freq, k):
+    """Word ids by rank: score descending, then id (alphabetical) ascending."""
+    if freq is None:
+        return np.arange(k, dtype=np.int64)
+    return np.lexsort((np.arange(k), -freq.astype(np.int64)))
 
 
 # -------------------------------------------------------------- FM-index ----
@@ -262,7 +279,7 @@ def align8(x):
     return (x + 7) & ~7
 
 
-def write_index(path, n, k, flags, dense, sparse, sections):
+def write_index(path, n, k, flags, dense, sparse, sections, num_hot):
     table_end = HEADER.size + len(sections) * SECTION.size
     offset = align8(table_end)
     entries = []
@@ -277,7 +294,7 @@ def write_index(path, n, k, flags, dense, sparse, sections):
         f.write(
             HEADER.pack(
                 MAGIC, FORMAT_VERSION, flags, n, k, BLOCK_SHIFT, SUPER_SHIFT,
-                len(dense), len(sparse), len(sections), NORM_ID.encode("ascii"),
+                len(dense), len(sparse), len(sections), NORM_ID.encode("ascii"), num_hot,
             )
         )
         for name, off, length in entries:
@@ -298,7 +315,7 @@ class IndexReader:
 
     def __init__(self, buf):
         (magic, version, self.flags, self.n, self.k, self.bshift, self.sshift,
-         D, S, nsec, norm_id) = HEADER.unpack_from(buf, 0)
+         D, S, nsec, norm_id, self.num_hot) = HEADER.unpack_from(buf, 0)
         if magic != MAGIC or version != FORMAT_VERSION:
             raise ValueError("bad magic/version")
         if norm_id.rstrip(b"\x00").decode("ascii") != NORM_ID:
@@ -330,6 +347,16 @@ class IndexReader:
         self.vids = view("VIDS", "<u4")
         self.voff = view("VOFF", "<u4")
         self.vblob = view("VBLOB", np.uint8)
+        self.hot = view("HOTK", np.uint8) if self.flags & FLAG_HOT else None
+
+    def hot_keys(self):
+        """Keys of the top-ranked words, in rank order."""
+        if self.hot is None:
+            return []
+        parts = self.hot.tobytes().split(bytes([SEP]))
+        if parts[-1] != b"" or len(parts) - 1 != self.num_hot:
+            raise ValueError("HOTK does not hold numHot SEP-terminated keys")
+        return parts[:-1]
 
     def occ(self, c, i):
         d = self.dense_index.get(c)
@@ -421,8 +448,12 @@ class Checker:
         self.passed += 1
 
 
-def verify(reader, text, encoded, keys, forms_by_key, freq, rng):
+def verify(reader, text, encoded, keys, forms_by_key, freq, rng, py_order):
     check = Checker()
+    # Hot list = keys of the first numHot words in rank order. py_order is an
+    # independent sort (Python's sorted, not numpy's lexsort used to build it).
+    check.equal("hot keys in rank order", reader.hot_keys(),
+                [encoded[i] for i in py_order[: reader.num_hot]])
     k = len(encoded)
     # Non-ASCII words are rare in English data but exercise the multi-byte and
     # sparse-symbol paths, so always check a batch of them on top of the sample.
@@ -476,14 +507,21 @@ NORMALIZATION_SAMPLES = [
 ]
 
 
-def golden(reader, text, encoded, keys, forms_by_key, freq, rng, bin_sha256):
+def golden(reader, text, encoded, keys, forms_by_key, freq, rng, bin_sha256, py_order):
     k = len(encoded)
     out = {
         "file": {"sha256": bin_sha256, "version": FORMAT_VERSION, "normId": NORM_ID,
-                 "n": reader.n, "numWords": k},
+                 "n": reader.n, "numWords": k, "numHot": reader.num_hot},
         "normalize": [[s, normalize(s)] for s in NORMALIZATION_SAMPLES],
         "exact": [], "prefix": [], "substring": [], "extract": [], "display": [], "freq": [],
+        "rank": [],
     }
+    # Word ids at sample positions of the rank order (score desc, id asc),
+    # including both sides of the hot-list boundary.
+    ranks = {0, 1, 2, k - 1} | set(rng.sample(range(k), min(12, k)))
+    if 0 < reader.num_hot < k:
+        ranks |= {reader.num_hot - 1, reader.num_hot}
+    out["rank"] = [{"rank": r, "id": int(py_order[r])} for r in sorted(ranks)]
     variant_ids = [i for i in range(k) if display_forms(keys[i], forms_by_key[keys[i]])]
     out["normalize"] += [[f, keys[i]] for i in rng.sample(variant_ids, min(10, len(variant_ids)))
                          for f in [rng.choice(sorted(forms_by_key[keys[i]]))]]
@@ -532,6 +570,8 @@ def main():
     ap.add_argument("--lang", default="en", help="Kaikki lang_code to keep (default: en)")
     ap.add_argument("--limit", type=int, help="use only the first N headwords (quick tests)")
     ap.add_argument("--no-freq", action="store_true", help="skip word frequencies")
+    ap.add_argument("--hot", type=int, default=DEFAULT_HOT,
+                    help=f"top-ranked words in the fast mid-word list (default {DEFAULT_HOT:,}; 0 = none)")
     ap.add_argument("--seed", type=int, default=1, help="seed for verification samples")
     args = ap.parse_args()
 
@@ -592,11 +632,20 @@ def main():
         ("VBLOB", np.frombuffer(b"".join(blobs), dtype=np.uint8)),
     ]
 
+    # Hot list: keys of the top-ranked words, in rank order, each ending in SEP.
+    # The app scans it with a plain string search, so mid-word hits come out
+    # already ranked; the ids are recomputed in the app from FREQ.
+    num_hot = min(max(args.hot, 0), k)
+    if num_hot:
+        hot_ids = rank_order(freq, k)[:num_hot]
+        hot_blob = b"".join(encoded[i] + bytes([SEP]) for i in hot_ids)
+        sections.append(("HOTK", np.frombuffer(hot_blob, dtype=np.uint8)))
+
+    flags = (FLAG_FREQ if freq is not None else 0) | (FLAG_HOT if num_hot else 0)
     out_dir = os.path.dirname(os.path.abspath(args.out))
     os.makedirs(out_dir, exist_ok=True)
     bin_path = args.out + ".bin"
-    entries = write_index(bin_path, n, k, FLAG_FREQ if freq is not None else 0,
-                          dense, sparse, sections)
+    entries = write_index(bin_path, n, k, flags, dense, sparse, sections, num_hot)
     with open(bin_path, "rb") as f:
         buf = f.read()
     sha = hashlib.sha256(buf).hexdigest()
@@ -604,11 +653,14 @@ def main():
     log("verifying against brute force")
     reader = IndexReader(buf)
     rng = random.Random(args.seed)
-    passed = verify(reader, text, encoded, keys, forms_by_key, freq, rng)
+    score = (lambda i: -int(freq[i])) if freq is not None else (lambda i: 0)
+    py_order = sorted(range(k), key=lambda i: (score(i), i))
+    passed = verify(reader, text, encoded, keys, forms_by_key, freq, rng, py_order)
     log(f"  OK: {passed:,} checks passed")
 
     golden_path = args.out + ".golden.json"
-    data = golden(reader, text, encoded, keys, forms_by_key, freq, random.Random(args.seed + 1), sha)
+    data = golden(reader, text, encoded, keys, forms_by_key, freq,
+                  random.Random(args.seed + 1), sha, py_order)
     with open(golden_path, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=1)
 
