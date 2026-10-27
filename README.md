@@ -27,9 +27,14 @@ See [`docs/adr/0001-frequency-tiered-gloss-storage.md`](docs/adr/0001-frequency-
 - ✅ Size & performance benchmarks ([`bench/`](bench/))
 - ✅ Ranked, lazily paged results: exact match first, then common words first, with words that start with your text given a head start; first page in ~1 ms at full scale (p99 4 ms)
 - ✅ Type-ahead dropdown (web): 50 results, then more load as you scroll; touch and mouse drag scrolling; every row aligned on the text you typed. In Chromium on the full index: ready in ~0.8 s, keystroke to results ~35 ms (~60–100 ms with the CPU slowed 4× to mimic a mid-range phone)
+- ✅ Android app (Capacitor): the same search, offline, with the full word list inside; signed APKs published on GitHub releases
 - ⏳ Definitions store (core + on-demand tail)
 - ⏳ Testing on real phones (the numbers above are an emulated phone)
-- ⏳ App UI (Capacitor) for web / PWA / iOS / Android / F-Droid
+- ⏳ PWA, iOS and F-Droid builds
+
+## Install (Android)
+
+Add `https://github.com/smitravitz/Dictionarius` to [Obtainium](https://obtainium.imranr.dev) to install it and get updates, or download the APK from the latest [release](https://github.com/smitravitz/Dictionarius/releases/latest). Definitions aren't in the app yet; it finds words and links each one to Wiktionary.
 
 ## Licensing
 
@@ -48,6 +53,15 @@ npm run test:e2e    # browser tests (desktop + phone) on a small sample index
 python scripts/build_fm_index.py path/to/raw-wiktextract-data.jsonl   # writes dist/headwords.bin
 npm run dev
 ```
+
+Android (needs Android Studio, or the Android SDK and JDK 21):
+
+```bash
+npm run build && npx cap sync android   # copy the web app and dist/headwords.bin into android/
+npx cap open android                    # or: cd android && ./gradlew assembleDebug
+```
+
+**Releasing:** once, run `bash scripts/setup-release.sh path/to/headwords.bin` on your own computer. It creates the signing key, stores it in GitHub's Actions secrets and uploads the word index. After that, pushing a tag such as `v0.2.0` builds a signed APK and publishes it as a release ([`.github/workflows/release.yml`](.github/workflows/release.yml)).
 
 Benchmarks (Python) live in [`bench/`](bench/) — see its README to reproduce every number above. Domain vocabulary is in [`CONTEXT.md`](CONTEXT.md); architecture decisions in [`docs/adr/`](docs/adr/).
 

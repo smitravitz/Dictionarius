@@ -61,6 +61,31 @@ jobs:
           path: playwright-report/
           retention-days: 7
 
+  android:
+    name: Android app builds
+    runs-on: ubuntu-24.04 # comes with the Android SDK
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: gradle
+      - run: npm ci
+      - name: Build the web app (with the small sample word list)
+        run: npm run build
+        env:
+          DICTIONARIUS_PUBLIC: ../test/fixtures
+      - run: npx cap sync android
+      - name: Build a debug APK
+        working-directory: android
+        run: ./gradlew assembleDebug --no-daemon
+
   bench:
     name: Benchmark (FM-index vs SQLite FTS5)
     runs-on: ubuntu-latest

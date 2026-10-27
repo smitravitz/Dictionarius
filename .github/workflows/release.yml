@@ -1,0 +1,115 @@
+name: Release
+
+# Pushing a tag like v1.2.3 builds a signed Android APK and publishes it as a
+# GitHub release (which Obtainium picks up). One-time setup: scripts/setup-release.sh.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write # to create the release
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  android:
+    name: Signed Android APK
+    runs-on: ubuntu-24.04 # comes with the Android SDK
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: gradle
+      - run: npm ci
+
+      - name: Work out the version from the tag
+        id: version
+        run: |
+          # v1.2.3 -> versionName 1.2.3, versionCode 10203 (must grow with every release)
+          if [[ ! "$GITHUB_REF_NAME" =~ ^v([0-9]+)\.([0-9]{1,2})\.([0-9]{1,2})$ ]]; then
+            echo "::error::Tag $GITHUB_REF_NAME isn't in the form v1.2.3"
+            exit 1
+          fi
+          major=${BASH_REMATCH[1]}
+          minor=${BASH_REMATCH[2]}
+          patch=${BASH_REMATCH[3]}
+          echo "name=$major.$minor.$patch" >> "$GITHUB_OUTPUT"
+          echo "code=$((major * 10000 + minor * 100 + patch))" >> "$GITHUB_OUTPUT"
+
+      - name: Fetch the word index
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # data/headwords.sha256 names the index; scripts/setup-release.sh uploaded it.
+          sha=$(cut -d' ' -f1 data/headwords.sha256)
+          mkdir -p release-data
+          gh release download "index-${sha:0:8}" --repo "$GITHUB_REPOSITORY" \
+            --pattern headwords.bin --dir release-data
+          cd release-data
+          sha256sum --check ../data/headwords.sha256
+
+      - name: Build the web app
+        run: npm run build
+        env:
+          DICTIONARIUS_PUBLIC: ../release-data
+
+      - run: npx cap sync android
+
+      - name: Build and sign the APK
+        working-directory: android
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          if [ -z "$ANDROID_KEYSTORE_BASE64" ]; then
+            echo "::error::The signing key isn't set up. Run scripts/setup-release.sh once."
+            exit 1
+          fi
+          export ANDROID_KEYSTORE_PATH="$RUNNER_TEMP/release.p12"
+          echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$ANDROID_KEYSTORE_PATH"
+          ./gradlew assembleRelease --no-daemon \
+            -PversionCode=${{ steps.version.outputs.code }} \
+            -PversionName=${{ steps.version.outputs.name }}
+          rm "$ANDROID_KEYSTORE_PATH"
+
+      - name: Check the signature
+        id: apk
+        run: |
+          built=android/app/build/outputs/apk/release/app-release.apk
+          apk="dictionarius-$GITHUB_REF_NAME.apk"
+          cp "$built" "$apk"
+          build_tools=$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -1)
+          "$build_tools/apksigner" verify --print-certs "$apk" | tee signature.txt
+          {
+            echo "file=$apk"
+            echo "size=$(du -h "$apk" | cut -f1)"
+            echo "sha256=$(sha256sum "$apk" | cut -d' ' -f1)"
+            echo "cert=$(grep -m1 'certificate SHA-256 digest' signature.txt | awk '{print $NF}')"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cat > notes.md <<EOF
+          Android app, ${{ steps.apk.outputs.size }}. Install it directly, or add this repository to [Obtainium](https://obtainium.imranr.dev) to get updates.
+
+          - APK SHA-256: \`${{ steps.apk.outputs.sha256 }}\`
+          - Signing certificate SHA-256: \`${{ steps.apk.outputs.cert }}\`
+
+          Words from [Wiktionary](https://en.wiktionary.org), [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/).
+          EOF
+          gh release create "$GITHUB_REF_NAME" "${{ steps.apk.outputs.file }}" \
+            --repo "$GITHUB_REPOSITORY" --verify-tag \
+            --title "Dictionarius $GITHUB_REF_NAME" --notes-file notes.md
