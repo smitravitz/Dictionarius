@@ -108,6 +108,9 @@ filtered to English) with `scripts/build_fm_index.py`, format v1:
   decoding. The core is therefore ~16 MB to download and ~32 MB in memory
   (with the projected 5.7 MB of core definitions), not ~15 MB. The decision
   stands; only the number moved.
+- Later the same day a 2.2 MB **hot list** (keys of the top 200,000 words in
+  rank order) was added so mid-word results are instant (`tion`: 223 ms →
+  3 ms for the first page). Index now **29.0 MB in memory, 12.4 MB gzip**.
 
 ## Open questions (resolve before build)
 

@@ -14,7 +14,7 @@ The open dictionary ecosystem (StarDict, Aard2, ZIM) does prefix/exact lookup ov
 
 ## How it stays small 🥔
 
-- **Core (~16 MB download):** every headword searchable + full definitions for the top ~50k words by frequency (~100% of real lookups), fully offline on first run. The headword index for all 1,357,380 English search keys is measured at **10.7 MB download / 26.8 MB in memory**; the core definitions (~5.7 MB) are still a projection.
+- **Core (~16 MB download):** every headword searchable + full definitions for the top ~50k words by frequency (~100% of real lookups), fully offline on first run. The headword index for all 1,357,380 English search keys is measured at **12.4 MB download / 29.0 MB in memory** (including a 2.2 MB hot list that makes mid-word search instant); the core definitions (~5.7 MB) are still a projection.
 - **Tail (on-demand):** rarer definitions fetch when tapped and cache locally, or pre-download the full set for total offline use.
 
 See [`docs/adr/0001-frequency-tiered-gloss-storage.md`](docs/adr/0001-frequency-tiered-gloss-storage.md) for the reasoning and measured numbers.
@@ -25,7 +25,7 @@ See [`docs/adr/0001-frequency-tiered-gloss-storage.md`](docs/adr/0001-frequency-
 - ✅ FM-index substring source + SQLite source, interchangeable behind one contract
 - ✅ Headword index built from real Wiktionary data ([`scripts/build_fm_index.py`](scripts/build_fm_index.py), [format](docs/index-format.md)) and a zero-copy TypeScript loader — at full scale it opens in ~2 ms and answers exact, prefix and mid-word lookups in microseconds (Node/V8)
 - ✅ Size & performance benchmarks ([`bench/`](bench/))
-- ⏳ Ranked, capped search results for the type-ahead dropdown
+- ✅ Ranked, lazily paged results for the type-ahead dropdown: exact → prefix → mid-word, common words first; first page in ~1 ms at full scale (p99 4 ms)
 - ⏳ Definitions store (core + on-demand tail)
 - ⏳ In-browser validation at full scale
 - ⏳ App UI (Capacitor) for web / PWA / iOS / Android / F-Droid
