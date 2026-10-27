@@ -1,0 +1,6 @@
+# Data pipeline dependencies (build time only; nothing here ships in the app).
+numpy>=1.24
+pydivsufsort>=0.0.20   # suffix array construction (BWT)
+regex>=2023.0          # \p{Diacritic}, matching the app's normalize()
+wordfreq>=3.0          # word frequencies for ranking (optional: --no-freq)
+orjson>=3.9            # optional: much faster parsing of the Kaikki dump
