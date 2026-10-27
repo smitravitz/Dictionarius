@@ -64,9 +64,11 @@ BLOCK_SHIFT, SUPER_SHIFT = 8, 16
 HEADER = struct.Struct("<8s9I48sI")  # 96 bytes; the last u32 is numHot
 DEFAULT_HOT = 200_000
 
-# wordfreq scores a phrase at about its rarest word's frequency ("of a" = 7.08,
-# like "of"), which floods results with phrases. Subtract this much Zipf per
-# extra word so phrases rank below comparable single words.
+# wordfreq scores a phrase or compound at about its rarest part's frequency
+# ("of a" = 7.08 like "of"; "going-to" = 5.93 like "going"), and an affix at
+# its stem's ("-something" = 5.81). Subtract this much Zipf per extra part (as
+# wordfreq splits it: spaces and hyphens) and once more for an affix, so these
+# rank below comparable single words.
 PHRASE_PENALTY = 1.0
 SECTION = struct.Struct("<8sII")  # name, offset, byteLength
 
@@ -191,17 +193,23 @@ def build_word_table(raw_words):
     return encoded, keys, forms_by_key, skipped
 
 
+# Zipf frequency per display form, filled in by word_frequencies().
+FORM_ZIPF = {}
+
+
 def display_forms(key, forms):
-    """Display forms for a key, or None when the key itself is the only form."""
+    """Display forms for a key, most frequent first (ties: the plain key, then
+    code-point order), or None when the key itself is the only form."""
     if forms == {key}:
         return None
-    return sorted(forms, key=lambda f: (f != key, f))
+    return sorted(forms, key=lambda f: (-FORM_ZIPF.get(f, 0.0), f != key, f))
 
 
 def word_frequencies(keys, forms_by_key):
     """Rank score x 100 per word: Zipf frequency (max over its display forms),
-    minus PHRASE_PENALTY per extra word. 0 = unknown; known words stay >= 1."""
-    from wordfreq import zipf_frequency
+    minus PHRASE_PENALTY per extra part and for affixes. 0 = unknown; known
+    words stay >= 1."""
+    from wordfreq import tokenize, zipf_frequency
 
     freq = np.zeros(len(keys), dtype="<u2")
     started = time.time()
@@ -209,9 +217,14 @@ def word_frequencies(keys, forms_by_key):
         if i and i % 200_000 == 0:
             log(f"  frequencies: {i:,}/{len(keys):,} ({time.time() - started:.0f}s)")
         candidates = forms_by_key[key] | {key}
-        best = max(zipf_frequency(f, "en") for f in candidates)
+        for f in candidates:
+            FORM_ZIPF[f] = zipf_frequency(f, "en")
+        best = max(FORM_ZIPF[f] for f in candidates)
         if best > 0:
-            best = max(0.01, best - PHRASE_PENALTY * (len(key.split()) - 1))
+            extra = max(0, len(tokenize(key, "en")) - 1)
+            if key.startswith("-") or key.endswith("-"):
+                extra += 1  # an affix such as "-something" or "anti-"
+            best = max(0.01, best - PHRASE_PENALTY * extra)
         freq[i] = round(best * 100)
     return freq
 

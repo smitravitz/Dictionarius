@@ -6,31 +6,30 @@ import { normalize } from "../src/normalize";
 
 const index = HeadwordIndex.fromBytes(new Uint8Array(readFileSync("test/fixtures/headwords-sample.bin")));
 
-// Independent oracle: scan every word, bucket it, sort each bucket by
-// frequency (desc) then id (asc = alphabetical). No FM-index, no heap.
+// Independent oracle: scan every word and sort. The exact match comes first;
+// every other match is ranked by score (Zipf x 100), with a head start of
+// `bonus` for words that start with the query; ties: prefix first, then id
+// (alphabetical). No FM-index, no heap, no streams.
 let keys: string[] = [];
 beforeAll(() => {
   keys = Array.from({ length: index.size }, (_, id) => index.key(id));
 });
 
 type Tier = "exact" | "prefix" | "midword";
-function oracle(query: string): { id: number; tier: Tier }[] {
+const BONUS = 1.5;
+function oracle(query: string, bonus = BONUS): { id: number; tier: Tier }[] {
   const q = normalize(query);
   if (!q) return [];
-  const byRank = (a: number, b: number) => index.frequency(b) - index.frequency(a) || a - b;
-  const exact: number[] = [];
-  const prefix: number[] = [];
-  const midword: number[] = [];
+  const exact: { id: number; tier: Tier }[] = [];
+  const rest: { id: number; tier: Tier; score: number }[] = [];
   keys.forEach((key, id) => {
-    if (key === q) exact.push(id);
-    else if (key.startsWith(q)) prefix.push(id);
-    else if (key.includes(q)) midword.push(id);
+    const score = Math.round(index.frequency(id) * 100);
+    if (key === q) exact.push({ id, tier: "exact" });
+    else if (key.startsWith(q)) rest.push({ id, tier: "prefix", score: score + Math.round(bonus * 100) });
+    else if (key.includes(q)) rest.push({ id, tier: "midword", score });
   });
-  return [
-    ...exact.map((id) => ({ id, tier: "exact" as Tier })),
-    ...prefix.sort(byRank).map((id) => ({ id, tier: "prefix" as Tier })),
-    ...midword.sort(byRank).map((id) => ({ id, tier: "midword" as Tier })),
-  ];
+  rest.sort((a, b) => b.score - a.score || (a.tier === b.tier ? 0 : a.tier === "prefix" ? -1 : 1) || a.id - b.id);
+  return [...exact, ...rest.map(({ id, tier }) => ({ id, tier }))];
 }
 
 /** Page through a cursor until it is done. */
@@ -49,10 +48,26 @@ const QUERIES = ["e", "re", "ing", "ati", "ste", "resume", "sum", "set", "ice cr
 describe("Completer", () => {
   const completer = new Completer(index);
 
-  it("ranks exact match, then prefix, then mid-word — each by frequency then alphabet", () => {
+  it("ranks the exact match first, then all matches by frequency, giving prefix matches a head start", () => {
     for (const q of QUERIES) {
       expect(drain(completer.complete(q)), q).toEqual(oracle(q));
     }
+  });
+
+  it("lets a common mid-word match outrank a rare prefix match", () => {
+    // With a huge head start every prefix match comes first (the old rule);
+    // with none, prefix and mid-word compete on frequency alone.
+    for (const bonus of [0, 99]) {
+      const c = new Completer(index, { prefixBonus: bonus });
+      for (const q of ["ing", "ate", "re"]) {
+        expect(drain(c.complete(q)), `bonus ${bonus} ${q}`).toEqual(oracle(q, bonus));
+      }
+    }
+    const tiers = (bonus: number) => drain(new Completer(index, { prefixBonus: bonus }).complete("ate")).map((r) => r.tier);
+    const competing = tiers(0);
+    expect(competing.indexOf("midword")).toBeLessThan(competing.indexOf("prefix")); // a mid-word beats a prefix
+    const stacked = tiers(99);
+    expect(stacked.lastIndexOf("prefix")).toBeLessThan(stacked.indexOf("midword")); // every prefix first
   });
 
   it("gives the same order whether mid-words are located in full or scanned by frequency", () => {

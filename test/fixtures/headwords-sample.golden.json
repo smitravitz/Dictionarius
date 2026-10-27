@@ -1,6 +1,6 @@
 {
  "file": {
-  "sha256": "a4c2ced2992680ef556f8bdd0f6d0700e489a756cf4fb6b19de9b42cce8f4bf8",
+  "sha256": "77911e3eac02e1cc6a6d679df05fb699e3bb23442d7cae780bbc0f1d5fa08753",
   "version": 1,
   "normId": "nfd-strip-diacritic-lower-trim/v1",
   "n": 166591,
@@ -495,39 +495,39 @@
   },
   {
    "rank": 1170,
-   "id": 5442
+   "id": 4634
   },
   {
    "rank": 1853,
-   "id": 11894
+   "id": 3392
   },
   {
    "rank": 2781,
-   "id": 14021
+   "id": 14016
   },
   {
    "rank": 2999,
-   "id": 12133
+   "id": 13672
   },
   {
    "rank": 3000,
-   "id": 12765
+   "id": 14134
   },
   {
    "rank": 3001,
-   "id": 12771
+   "id": 14366
   },
   {
    "rank": 5189,
-   "id": 8333
+   "id": 3751
   },
   {
    "rank": 5540,
-   "id": 3732
+   "id": 9592
   },
   {
    "rank": 6953,
-   "id": 16371
+   "id": 2201
   },
   {
    "rank": 8243,
