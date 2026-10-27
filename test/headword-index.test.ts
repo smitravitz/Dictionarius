@@ -113,8 +113,8 @@ function describeAgainstGolden(name: string, base: string) {
 
 describeAgainstGolden("public-domain fixture", FIXTURE);
 // Full-scale check against a real build, when one is available locally:
-//   DICTIONARILY_INDEX=dist/headwords npx vitest run test/headword-index.test.ts
-describeAgainstGolden("local build ($DICTIONARILY_INDEX or dist/headwords)", process.env.DICTIONARILY_INDEX ?? "dist/headwords");
+//   DICTIONARIUS_INDEX=dist/headwords npx vitest run test/headword-index.test.ts
+describeAgainstGolden("local build ($DICTIONARIUS_INDEX or dist/headwords)", process.env.DICTIONARIUS_INDEX ?? "dist/headwords");
 
 describe("HeadwordIndex rejects files it can't trust", () => {
   const { bytes } = load(FIXTURE);

@@ -4,7 +4,7 @@ import tempfile
 # Datasets live in bench/data/ (git-ignored; see fetch_data.sh) or $DICT_BENCH_DATA.
 DATA = os.environ.get("DICT_BENCH_DATA",
                       os.path.join(os.path.dirname(os.path.abspath(__file__)), "data"))
-OUT = tempfile.mkdtemp(prefix="dictionarily-bench-")
+OUT = tempfile.mkdtemp(prefix="dictionarius-bench-")
 words=[w.strip().decode() for w in open(os.path.join(DATA, 'words_alpha.txt'),'rb') if w.strip()]
 def human(b):
     for u in ['B','KB','MB','GB']:

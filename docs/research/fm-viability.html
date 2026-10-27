@@ -16,7 +16,7 @@
   <!-- HEADER / VERDICT -->
   <header class="space-y-4">
     <p class="text-xs uppercase tracking-[0.2em] text-slate-500">Feasibility teardown · measured on real data</p>
-    <h1 class="text-4xl font-serif">FM-index for Dictionarily — viable?</h1>
+    <h1 class="text-4xl font-serif">FM-index for Dictionarius — viable?</h1>
     <div class="rounded-xl border-l-4 border-emerald-500 bg-emerald-50 px-6 py-5">
       <p class="text-lg font-semibold text-emerald-900">✅ Viable — and strongly differentiated.</p>
       <p class="text-sm text-slate-700 mt-1">Benchmarked on <strong>370,105 real English words</strong>. Engineered FM-index is <strong>~8× smaller than SQLite FTS5 trigram</strong> for the same substring search, and <strong>faster</strong>. No findable open dictionary app uses this — the algorithm itself is mature (DNA aligners, search engines).</p>
@@ -114,7 +114,7 @@
           <tr><td class="px-4 py-3 font-medium">Aard2 / slob</td><td class="px-4 py-3">LZMA2 bins</td><td class="px-4 py-3">sorted key index (UCA)</td><td class="px-4 py-3 text-slate-500">exact / prefix only</td><td class="px-4 py-3 text-red-500">no</td></tr>
           <tr><td class="px-4 py-3 font-medium">GoldenDict</td><td class="px-4 py-3">per-format</td><td class="px-4 py-3">own built index</td><td class="px-4 py-3 text-amber-600">wildcard via scan (slow)</td><td class="px-4 py-3 text-red-500">no</td></tr>
           <tr><td class="px-4 py-3 font-medium">ZIM / Kiwix</td><td class="px-4 py-3">zstd/lzma clusters</td><td class="px-4 py-3">URL index + <strong>Xapian</strong></td><td class="px-4 py-3 text-slate-500">full-text via separate inverted index</td><td class="px-4 py-3 text-red-500">no</td></tr>
-          <tr class="bg-emerald-50"><td class="px-4 py-3 font-semibold text-emerald-800">Dictionarily (proposed)</td><td class="px-4 py-3 text-emerald-800">FM-index <em>is</em> storage</td><td class="px-4 py-3 text-emerald-800">FM-index (BWT)</td><td class="px-4 py-3 text-emerald-800 font-semibold">native, O(query len)</td><td class="px-4 py-3 text-emerald-700 font-bold">yes ★</td></tr>
+          <tr class="bg-emerald-50"><td class="px-4 py-3 font-semibold text-emerald-800">Dictionarius (proposed)</td><td class="px-4 py-3 text-emerald-800">FM-index <em>is</em> storage</td><td class="px-4 py-3 text-emerald-800">FM-index (BWT)</td><td class="px-4 py-3 text-emerald-800 font-semibold">native, O(query len)</td><td class="px-4 py-3 text-emerald-700 font-bold">yes ★</td></tr>
         </tbody>
       </table>
     </div>

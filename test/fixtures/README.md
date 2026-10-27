@@ -27,9 +27,9 @@ python scripts/build_fm_index.py test/fixtures/headwords-sample.words.json \
 The build verifies itself against brute force before writing the golden file.
 
 **Full-scale check.** The same test suite runs against a real build when one is
-present at `dist/headwords.bin` (or `$DICTIONARILY_INDEX`, path without
+present at `dist/headwords.bin` (or `$DICTIONARIUS_INDEX`, path without
 extension):
 
 ```bash
-DICTIONARILY_INDEX=dist/headwords npx vitest run test/headword-index.test.ts
+DICTIONARIUS_INDEX=dist/headwords npx vitest run test/headword-index.test.ts
 ```

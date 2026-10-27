@@ -1,6 +1,6 @@
 # Dictionary data — license & attribution
 
-Dictionary content in this folder (and in any data bundle or download Dictionarily
+Dictionary content in this folder (and in any data bundle or download Dictionarius
 ships) is **not** covered by the GPL that applies to the code. It keeps the
 license of its source.
 
@@ -19,13 +19,13 @@ contributors, extracted to structured form via
 
 Wiktionary text is available under the
 [Creative Commons Attribution-ShareAlike](https://creativecommons.org/licenses/by-sa/4.0/)
-license (and the GFDL). Dictionarily redistributes it, and every data file
+license (and the GFDL). Dictionarius redistributes it, and every data file
 derived from it, under **[CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/)**.
 
 You may reuse this data, including commercially, provided you give attribution
 and share your adaptations under the same license.
 
-## How Dictionarily meets the license terms
+## How Dictionarius meets the license terms
 
 - **Attribution.** Every displayed entry credits its source and license, and
   links to the entry's page on Wiktionary

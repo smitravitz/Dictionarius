@@ -20,6 +20,6 @@ export default defineConfig({
     command: "npx vite --port 4173 --strictPort",
     url: "http://localhost:4173",
     reuseExistingServer: !process.env.CI,
-    env: { DICTIONARILY_PUBLIC: "../test/fixtures" },
+    env: { DICTIONARIUS_PUBLIC: "../test/fixtures" },
   },
 });
