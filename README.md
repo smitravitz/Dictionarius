@@ -21,13 +21,14 @@ See [`docs/adr/0001-frequency-tiered-gloss-storage.md`](docs/adr/0001-frequency-
 
 ## Status
 
-- ✅ Platform-agnostic core (lookup, search, suggest, favorites, history) — test-driven, 59 passing tests
+- ✅ Platform-agnostic core (lookup, search, suggest, favorites, history) — test-driven, 81 unit tests plus browser tests on desktop and phone
 - ✅ FM-index substring source + SQLite source, interchangeable behind one contract
 - ✅ Headword index built from real Wiktionary data ([`scripts/build_fm_index.py`](scripts/build_fm_index.py), [format](docs/index-format.md)) and a zero-copy TypeScript loader — at full scale it opens in ~2 ms and answers exact, prefix and mid-word lookups in microseconds (Node/V8)
 - ✅ Size & performance benchmarks ([`bench/`](bench/))
-- ✅ Ranked, lazily paged results for the type-ahead dropdown: exact → prefix → mid-word, common words first; first page in ~1 ms at full scale (p99 4 ms)
+- ✅ Ranked, lazily paged results: exact match first, then common words first, with words that start with your text given a head start; first page in ~1 ms at full scale (p99 4 ms)
+- ✅ Type-ahead dropdown (web): 50 results, then more load as you scroll; touch and mouse drag scrolling; every row aligned on the text you typed. In Chromium on the full index: ready in ~0.8 s, keystroke to results ~35 ms (~60–100 ms with the CPU slowed 4× to mimic a mid-range phone)
 - ⏳ Definitions store (core + on-demand tail)
-- ⏳ In-browser validation at full scale
+- ⏳ Testing on real phones (the numbers above are an emulated phone)
 - ⏳ App UI (Capacitor) for web / PWA / iOS / Android / F-Droid
 
 ## Licensing
@@ -39,8 +40,13 @@ See [`docs/adr/0001-frequency-tiered-gloss-storage.md`](docs/adr/0001-frequency-
 
 ```bash
 npm install
-npm test            # run the suite
+npm test            # unit tests
 npm run typecheck   # strict TypeScript check
+npm run test:e2e    # browser tests (desktop + phone) on a small sample index
+
+# Run the app on the full word list: build the index, then start the dev server
+python scripts/build_fm_index.py path/to/raw-wiktextract-data.jsonl   # writes dist/headwords.bin
+npm run dev
 ```
 
 Benchmarks (Python) live in [`bench/`](bench/) — see its README to reproduce every number above. Domain vocabulary is in [`CONTEXT.md`](CONTEXT.md); architecture decisions in [`docs/adr/`](docs/adr/).
