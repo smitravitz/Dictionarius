@@ -13,6 +13,8 @@
         <item name="windowActionBar">false</item>
         <item name="windowNoTitle">true</item>
         <item name="android:background">@null</item>
+        <!-- Behind the page while it loads: paper, or the dark background at night -->
+        <item name="android:windowBackground">@color/splash_background</item>
     </style>
 
 
