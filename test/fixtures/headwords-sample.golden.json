@@ -1,0 +1,476 @@
+{
+ "file": {
+  "sha256": "16f5fc3b3c020f01da9259e97b5efd430f205a9f112a3f839a53f2ea2dfebe84",
+  "version": 1,
+  "normId": "nfd-strip-diacritic-lower-trim/v1",
+  "n": 166591,
+  "numWords": 17067
+ },
+ "normalize": [
+  [
+   "Résumé",
+   "resume"
+  ],
+  [
+   "naïve",
+   "naive"
+  ],
+  [
+   "Ångström",
+   "angstrom"
+  ],
+  [
+   "İstanbul",
+   "istanbul"
+  ],
+  [
+   "ΟΔΟΣ",
+   "οδος"
+  ],
+  [
+   "Straße",
+   "straße"
+  ],
+  [
+   "œuvre",
+   "œuvre"
+  ],
+  [
+   "Hawaiʻi",
+   "hawaii"
+  ],
+  [
+   "C#",
+   "c#"
+  ],
+  [
+   "  padded ",
+   "padded"
+  ],
+  [
+   "﻿bom",
+   "bom"
+  ],
+  [
+   "ice cream",
+   "ice cream"
+  ],
+  [
+   "Ǆemal",
+   "ǆemal"
+  ],
+  [
+   "Aulnager",
+   "aulnager"
+  ],
+  [
+   "Broadish",
+   "broadish"
+  ],
+  [
+   "BRABBLEMENT",
+   "brabblement"
+  ],
+  [
+   "INCAPABLENESS",
+   "incapableness"
+  ],
+  [
+   "Curtal",
+   "curtal"
+  ],
+  [
+   "Threadiness",
+   "threadiness"
+  ],
+  [
+   "Whiteflaw",
+   "whiteflaw"
+  ],
+  [
+   "Snowstorm",
+   "snowstorm"
+  ],
+  [
+   "GROANFUL",
+   "groanful"
+  ],
+  [
+   "Expertness",
+   "expertness"
+  ]
+ ],
+ "exact": [
+  {
+   "q": "prohibition",
+   "id": 11928
+  },
+  {
+   "q": "theosophize",
+   "id": 15233
+  },
+  {
+   "q": "oscillatory",
+   "id": 10435
+  },
+  {
+   "q": "recoction",
+   "id": 12452
+  },
+  {
+   "q": "skringe",
+   "id": 13880
+  },
+  {
+   "q": "exorable",
+   "id": 5389
+  },
+  {
+   "q": "flowery-kirtled",
+   "id": 5814
+  },
+  {
+   "q": "inharmoniously",
+   "id": 7737
+  },
+  {
+   "q": "inconvertibility",
+   "id": 7556
+  },
+  {
+   "q": "anticausodic",
+   "id": 781
+  },
+  {
+   "q": "flitch",
+   "id": 5790
+  },
+  {
+   "q": "pactolian",
+   "id": 10654
+  },
+  {
+   "q": "filled cheese",
+   "id": 5688
+  },
+  {
+   "q": "documental",
+   "id": 4479
+  },
+  {
+   "q": "wher",
+   "id": 16717
+  },
+  {
+   "q": "whereofqzx",
+   "id": null
+  },
+  {
+   "q": "premeritqzx",
+   "id": null
+  },
+  {
+   "q": "wofulnessqzx",
+   "id": null
+  },
+  {
+   "q": "foundershaftqzx",
+   "id": null
+  },
+  {
+   "q": "subductionqzx",
+   "id": null
+  }
+ ],
+ "prefix": [
+  {
+   "q": "p",
+   "start": 10643,
+   "count": 1555
+  },
+  {
+   "q": "r",
+   "start": 12295,
+   "count": 748
+  },
+  {
+   "q": "in",
+   "start": 7472,
+   "count": 526
+  },
+  {
+   "q": "bi",
+   "start": 1601,
+   "count": 106
+  },
+  {
+   "q": "hex",
+   "start": 6938,
+   "count": 10
+  },
+  {
+   "q": "ame",
+   "start": 560,
+   "count": 9
+  },
+  {
+   "q": "appr",
+   "start": 898,
+   "count": 13
+  },
+  {
+   "q": "palin",
+   "start": 10689,
+   "count": 2
+  },
+  {
+   "q": "outmou",
+   "start": 10501,
+   "count": 1
+  },
+  {
+   "q": "outstret",
+   "start": 10517,
+   "count": 1
+  }
+ ],
+ "substring": [
+  {
+   "q": "c",
+   "occurrences": 6791,
+   "wordCount": 5769
+  },
+  {
+   "q": "sm",
+   "occurrences": 332,
+   "wordCount": 332
+  },
+  {
+   "q": "or",
+   "occurrences": 1439,
+   "wordCount": 1403
+  },
+  {
+   "q": "ut",
+   "occurrences": 374,
+   "wordCount": 371
+  },
+  {
+   "q": "ar",
+   "occurrences": 1409,
+   "wordCount": 1381
+  },
+  {
+   "q": "me",
+   "occurrences": 898,
+   "wordCount": 882
+  },
+  {
+   "q": "ctuar",
+   "occurrences": 4,
+   "wordCount": 4,
+   "wordIds": [
+    204,
+    9720,
+    13129,
+    16229
+   ]
+  },
+  {
+   "q": "ss",
+   "occurrences": 906,
+   "wordCount": 884
+  },
+  {
+   "q": "s",
+   "occurrences": 9083,
+   "wordCount": 6995
+  },
+  {
+   "q": "ec",
+   "occurrences": 547,
+   "wordCount": 544
+  },
+  {
+   "q": "th",
+   "occurrences": 737,
+   "wordCount": 725
+  },
+  {
+   "q": "moeomer",
+   "occurrences": 1,
+   "wordCount": 1,
+   "wordIds": [
+    7052
+   ]
+  },
+  {
+   "q": "qzxqzx",
+   "occurrences": 0,
+   "wordCount": 0,
+   "wordIds": []
+  }
+ ],
+ "extract": [
+  {
+   "id": 0,
+   "word": "!"
+  },
+  {
+   "id": 3455,
+   "word": "craft"
+  },
+  {
+   "id": 4960,
+   "word": "enchoric"
+  },
+  {
+   "id": 5341,
+   "word": "exchange editor"
+  },
+  {
+   "id": 5684,
+   "word": "filially"
+  },
+  {
+   "id": 6615,
+   "word": "gwiniad"
+  },
+  {
+   "id": 6891,
+   "word": "herbose"
+  },
+  {
+   "id": 9745,
+   "word": "mummichog"
+  },
+  {
+   "id": 11162,
+   "word": "phantastic"
+  },
+  {
+   "id": 12363,
+   "word": "rapidity"
+  },
+  {
+   "id": 12905,
+   "word": "roble"
+  },
+  {
+   "id": 16616,
+   "word": "water plant"
+  },
+  {
+   "id": 16743,
+   "word": "whistlewing"
+  },
+  {
+   "id": 17066,
+   "word": "🫀"
+  }
+ ],
+ "display": [
+  {
+   "id": 8993,
+   "forms": [
+    "Mammonism"
+   ]
+  },
+  {
+   "id": 3026,
+   "forms": [
+    "Compendium"
+   ]
+  },
+  {
+   "id": 8924,
+   "forms": [
+    "Magnet"
+   ]
+  },
+  {
+   "id": 2780,
+   "forms": [
+    "CLARENCIEUX"
+   ]
+  },
+  {
+   "id": 8321,
+   "forms": [
+    "Knitter"
+   ]
+  },
+  {
+   "id": 6643,
+   "forms": [
+    "Hackly"
+   ]
+  },
+  {
+   "id": 16578,
+   "forms": [
+    "Warrener"
+   ]
+  },
+  {
+   "id": 6259,
+   "forms": [
+    "Genty"
+   ]
+  },
+  {
+   "id": 16823,
+   "forms": [
+    "Within"
+   ]
+  },
+  {
+   "id": 2160,
+   "forms": [
+    "Caesar"
+   ]
+  }
+ ],
+ "freq": [
+  {
+   "id": 3275,
+   "zipf100": 0
+  },
+  {
+   "id": 15492,
+   "zipf100": 0
+  },
+  {
+   "id": 8925,
+   "zipf100": 0
+  },
+  {
+   "id": 9321,
+   "zipf100": 302
+  },
+  {
+   "id": 16020,
+   "zipf100": 406
+  },
+  {
+   "id": 9170,
+   "zipf100": 0
+  },
+  {
+   "id": 7507,
+   "zipf100": 0
+  },
+  {
+   "id": 13784,
+   "zipf100": 0
+  },
+  {
+   "id": 4509,
+   "zipf100": 0
+  },
+  {
+   "id": 3407,
+   "zipf100": 0
+  }
+ ]
+}
