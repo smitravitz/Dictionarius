@@ -8,6 +8,7 @@ import { normalize } from "../src/normalize";
 import { sourcePageUrl } from "../src/attribution";
 import type { FromWorker, ToWorker } from "./protocol";
 import { ResultsList } from "./results-list";
+import { setUpNativeShell } from "./native";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const input = $<HTMLInputElement>("q");
@@ -103,7 +104,13 @@ input.addEventListener("keydown", (event) => {
   }
 });
 
+// Where Back returns to from an open word: the search text, its summary and scroll position.
+let returnTo: { text: string; summary: string; scrollTop: number } | null = null;
+
 function showEntry(s: Suggestion) {
+  if (!frame.hidden) returnTo = { text: input.value, summary: summary.textContent ?? "", scrollTop: scroller.scrollTop };
+  // One history step per open word, so Back (browser or Android) closes it.
+  if (!history.state?.entry) history.pushState({ entry: true }, "");
   input.value = s.display;
   frame.hidden = true;
   intro.hidden = true;
@@ -118,6 +125,25 @@ function showEntry(s: Suggestion) {
   $<HTMLAnchorElement>("entry-link").href = page ?? "https://en.wiktionary.org";
   entry.hidden = false;
 }
+
+window.addEventListener("popstate", () => {
+  if (entry.hidden) return;
+  entry.hidden = true;
+  if (!returnTo) return search(input.value);
+  // The results are still in the list; show them again where they were.
+  input.value = returnTo.text;
+  summary.textContent = returnTo.summary;
+  frame.hidden = false;
+  scroller.scrollTop = returnTo.scrollTop; // hiding the list reset it
+  input.setAttribute("aria-expanded", "true");
+});
+
+void setUpNativeShell(() => {
+  if (!input.value) return false;
+  input.value = "";
+  search("");
+  return true;
+});
 
 for (const button of document.querySelectorAll<HTMLButtonElement>(".examples button")) {
   button.addEventListener("click", () => {

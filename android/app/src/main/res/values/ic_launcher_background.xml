@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Paper, the app's light background -->
+    <color name="ic_launcher_background">#F3F5F8</color>
+    <color name="splash_background">#F3F5F8</color>
+</resources>

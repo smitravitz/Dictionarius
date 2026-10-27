@@ -18,6 +18,7 @@
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
+    "@capacitor/cli": "^8.5.3",
     "@playwright/test": "1.63.0",
     "@types/node": "^22.10.0",
     "typescript": "^5.6.0",
@@ -25,7 +26,15 @@
     "vitest": "^5.0.5"
   },
   "dependencies": {
+    "@capacitor/android": "^8.5.3",
+    "@capacitor/app": "^8.1.2",
+    "@capacitor/core": "^8.5.3",
     "@fontsource-variable/literata": "^5.3.0",
     "@fontsource/atkinson-hyperlegible-next": "^5.3.0"
+  },
+  "overrides": {
+    "xcode": {
+      "uuid": "^11.1.1"
+    }
   }
 }

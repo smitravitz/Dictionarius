@@ -102,6 +102,24 @@ test("tapping a word opens it, with its Wiktionary link", async ({ page }) => {
   await expect(page.locator("#q")).toHaveAttribute("aria-expanded", "false");
 });
 
+test("Back closes the word and returns to the same results", async ({ page }) => {
+  await open(page);
+  await page.locator("#q").fill("e");
+  await expect.poll(() => loadedRows(page)).toBe(PAGE);
+  await scroller(page).evaluate((el) => (el.scrollTop = 10 * 52));
+  // Wait for the rows near row 10 to render, then open one of them.
+  const row = page.locator('li.word[aria-posinset="12"]');
+  const word = await row.getAttribute("aria-label");
+  await row.click();
+  await expect(page.locator("#entry-word")).toHaveText(word!);
+  await page.goBack();
+  await expect(page.locator("#entry")).toBeHidden();
+  await expect(page.locator("#q")).toHaveValue("e");
+  await expect(page.locator("#q")).toHaveAttribute("aria-expanded", "true");
+  expect(await scroller(page).evaluate((el) => el.scrollTop)).toBeGreaterThan(5 * ROW); // still scrolled
+  await expect(page.locator("#summary")).toContainText("“e”");
+});
+
 test("arrow keys move through the results and Enter opens one", async ({ page }) => {
   await open(page);
   const input = page.locator("#q");
