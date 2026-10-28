@@ -85,10 +85,10 @@ test("every row lines up on the typed fragment", async ({ page }) => {
   await page.locator("#q").fill("tion");
   await expect(page.locator("li.word mark.frag").first()).toBeVisible();
   const lefts = await page.locator("li.word mark.frag").evaluateAll((marks) =>
-    marks.map((m) => Math.round(m.getBoundingClientRect().left)),
+    marks.map((m) => m.getBoundingClientRect().left),
   );
   expect(lefts.length).toBeGreaterThan(5);
-  expect(new Set(lefts).size).toBe(1); // one seam
+  expect(Math.max(...lefts) - Math.min(...lefts)).toBeLessThanOrEqual(1.5); // one seam
   await expect(page.locator("li.word mark.frag").first()).toHaveText("tion");
 });
 
@@ -145,6 +145,62 @@ test("says so when no word contains the fragment", async ({ page }) => {
   await page.locator("#q").fill("qzxqzx");
   await expect(page.locator("#summary")).toHaveText("No word contains “qzxqzx”. Try a shorter piece.");
   await expect(page.locator("li.word")).toHaveCount(0);
+});
+
+test("the start screen fills with everyday examples", async ({ page }) => {
+  await open(page);
+  const chips = page.locator("#examples button");
+  expect(await chips.count()).toBeGreaterThanOrEqual(40);
+  const labels = await chips.allTextContents();
+  expect(labels.slice(0, 3)).toEqual(["…ate", "…ease", "…ing"]);
+  expect(new Set(labels).size).toBe(labels.length);
+  // The chips reach well down the screen rather than sitting in one short row.
+  const listBottom = await page.locator("#examples").evaluate((el) => el.getBoundingClientRect().bottom);
+  expect(listBottom).toBeGreaterThan(page.viewportSize()!.height * 0.6);
+  await page.getByRole("button", { name: "…ease" }).click();
+  await expect(page.locator("#q")).toHaveValue("ease");
+  await expect(page.locator("li.word mark.frag").first()).toHaveText("ease");
+});
+
+test("a word too long for the row scrolls sideways to show its start", async ({ page, isMobile }) => {
+  await page.setViewportSize({ width: 360, height: 700 });
+  await open(page);
+  await page.locator("#q").fill("veness");
+  const row = page.locator('li.word[aria-label="philoprogenitiveness"]');
+  const track = row.locator(".track");
+  // At rest the fragment sits on the seam, so the start is scrolled out of view.
+  await expect.poll(() => track.evaluate((el) => el.scrollLeft)).toBeGreaterThan(0);
+  const seamLeft = await page.locator(".seam").evaluate((el) => el.getBoundingClientRect().left);
+  const fragLeft = await row.locator("mark.frag").evaluate((el) => el.getBoundingClientRect().left);
+  expect(Math.abs(fragLeft - seamLeft)).toBeLessThanOrEqual(1.5);
+
+  await row.scrollIntoViewIfNeeded();
+  const box = (await track.boundingBox())!;
+  const y = Math.round(box.y + box.height / 2);
+  const topBefore = await scroller(page).evaluate((el) => el.scrollTop);
+  if (isMobile) {
+    // A finger swipe to the right, as a phone sends it.
+    const cdp = await page.context().newCDPSession(page);
+    let x = Math.round(box.x + 40);
+    await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x, y }] });
+    for (let step = 0; step < 10; step++) {
+      x += 20;
+      await cdp.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [{ x, y }] });
+    }
+    await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+  } else {
+    await page.mouse.move(box.x + 40, y);
+    await page.mouse.down();
+    await page.mouse.move(box.x + 240, y, { steps: 10 });
+    await page.mouse.up();
+  }
+  await expect.poll(() => track.evaluate((el) => el.scrollLeft)).toBe(0);
+  // The whole start of the word is now inside the row.
+  const trackLeft = await track.evaluate((el) => el.getBoundingClientRect().left);
+  const beforeLeft = await row.locator(".before").evaluate((el) => el.getBoundingClientRect().left);
+  expect(beforeLeft).toBeGreaterThanOrEqual(trackLeft);
+  expect(await scroller(page).evaluate((el) => el.scrollTop)).toBe(topBefore); // the list stayed put
+  await expect(page.locator("#entry")).toBeHidden(); // and no word opened
 });
 
 test("clearing the search brings back the examples", async ({ page }) => {

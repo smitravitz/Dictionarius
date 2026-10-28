@@ -14,7 +14,7 @@ The open dictionary ecosystem (StarDict, Aard2, ZIM) does prefix/exact lookup ov
 
 ## How it stays small 🥔
 
-- **Core (~16 MB download):** every headword searchable + full definitions for the top ~50k words by frequency (~100% of real lookups), fully offline on first run. The headword index for all 1,357,380 English search keys is measured at **12.4 MB download / 29.0 MB in memory** (including a 2.2 MB hot list that makes mid-word search instant); the core definitions (~5.7 MB) are still a projection.
+- **Core (~16 MB download):** every headword searchable + full definitions for the top ~50k words by frequency (~100% of real lookups), fully offline on first run. The headword index for all 1,357,380 English search keys is measured at **12.4 MB download / 29.8 MB in memory** (including a 1.6 MB hot list that makes mid-word search instant); the core definitions (~5.7 MB) are still a projection.
 - **Tail (on-demand):** rarer definitions fetch when tapped and cache locally, or pre-download the full set for total offline use.
 
 See [`docs/adr/0001-frequency-tiered-gloss-storage.md`](docs/adr/0001-frequency-tiered-gloss-storage.md) for the reasoning and measured numbers.
@@ -25,8 +25,8 @@ See [`docs/adr/0001-frequency-tiered-gloss-storage.md`](docs/adr/0001-frequency-
 - ✅ FM-index substring source + SQLite source, interchangeable behind one contract
 - ✅ Headword index built from real Wiktionary data ([`scripts/build_fm_index.py`](scripts/build_fm_index.py), [format](docs/index-format.md)) and a zero-copy TypeScript loader — at full scale it opens in ~2 ms and answers exact, prefix and mid-word lookups in microseconds (Node/V8)
 - ✅ Size & performance benchmarks ([`bench/`](bench/))
-- ✅ Ranked, lazily paged results: exact match first, then common words first, with words that start with your text given a head start; first page in ~1 ms at full scale (p99 4 ms)
-- ✅ Type-ahead dropdown (web): 50 results, then more load as you scroll; touch and mouse drag scrolling; every row aligned on the text you typed. In Chromium on the full index: ready in ~0.8 s, keystroke to results ~35 ms (~60–100 ms with the CPU slowed 4× to mimic a mid-range phone)
+- ✅ Ranked, lazily paged results: exact match first, then single words before hyphenated words before phrases; within each, common words first, with words that start with your text given a head start. First page in ~1–5 ms at full scale
+- ✅ Type-ahead dropdown (web): 50 results, then more load as you scroll; touch and mouse drag scrolling; every row aligned on the text you typed, and a row too long for the screen scrolls sideways. In Chromium on the full index: ready in ~0.4–0.8 s, keystroke to results ~35 ms (~35–65 ms with the CPU slowed 4× to mimic a mid-range phone)
 - ✅ Android app (Capacitor): the same search, offline, with the full word list inside; signed APKs published on GitHub releases
 - ⏳ Definitions store (core + on-demand tail)
 - ⏳ Testing on real phones (the numbers above are an emulated phone)
