@@ -1,20 +1,18 @@
 /**
- * The position slider. Press and hold a blank spot in the results (not a
- * word: holding a word is kept for something else), feel a pulse, then slide
- * sideways to choose how many letters come before the match. A histogram
- * sits centred across the middle 80% of the screen (the active range): one
- * bar per position, as tall as the words found there, and as wide as
- * position-scale.ts gives it: 4-6 letters wide, 6 at about 75%, the rare far
- * end squeezed. The cursor stays under the finger; the margins either side
- * count as the first and last position, so the ends are easy to reach. Each
- * step ticks; the list scrolls to the words at that position as you go, and
- * stays whole: scroll up or down from there.
+ * The position slider: hold a blank spot in the results (scroller-gestures.ts
+ * decides what counts as a hold), feel a pulse, then slide sideways to choose
+ * how many letters come before the match. A histogram sits centred across the
+ * middle 80% of the screen (the active range): one bar per position, as tall
+ * as the words found there, and as wide as position-scale.ts gives it: 4-6
+ * letters wide, 6 at about 75%, the rare far end squeezed. The cursor stays
+ * under the finger; the margins either side count as the first and last
+ * position, so the ends are easy to reach. Each step ticks; the list scrolls
+ * to the words at that position as you go, and stays whole: scroll up or down
+ * from there.
  */
-import { pulse, release, tick } from "./haptics";
+import { pulse, tick } from "./haptics";
 import { positionScale, type PositionScale } from "./position-scale";
 
-const HOLD_MS = 420; // just under Android's long-press, so ours wins
-const MOVE_SLOP = 8; // moving further than this before the hold means scrolling
 const MAX_DOTS = 10;
 const TRACK_SHARE = 0.8; // the active range, of the width; the margins either side reach the ends
 
@@ -37,9 +35,6 @@ export interface SliderEvents {
 }
 
 export class OffsetSlider {
-  /** True while the slider is open: the list's own drag-scrolling stands back. */
-  active = false;
-
   private readonly el: HTMLElement;
   private readonly dots: HTMLElement;
   private readonly frag: HTMLElement;
@@ -47,29 +42,14 @@ export class OffsetSlider {
   private readonly window: HTMLElement;
   private readonly track: HTMLElement;
   private readonly thumb: HTMLElement;
-  private timer: ReturnType<typeof setTimeout> | undefined;
-  private pointerId = -1;
-  private pointerType = "";
-  /** Where the press landed. Touch events keep going to it even after the
-   *  list is rebuilt under the finger (which detaches it), so the listener
-   *  that stops the browser from scrolling must sit on it too. */
-  private touched: EventTarget | null = null;
-  private readonly blockScroll = (e: Event) => {
-    if (this.active) e.preventDefault();
-  };
-  private startX = 0;
-  private startY = 0;
-  private lastX = 0;
   private value = 0;
   private max = 0;
   private scale: PositionScale = positionScale(1);
   private rangeX = 0; // where the active range starts inside the window
   private range = 1; // its width in pixels
-  private suppressClick = false;
 
   constructor(
     frame: HTMLElement,
-    private readonly scroller: HTMLElement,
     private readonly events: SliderEvents,
   ) {
     this.el = div("slider");
@@ -85,92 +65,28 @@ export class OffsetSlider {
     this.window.append(this.track, this.thumb);
     this.el.append(label, this.note, this.window);
     frame.append(this.el);
-
-    scroller.addEventListener("pointerdown", (e) => this.down(e));
-    // The finger may leave the list while sliding: follow it anywhere.
-    window.addEventListener("pointermove", (e) => this.move(e));
-    window.addEventListener("pointerup", (e) => this.up(e));
-    window.addEventListener("pointercancel", (e) => this.up(e));
-    // Once open, a sideways slide must not scroll the list or the row.
-    scroller.addEventListener("touchmove", this.blockScroll, { passive: false });
-    scroller.addEventListener("contextmenu", (e) => (this.active || this.timer) && e.preventDefault());
-    scroller.addEventListener(
-      "click",
-      (e) => {
-        if (!this.suppressClick) return;
-        e.preventDefault();
-        e.stopPropagation();
-      },
-      true,
-    );
   }
 
-  private down(e: PointerEvent) {
-    if (!e.isPrimary || (e.pointerType === "mouse" && e.button !== 0)) return;
-    if ((e.target as Element).closest(".before, .frag, .after")) return; // on a word
-    this.cancelHold();
-    this.pointerId = e.pointerId;
-    this.pointerType = e.pointerType;
-    this.touched = e.target;
-    this.touched?.addEventListener("touchmove", this.blockScroll, { passive: false });
-    this.startX = this.lastX = e.clientX;
-    this.startY = e.clientY;
-    this.timer = setTimeout(() => this.open(), HOLD_MS);
-  }
-
-  private move(e: PointerEvent) {
-    if (e.pointerId !== this.pointerId) return;
-    this.lastX = e.clientX;
-    if (!this.active) {
-      if (Math.hypot(e.clientX - this.startX, e.clientY - this.startY) > MOVE_SLOP) this.cancelHold();
-      return;
-    }
-    e.preventDefault();
-    this.slideTo(e.clientX);
-  }
-
-  private up(e: PointerEvent) {
-    if (e.pointerId !== this.pointerId) return;
-    this.cancelHold();
-    this.pointerId = -1;
-    this.touched?.removeEventListener("touchmove", this.blockScroll);
-    this.touched = null;
-    if (!this.active) return;
-    this.active = false;
-    release();
-    this.el.classList.remove("on");
-    setTimeout(() => (this.suppressClick = false), 0);
-  }
-
-  private cancelHold() {
-    clearTimeout(this.timer);
-    this.timer = undefined;
-  }
-
-  private open() {
-    this.timer = undefined;
+  /** Open under a finger at screen x. False when there's nothing to slide. */
+  open(x: number): boolean {
     const state = this.events.state();
-    if (!state) return;
-    this.active = true;
-    this.suppressClick = true;
-    if (this.pointerType === "mouse") {
-      try {
-        this.scroller.setPointerCapture(this.pointerId);
-      } catch {
-        // the pointer is already gone
-      }
-    }
+    if (!state) return false;
     pulse();
     this.events.used();
     this.el.classList.add("on");
     this.value = -1; // so the position under the finger is applied now
     this.layout(state);
-    this.slideTo(this.lastX);
+    this.slideTo(x);
+    return true;
+  }
+
+  close() {
+    this.el.classList.remove("on");
   }
 
   /** The finger is at screen x: put the cursor there and pick the position
    *  under it. Left of the bars is the first position, right of them the last. */
-  private slideTo(x: number) {
+  slideTo(x: number) {
     const box = this.window.getBoundingClientRect();
     const inside = Math.min(box.width, Math.max(0, x - box.left));
     this.thumb.style.transform = `translateX(${inside}px)`;

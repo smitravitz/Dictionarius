@@ -9,6 +9,7 @@ import { sourcePageUrl } from "../src/attribution";
 import type { Counts, FromWorker, ToWorker } from "./protocol";
 import { ResultsList } from "./results-list";
 import { OffsetSlider } from "./offset-slider";
+import { ScrollerGestures } from "./scroller-gestures";
 import { setUpNativeShell } from "./native";
 import { EXAMPLES, exampleLabel } from "./examples";
 
@@ -36,10 +37,9 @@ let seeking = -1; // the position a seek is on its way to
 const list = new ResultsList(scroller, $("results"), {
   needRows: (from, to) => send({ type: "rows", seq, from, to }),
   choose: (s) => showEntry(s),
-  busy: () => slider.active,
 });
 
-const slider = new OffsetSlider(frame, scroller, {
+const slider = new OffsetSlider(frame, {
   state: () =>
     query && counts && counts.occurrences > 0
       ? { query, byOffset: counts.byOffset, complete: counts.total !== null }
@@ -49,6 +49,17 @@ const slider = new OffsetSlider(frame, scroller, {
     hint.hidden = true;
     remember(HINT_SEEN);
   },
+});
+
+// Taps, holds and drags on the list (scroller-gestures.ts): a tap opens a word,
+// unless it's a finger putting the keyboard away; a hold on a blank spot opens
+// the slider.
+new ScrollerGestures(scroller, {
+  typing: () => document.activeElement === input,
+  dismissKeyboard: () => input.blur(),
+  holdStart: (x) => slider.open(x),
+  holdMove: (x) => slider.slideTo(x),
+  holdEnd: () => slider.close(),
 });
 
 // Settings live in browser storage; safe search is on unless turned off.
@@ -101,28 +112,6 @@ function mergeCounts(old: Counts | null, next: Counts): Counts {
 }
 
 input.addEventListener("input", () => search(input.value));
-
-// While typing on a touch screen, a tap on the list only puts the keyboard
-// away: the keyboard closing moves the list under the finger, so the tap
-// would land on a word nobody aimed at. The next tap opens words as usual.
-// (Noted when the press starts: by the click, focus has already moved.)
-let tapClosesKeyboard = false;
-scroller.addEventListener(
-  "pointerdown",
-  (e) => (tapClosesKeyboard = e.pointerType !== "mouse" && document.activeElement === input),
-  true,
-);
-scroller.addEventListener(
-  "click",
-  (e) => {
-    if (!tapClosesKeyboard) return;
-    tapClosesKeyboard = false;
-    e.preventDefault();
-    e.stopPropagation();
-    input.blur();
-  },
-  true,
-);
 
 function search(text: string) {
   entry.hidden = true;

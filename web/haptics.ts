@@ -35,6 +35,3 @@ export function tick() {
   if (native) void native.tick().catch(() => {});
   else vibrate(5);
 }
-
-/** The selection ended: nothing to feel. */
-export function release() {}
