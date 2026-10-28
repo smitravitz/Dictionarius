@@ -21,4 +21,6 @@ repositories {
 
 dependencies {
     implementation project(':capacitor-android')
+    // Capacitor's Plugin API hands out an AppCompatActivity; the app already ships appcompat.
+    implementation "androidx.appcompat:appcompat:${project.hasProperty('androidxAppCompatVersion') ? rootProject.ext.androidxAppCompatVersion : '1.7.1'}"
 }
