@@ -7,15 +7,27 @@ import {
   SAFE_SEARCH_OVERRIDES,
 } from "../src/safe-search-overrides";
 
-const list = (allow: string[], block: string[]) =>
-  ["# a comment", "", "[allow]", ...allow.map(encodeEntry), "[block]", "# why", ...block.map(encodeEntry), ""].join("\n");
+const list = (allow: string[], block: string[], contains?: string[]) =>
+  [
+    "# a comment",
+    "",
+    "[allow]",
+    ...allow.map(encodeEntry),
+    "[block]",
+    "# why",
+    ...block.map(encodeEntry),
+    ...(contains ? ["[contains]", ...contains.map(encodeEntry)] : []),
+    "",
+  ].join("\n");
 
 describe("safe search's hand-picked list", () => {
   it("reads encoded sections, skips comments, and normalizes words", () => {
-    expect(parseSafeSearchList(list(["Boy", "fun run", "Café"], ["Gapword"]))).toEqual({
+    expect(parseSafeSearchList(list(["Boy", "fun run", "Café"], ["Gapword"], ["Gapp"]))).toEqual({
       allow: ["boy", "fun run", "cafe"],
       block: ["gapword"],
+      contains: ["gapp"],
     });
+    expect(parseSafeSearchList(list(["boy"], []))).toEqual({ allow: ["boy"], block: [], contains: [] });
   });
 
   it("decodes what the Python script encodes", () => {
@@ -27,7 +39,7 @@ describe("safe search's hand-picked list", () => {
   });
 
   it("rejects an entry outside a section, a plain word, or a word in both", () => {
-    expect(() => parseSafeSearchList(`${encodeEntry("boy")}\n[allow]\n`)).toThrow(/before \[allow\] or \[block\]/);
+    expect(() => parseSafeSearchList(`${encodeEntry("boy")}\n[allow]\n`)).toThrow(/before a section/);
     expect(() => parseSafeSearchList("[block]\nnot encoded!\n")).toThrow(/not an encoded word/);
     expect(() => parseSafeSearchList(list(["boy"], ["Boy"]))).toThrow(/both allowed and blocked/);
   });
@@ -35,5 +47,6 @@ describe("safe search's hand-picked list", () => {
   it("ships data/safe-search.list", () => {
     expect(SAFE_SEARCH_OVERRIDES.allow?.length).toBeGreaterThan(0);
     expect(SAFE_SEARCH_OVERRIDES.block?.length).toBeGreaterThan(0);
+    expect(SAFE_SEARCH_OVERRIDES.contains?.length).toBeGreaterThan(0);
   });
 });

@@ -4,7 +4,8 @@ import list from "../data/safe-search.list?raw";
 
 /**
  * Safe search's hand-picked list (data/safe-search.list): words to allow or
- * block on top of the rule in docs/index-format.md#safe-search. The index
+ * block, and pieces that hide every word containing them, on top of the rule
+ * in docs/index-format.md#safe-search. The index
  * builder applies it too; applying it again here means an edit reaches the
  * app without rebuilding the index. Words are stored encoded (ROT13, then
  * base64) so the file isn't a readable word list; scripts/safe_search_list.py
@@ -29,17 +30,18 @@ export function encodeEntry(word: string): string {
   return btoa(String.fromCharCode(...new TextEncoder().encode(rot13(word))));
 }
 
-/** Read the list: "[allow]" and "[block]" sections of encoded words, one per
- *  line; "#" starts a comment line. Words come back decoded and normalized. */
+/** Read the list: "[allow]", "[block]" and "[contains]" sections of encoded
+ *  words, one per line; "#" starts a comment line. Words come back decoded
+ *  and normalized. */
 export function parseSafeSearchList(text: string): Required<SafeSearchOverrides> {
-  const allow: string[] = [];
-  const block: string[] = [];
+  const lists = { allow: [] as string[], block: [] as string[], contains: [] as string[] };
   let section: string[] | null = null;
   text.split(/\r?\n/).forEach((raw, i) => {
     const line = raw.trim();
     if (!line || line.startsWith("#")) return;
-    if (line === "[allow]" || line === "[block]") section = line === "[allow]" ? allow : block;
-    else if (!section) throw new Error(`line ${i + 1}: an entry before [allow] or [block]`);
+    const name = /^\[(allow|block|contains)\]$/.exec(line)?.[1] as keyof typeof lists | undefined;
+    if (name) section = lists[name];
+    else if (!section) throw new Error(`line ${i + 1}: an entry before a section ([allow], [block] or [contains])`);
     else {
       try {
         section.push(normalize(decodeEntry(line)));
@@ -48,9 +50,9 @@ export function parseSafeSearchList(text: string): Required<SafeSearchOverrides>
       }
     }
   });
-  const both = allow.filter((w) => block.includes(w));
+  const both = lists.allow.filter((w) => lists.block.includes(w));
   if (both.length) throw new Error(`${both.length} word(s) both allowed and blocked`);
-  return { allow, block };
+  return lists;
 }
 
 export const SAFE_SEARCH_OVERRIDES: SafeSearchOverrides = parseSafeSearchList(list);

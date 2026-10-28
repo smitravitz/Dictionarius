@@ -152,6 +152,7 @@ KEPT_CATEGORIES = EXPLICIT_CATEGORIES | SLUR_CATEGORIES
 EXPLICIT_LABELS = EXPLICIT_TAGS | {"cat:" + c for c in EXPLICIT_CATEGORIES}
 SLUR_LABELS = SLUR_TAGS | {"cat:" + c for c in SLUR_CATEGORIES}
 BLOCKED = "blocked by hand"
+CONTAINS = "contains a blocked piece"
 CANDIDATE = "a slur meaning further down"
 
 
@@ -193,11 +194,14 @@ class Labels:
 
     A word is explicit when its main meaning (the first meaning of its first
     entry, as the page lists it) is labelled vulgar, offensive or a slur, or
-    when its main meaning is just a plural, tense or spelling of such a word.
-    That is one step: nothing is hidden for being linked to a linked word.
-    Labels further down a word's meanings hide nothing; a word with an
-    innocent first meaning that is mostly known as a bad word goes on the
-    hand-picked block list (data/safe-search.list) instead.
+    when its main meaning is just a plural, tense or spelling of such a word,
+    or of one of those ("sand-niggers": the plural of a spelling). The links
+    followed are only main meanings that are nothing but a form of another
+    word, so an ordinary word is never reached: "is" is a form of "be", whose
+    main meaning is "to exist". Labels further down a word's meanings hide
+    nothing; a word with an innocent first meaning that is mostly known as a
+    bad word goes on the hand-picked block list (data/safe-search.list)
+    instead.
 
     `allow` (search keys, normalized) keeps words visible, and with them their
     plurals and tenses."""
@@ -228,11 +232,21 @@ class Labels:
         def allowed(w):
             return bool(allow) and normalize(w) in allow
 
-        bad = {w for w, (labels, _) in self.main.items() if labels & EXPLICIT_LABELS and not allowed(w)}
-        reasons = dict.fromkeys(bad, "main meaning")
+        reasons = {w: "main meaning" for w, (labels, _) in self.main.items()
+                   if labels & EXPLICIT_LABELS and not allowed(w)}
+        # Then the words whose main meaning is a form of explicit words only,
+        # and their forms in turn.
+        forms_of = {}
         for w, (_, bases) in self.main.items():
-            if bases and w not in bad and all(b in bad for b in bases) and not allowed(w):
-                reasons[w] = f"form of {min(bases)}"
+            for b in bases:
+                forms_of.setdefault(b, []).append(w)
+        todo = list(reasons)
+        while todo:
+            for w in forms_of.get(todo.pop(), ()):
+                bases = self.main[w][1]
+                if w not in reasons and all(b in reasons for b in bases) and not allowed(w):
+                    reasons[w] = f"form of {min(bases)}"
+                    todo.append(w)
         return reasons
 
     def explicit_words(self, allow=frozenset()):
@@ -276,27 +290,30 @@ class Labels:
 
 
 def read_safe_search_list(text):
-    """(allow, block) search keys from the encoded hand-picked list
+    """(allow, block, pieces), normalized, from the encoded hand-picked list
     (data/safe-search.list, see scripts/safe_search_list.py)."""
     sections = safe_search_list.parse(text)
-    allow = frozenset(normalize(w) for w in sections["allow"])
-    block = frozenset(normalize(w) for w in sections["block"])
+    allow, block, pieces = (frozenset(normalize(w) for w in sections[name]) for name in safe_search_list.SECTIONS)
     both = allow & block
     if both:
         raise ValueError(f"{len(both)} word(s) both allowed and blocked")
-    return allow, block
+    return allow, block, pieces
 
 
-def explicit_keys(keys, forms_by_key, reasons, allow=frozenset(), block=frozenset()):
-    """(id, reason) of each search key safe search hides: blocked keys, and
-    keys whose most common written form is explicit (ties: the lowercase form).
-    Call after word_frequencies(), which ranks forms."""
+def explicit_keys(keys, forms_by_key, reasons, allow=frozenset(), block=frozenset(), pieces=frozenset()):
+    """(id, reason) of each search key safe search hides: blocked keys, keys
+    containing a blocked piece, and keys whose most common written form is
+    explicit (ties: the lowercase form). Call after word_frequencies(), which
+    ranks forms."""
     out = []
     for i, key in enumerate(keys):
         if key in allow:
             continue
         if key in block:
             out.append((i, BLOCKED))
+            continue
+        if any(p in key for p in pieces):
+            out.append((i, CONTAINS))
             continue
         forms = display_forms(key, forms_by_key[key])
         word = forms[0] if forms else key
@@ -886,12 +903,13 @@ def main():
             log("  wordfreq not installed, skipping frequencies (pip install wordfreq)")
 
     # Safe search's rule, worked out now: it also breaks ties between display forms.
-    reasons, allow, block = {}, frozenset(), frozenset()
+    reasons, allow, block, pieces = {}, frozenset(), frozenset(), frozenset()
     if labels.seen:
         if args.safe_search_list:
             with open(args.safe_search_list, encoding="utf-8") as f:
-                allow, block = read_safe_search_list(f.read())
-            log(f"  safe search hand-picked list: {len(allow):,} allowed, {len(block):,} blocked")
+                allow, block, pieces = read_safe_search_list(f.read())
+            log(f"  safe search hand-picked list: {len(allow):,} allowed, {len(block):,} blocked, "
+                f"{len(pieces):,} piece(s)")
         reasons = labels.explicit_reasons(allow)
         EXPLICIT_FORMS.update(reasons)
 
@@ -930,7 +948,7 @@ def main():
     # Safe search: a key is explicit when its most common written form is.
     explicit_ids = None
     if labels.seen:
-        hidden = explicit_keys(keys, forms_by_key, reasons, allow, block)
+        hidden = explicit_keys(keys, forms_by_key, reasons, allow, block, pieces)
         shown = candidate_keys(keys, forms_by_key, {**labels.candidates(reasons), **reasons}, hidden, allow)
         explicit_ids = [i for i, _ in hidden]
         sections.append(("EXPLICIT", np.array(explicit_ids, dtype="<u4")))

@@ -54,7 +54,7 @@ for (const word of await readList(listPath)) {
   const id = index.exact(key);
   if (id === null) tally.absent++;
   else if (allow.has(key)) tally.allowed++;
-  else if (index.isExplicit(id) || block.has(key)) tally.hidden++;
+  else if (index.isExplicit(id) || block.has(key) || lists.contains.some((p) => key.includes(p))) tally.hidden++;
   else shown.push({ zipf: index.frequency(id), word: index.displayForms(id)[0] });
 }
 shown.sort((a, b) => b.zipf - a.zipf || a.word.localeCompare(b.word));

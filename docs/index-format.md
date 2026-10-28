@@ -157,8 +157,10 @@ a word; a meaning is explicit when its tags include `vulgar`, `offensive` or
 terms*, *English ethnic slurs* or *English swear words*. A headword is explicit
 when its **main meaning** is: the first meaning of its first entry, as the page
 lists it. So is a word whose main meaning is just a plural, tense or spelling
-(`form_of`, `alt_of`) of such a word. That is one step: nothing is hidden for
-being linked to a linked word.
+(`form_of`, `alt_of`) of such a word, or of one of those, however many steps
+(`sand-niggers` is the plural of a spelling of `sand nigger`). Only main
+meanings that are nothing but a form are followed, so an ordinary word is
+never reached: `is` is a form of `be`, whose main meaning is "to exist".
 
 Labels further down a word's meanings hide nothing. Plenty of everyday words
 carry a rare slur or vulgar sense that almost nobody means, and a word with an
@@ -172,8 +174,11 @@ explicit, so a slur spelling such as `RuSSian` can't hide `Russian`).
 
 **Hand-picked list.** [`data/safe-search.list`](../data/safe-search.list)
 names search keys to **block** (bad words whose first meaning is innocent, and
-ones the labels miss) and to **allow** (names and ordinary words that share a
-key with an offensive word). It is stored encoded so the repository doesn't
+ones the labels miss), to **allow** (names and ordinary words that share a
+key with an offensive word, and the odd ordinary word a chain of spellings
+reaches, such as `foo`), and pieces whose words all **contain** a slur, which
+hide every key containing them (`snigger` reads as the slur in it; so do
+compounds such as `glownigger` that Wiktionary doesn't label). Allow wins. It is stored encoded so the repository doesn't
 carry a readable list of slurs; `python scripts/safe_search_list.py show`
 decodes it, and `add` / `remove` edit it. Part of the block list was picked by hand from
 [cuss](https://github.com/wooorm/cuss)'s likely-profane words (MIT; see `data/README.md`);
@@ -188,7 +193,7 @@ first, with why. That is where candidates for the list come from. It also
 writes `<out>.labels.jsonl.gz`, the labels this rule reads, so a rule change
 can be rebuilt (`--labels`) without the multi-GB dump.
 
-A word typed out in full always shows.
+A hidden word stays hidden even when it is typed out in full.
 
 ## Hot list
 

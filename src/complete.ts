@@ -43,7 +43,7 @@ const MAX_SCORE = SHAPE_STEP - 1;
 const SMALL_CHUNK = 256;
 
 export interface SearchOptions {
-  /** Leave out explicit words (except an exact match). */
+  /** Leave out explicit words, even one typed out in full. */
   safe?: boolean;
 }
 
@@ -51,13 +51,15 @@ export interface SearchOptions {
 export interface SafeSearchOverrides {
   /** Hide these too: words the labels missed. */
   block?: readonly string[];
-  /** Show these after all: words the labels caught by mistake. */
+  /** Hide every word containing one of these pieces ("snigger" reads as the slur in it). */
+  contains?: readonly string[];
+  /** Show these after all: words the labels caught by mistake. Wins over block and contains. */
   allow?: readonly string[];
 }
 
-/** What safe search hides, for one query's exact match. */
+/** What safe search hides. */
 interface Hidden {
-  /** True for an explicit word that isn't the exact match. */
+  /** True for a hidden word. */
   has(id: number): boolean;
   /** Hidden words with ids in [lo, hi). */
   countIn(lo: number, hi: number): number;
@@ -96,7 +98,7 @@ export class Completer {
     const query = normalize(typed);
     // Separator bytes would match word boundaries; a normalized query has none.
     const exactId = query && !/[\u0000\u0001]/.test(query) ? this.index.exact(query) : null;
-    const hidden = options.safe && this.safeIds().length > 0 ? this.hidden(exactId) : null;
+    const hidden = options.safe && this.safeIds().length > 0 ? this.hidden() : null;
     return new Matches(this.index, this.ranks, this.maxRank, query, exactId, hidden);
   }
 
@@ -107,8 +109,9 @@ export class Completer {
     this.hiddenKeys = Array.from(this.safeIds(), (id) => this.index.key(id));
   }
 
-  /** Ids safe search hides: the index's explicit words, plus `block`, minus
-   *  `allow`. Words missing from the index are ignored. */
+  /** Ids safe search hides: the index's explicit words, plus `block` and
+   *  every word containing a piece in `contains`, minus `allow`. Words missing
+   *  from the index are ignored. */
   private safeIds(): Uint32Array {
     if (this.hiddenIds) return this.hiddenIds;
     const index = this.index;
@@ -117,6 +120,10 @@ export class Completer {
     const allowed = new Set(lookup(this.overrides.allow));
     const ids = new Set(index.explicitIds());
     for (const id of lookup(this.overrides.block)) ids.add(id);
+    for (const piece of this.overrides.contains ?? []) {
+      const key = normalize(piece);
+      if (key) for (const id of index.wordsContaining(key)) ids.add(id);
+    }
     for (const id of allowed) ids.delete(id);
     this.hiddenIds = Uint32Array.from(ids).sort();
     this.hiddenBits = new Uint32Array((index.size + 31) >>> 5);
@@ -124,22 +131,17 @@ export class Completer {
     return this.hiddenIds;
   }
 
-  private hidden(exactId: number | null): Hidden {
+  private hidden(): Hidden {
     const ids = this.safeIds();
     const bits = this.hiddenBits!;
-    const isHidden = (id: number) => (bits[id >>> 5] & (1 << (id & 31))) !== 0;
     this.prepareSafeSearch();
     const keys = this.hiddenKeys!;
     return {
-      has: (id) => id !== exactId && isHidden(id),
-      countIn(lo, hi) {
-        let n = lowerBound(ids, hi) - lowerBound(ids, lo);
-        if (exactId !== null && exactId >= lo && exactId < hi && isHidden(exactId)) n--;
-        return n;
-      },
+      has: (id) => (bits[id >>> 5] & (1 << (id & 31))) !== 0,
+      countIn: (lo, hi) => lowerBound(ids, hi) - lowerBound(ids, lo),
       countEndingWith(query) {
         let n = 0;
-        for (let i = 0; i < keys.length; i++) if (ids[i] !== exactId && keys[i].endsWith(query)) n++;
+        for (const key of keys) if (key.endsWith(query)) n++;
         return n;
       },
     };

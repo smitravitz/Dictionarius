@@ -41,7 +41,7 @@ function oracle(query: string, fromOffset = 0, safe = false, explicit = EXPLICIT
   keys.forEach((key, id) => {
     const offset = offsetOf(key, q);
     if (offset < fromOffset) return;
-    if (safe && explicit.has(key) && key !== q) return; // hidden unless typed in full
+    if (safe && explicit.has(key)) return; // hidden, even typed out in full
     rows.push({ id, offset, exact: key === q, shape: shapeOf(key), score: Math.round(index.frequency(id) * 100) });
   });
   rows.sort(
@@ -202,9 +202,12 @@ describe("Completer", () => {
       for (const word of EXPLICIT) expect(shown).not.toContain(word);
     });
 
-    it("still shows an explicit word typed out in full, but not its relatives", () => {
-      const shown = drain(completer.search("rudeword", { safe: true }).cursor()).map((r) => keys[r.id]);
-      expect(shown).toEqual(["rudeword"]);
+    it("hides an explicit word even when it is typed out in full", () => {
+      const m = completer.search("rudeword", { safe: true });
+      expect(drain(m.cursor())).toEqual([]);
+      while (!m.count(1_000));
+      expect([m.starts, m.ends, m.total]).toEqual([0, 0, 0]);
+      expect(m.occurrences).toBeGreaterThan(0); // there is such a word: safe search hid it
     });
 
     it("shows everything with safe search off", () => {
@@ -254,6 +257,26 @@ describe("Completer", () => {
 
       it("leaves safe search off alone", () => {
         for (const q of ["an", "rude"]) expect(drain(tuned.search(q).cursor()), q).toEqual(oracle(q));
+      });
+    });
+
+    describe("with a piece to hide wherever it appears", () => {
+      // "snigger" reads as the slur in it: every word containing a blocked
+      // piece is hidden, unless it is allowed.
+      const netted = new Completer(index, { contains: ["Gap"], allow: ["air gap"] });
+
+      it("hides every word containing it, except allowed ones, and counts what it shows", () => {
+        const explicit = new Set([...EXPLICIT, ...keys.filter((k) => k.includes("gap") && k !== "air gap")]);
+        expect(explicit.size).toBeGreaterThan(EXPLICIT.size + 1);
+        for (const q of ["ga", "a", "gap", "air"]) {
+          const m = netted.search(q, { safe: true });
+          const rows = oracle(q, 0, true, explicit);
+          expect(drain(m.cursor()), q).toEqual(rows);
+          while (!m.count(1_000));
+          expect(m.total, `${q} total`).toBe(rows.length);
+        }
+        const air = drain(netted.search("air", { safe: true }).cursor()).map((r) => keys[r.id]);
+        expect(air).toContain("air gap");
       });
     });
   });
