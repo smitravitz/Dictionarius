@@ -17,9 +17,8 @@
  * thumb.
  */
 import { pulse, tick } from "./haptics";
-import { positionScale, type PositionScale } from "./position-scale";
+import { positionDots, positionScale, type PositionScale } from "./position-scale";
 
-const MAX_DOTS = 10;
 const TRACK_SHARE = 0.8; // the active range, of the width; the margins either side reach the ends
 
 export interface SliderState {
@@ -43,6 +42,7 @@ export interface SliderEvents {
 export class OffsetSlider {
   private readonly el: HTMLElement;
   private readonly dots: HTMLElement;
+  private readonly more: HTMLElement;
   private readonly frag: HTMLElement;
   private readonly note: HTMLElement;
   private readonly window: HTMLElement;
@@ -63,8 +63,9 @@ export class OffsetSlider {
     this.el.setAttribute("aria-hidden", "true"); // pointer-only; Alt+←/→ does the same from the keyboard
     const label = el("p", "slider-label");
     this.dots = el("span", "slider-dots");
+    this.more = el("span", "slider-more");
     this.frag = el("span", "slider-frag");
-    label.append(this.dots, this.frag);
+    label.append(this.dots, this.more, this.frag);
     this.note = el("p", "slider-note");
     this.window = div("slider-window");
     this.track = div("slider-track");
@@ -141,7 +142,9 @@ export class OffsetSlider {
     }
     this.track.replaceChildren(...bars);
 
-    this.dots.textContent = "•".repeat(Math.min(value, MAX_DOTS)) + (value > MAX_DOTS ? `+${value - MAX_DOTS}` : "");
+    const { dots, more } = positionDots(value);
+    this.dots.textContent = dots;
+    this.more.textContent = more;
     this.frag.textContent = query;
     const count = byOffset[value];
     const letters = `${value} ${value === 1 ? "letter" : "letters"} before`;

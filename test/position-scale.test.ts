@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { positionScale } from "../web/position-scale";
+import { positionDots, positionScale } from "../web/position-scale";
 
 // The position slider's layout, as agreed: shares of the active scrubber range
 // (the middle 80% of the screen). Positions 0-3 get 8, 8, 9 and 11%; 4-6 are
@@ -64,5 +64,18 @@ describe("positionScale", () => {
     expect(positionScale(1).at(0.9)).toBe(0);
     expect(positionScale(0).edges).toEqual([0.5]);
     expect(positionScale(0).at(0.5)).toBe(0);
+  });
+});
+
+describe("positionDots", () => {
+  // The slider's label: a dot per letter before the match, up to ten; past
+  // ten, the ten dots and then "10+1", "10+2", …
+  it("writes a dot per letter up to ten, then 10+n after the ten dots", () => {
+    const ten = "•".repeat(10);
+    expect(positionDots(0)).toEqual({ dots: "", more: "" });
+    expect(positionDots(3)).toEqual({ dots: "•••", more: "" });
+    expect(positionDots(10)).toEqual({ dots: ten, more: "" });
+    expect(positionDots(11)).toEqual({ dots: ten, more: "10+1" });
+    expect(positionDots(23)).toEqual({ dots: ten, more: "10+13" });
   });
 });
