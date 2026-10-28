@@ -4,6 +4,7 @@
  * Every row is aligned on the typed fragment: text before it sits left of the
  * seam, the fragment and the rest to the right. A word that starts with the
  * fragment has nothing left of the seam, so the geometry shows the match type.
+ * A row too long for the screen scrolls sideways, starting on the seam.
  */
 import type { Suggestion } from "../src/complete";
 import { splitOnFragment } from "../src/highlight";
@@ -36,7 +37,10 @@ export class ResultsList {
     this.foot.className = "foot";
     this.foot.setAttribute("role", "presentation");
     scroller.addEventListener("scroll", () => this.schedule(), { passive: true });
-    new ResizeObserver(() => this.schedule()).observe(scroller);
+    new ResizeObserver(() => {
+      this.alignRows([...this.rendered.values()]); // the seam may have moved
+      this.schedule();
+    }).observe(scroller);
     list.addEventListener("click", (event) => {
       const li = (event.target as Element).closest<HTMLElement>("li[data-row]");
       const s = li ? this.rows[Number(li.dataset.row)] : undefined;
@@ -106,13 +110,16 @@ export class ResultsList {
         this.rendered.delete(i);
       }
     }
+    const added: HTMLElement[] = [];
     for (let i = first; i < last; i++) {
       if (!this.rendered.has(i)) {
         const el = this.build(i);
         this.list.append(el);
         this.rendered.set(i, el);
+        added.push(el);
       }
     }
+    this.alignRows(added);
 
     const count = this.rows.length;
     this.foot.textContent = !this.done ? "Loading more…" : count > 0 ? `That’s all ${count.toLocaleString()}.` : "";
@@ -143,13 +150,33 @@ export class ResultsList {
     li.setAttribute("aria-label", s.display);
 
     const split = splitOnFragment(s.display, this.query) ?? { before: "", match: "", after: s.display };
-    const before = span("before", "");
-    before.append(span("", split.before));
     const match = document.createElement("mark");
     match.className = "frag";
     match.textContent = split.match;
-    li.append(before, match, span("after", split.after));
+    const line = span("line", "");
+    line.append(span("before", split.before), match, span("after", split.after));
+    const track = span("track", "");
+    track.append(line);
+    li.append(track);
     return li;
+  }
+
+  /** Scroll rows sideways so their fragment sits on the seam. Text longer than
+   *  the space left of the seam would otherwise push the fragment right. */
+  private alignRows(rows: HTMLElement[]) {
+    if (rows.length === 0) return;
+    const seam = parseFloat(getComputedStyle(this.list).getPropertyValue("--seam-x")) || 0;
+    // Measure every row, then widen and scroll them, so layout runs only twice.
+    const shifts = rows.map((li) =>
+      Math.max(0, (li.querySelector(".before") as HTMLElement).getBoundingClientRect().width - seam),
+    );
+    // Room to scroll that far even when the rest of the word is short.
+    rows.forEach((li, i) => {
+      (li.querySelector(".line") as HTMLElement).style.minWidth = `calc(100% + ${shifts[i]}px)`;
+    });
+    rows.forEach((li, i) => {
+      (li.firstElementChild as HTMLElement).scrollLeft = shifts[i];
+    });
   }
 }
 
@@ -161,16 +188,20 @@ function span(className: string, text: string): HTMLSpanElement {
 }
 
 /**
- * Drag-to-scroll for mice, with momentum on release. Touch keeps the browser's
- * native scrolling (already a drag, with the platform's own momentum). A drag
- * longer than a few pixels doesn't count as a click on the row under it.
+ * Drag-to-scroll for mice: up/down moves the list (with momentum on release),
+ * sideways moves the row under the pointer. Touch keeps the browser's native
+ * scrolling (already a drag, with the platform's own momentum). A drag longer
+ * than a few pixels doesn't count as a click on the row under it.
  */
 function enableDragScroll(el: HTMLElement) {
   const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)");
   let pointerId = -1;
+  let startX = 0;
   let startY = 0;
   let startTop = 0;
-  let dragging = false;
+  let startLeft = 0;
+  let row: HTMLElement | null = null; // the row's sideways scroller under the pointer
+  let dragging: "none" | "list" | "row" = "none";
   let suppressClick = false;
   let samples: { t: number; y: number }[] = [];
   let glide = 0;
@@ -179,34 +210,43 @@ function enableDragScroll(el: HTMLElement) {
     if (e.pointerType !== "mouse" || e.button !== 0) return;
     cancelAnimationFrame(glide);
     pointerId = e.pointerId;
+    startX = e.clientX;
     startY = e.clientY;
     startTop = el.scrollTop;
-    dragging = false;
+    row = (e.target as Element).closest<HTMLElement>(".track");
+    startLeft = row?.scrollLeft ?? 0;
+    dragging = "none";
     samples = [{ t: e.timeStamp, y: e.clientY }];
   });
 
   el.addEventListener("pointermove", (e) => {
     if (e.pointerId !== pointerId) return;
+    const dx = e.clientX - startX;
     const dy = e.clientY - startY;
-    if (!dragging && Math.abs(dy) > 6) {
-      dragging = true;
+    if (dragging === "none" && Math.max(Math.abs(dx), Math.abs(dy)) > 6) {
+      dragging = Math.abs(dx) > Math.abs(dy) && row ? "row" : "list";
       el.setPointerCapture(pointerId);
       el.classList.add("dragging");
     }
-    if (!dragging) return;
-    el.scrollTop = startTop - dy;
-    samples.push({ t: e.timeStamp, y: e.clientY });
-    if (samples.length > 6) samples.shift();
+    if (dragging === "row") {
+      row!.scrollLeft = startLeft - dx;
+    } else if (dragging === "list") {
+      el.scrollTop = startTop - dy;
+      samples.push({ t: e.timeStamp, y: e.clientY });
+      if (samples.length > 6) samples.shift();
+    }
   });
 
   const end = (e: PointerEvent) => {
     if (e.pointerId !== pointerId) return;
     pointerId = -1;
-    if (!dragging) return;
-    dragging = false;
+    const was = dragging;
+    dragging = "none";
+    if (was === "none") return;
     el.classList.remove("dragging");
     suppressClick = true;
     setTimeout(() => (suppressClick = false), 0);
+    if (was === "row") return;
 
     const first = samples[0];
     const last = samples[samples.length - 1];

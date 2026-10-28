@@ -169,7 +169,12 @@ body {
 
 /* ----------------------------------------------------------------- intro */
 
+/* The examples fill whatever height the start screen has, and scroll past it. */
 .intro {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 1.5rem var(--pad);
 }
 
@@ -250,7 +255,7 @@ a:focus-visible {
   inset: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
-  touch-action: pan-y;
+  touch-action: pan-x pan-y; /* up/down for the list, sideways for a row */
   scrollbar-width: thin;
 }
 
@@ -270,11 +275,9 @@ a:focus-visible {
   top: 0;
   right: 0;
   left: 0;
-  display: grid;
-  grid-template-columns: var(--seam-x) auto minmax(0, 1fr);
+  display: flex;
   align-items: center;
   height: var(--row);
-  padding: 0 var(--pad);
   user-select: none;
   -webkit-user-select: none;
 }
@@ -296,16 +299,41 @@ a:focus-visible {
   box-shadow: inset 3px 0 0 var(--proof);
 }
 
-/* Text before the fragment hugs the seam; long beginnings fade out at the left. */
-.before {
-  display: flex;
-  justify-content: flex-end;
-  overflow: hidden;
-  -webkit-mask-image: linear-gradient(to right, transparent, #000 1.5rem);
-  mask-image: linear-gradient(to right, transparent, #000 1.5rem);
+/* Each row scrolls sideways on its own, so a long beginning or ending can be
+   read in full. It starts scrolled so the fragment sits on the seam; text that
+   runs past either edge fades out there. */
+.track {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 var(--pad), #000 calc(100% - var(--pad)), transparent);
+  mask-image: linear-gradient(to right, transparent, #000 var(--pad), #000 calc(100% - var(--pad)), transparent);
 }
 
-.before > span,
+.track::-webkit-scrollbar {
+  display: none;
+}
+
+/* Before the fragment: at least the seam's width, right-aligned against it. */
+.line {
+  display: grid;
+  grid-template-columns: minmax(var(--seam-x), max-content) max-content max-content;
+  align-items: center;
+  width: max-content;
+  min-width: 100%;
+  height: 100%;
+  padding: 0 var(--pad);
+}
+
+.before {
+  justify-self: end;
+}
+
+.before,
 .frag,
 .after {
   white-space: pre;
@@ -318,14 +346,8 @@ a:focus-visible {
   font-weight: 650;
 }
 
-.after {
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
 .foot {
-  grid-column: 2 / 4;
-  padding-left: 0.625rem;
+  padding-left: calc(var(--pad) + var(--seam-x) + 0.625rem);
   color: var(--pencil);
   font-size: 0.8125rem;
 }

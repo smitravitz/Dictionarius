@@ -9,6 +9,7 @@ import { sourcePageUrl } from "../src/attribution";
 import type { FromWorker, ToWorker } from "./protocol";
 import { ResultsList } from "./results-list";
 import { setUpNativeShell } from "./native";
+import { EXAMPLES, exampleLabel } from "./examples";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const input = $<HTMLInputElement>("q");
@@ -145,13 +146,24 @@ void setUpNativeShell(() => {
   return true;
 });
 
-for (const button of document.querySelectorAll<HTMLButtonElement>(".examples button")) {
-  button.addEventListener("click", () => {
-    input.value = button.dataset.query ?? "";
-    input.focus();
-    search(input.value);
-  });
+// Example fragments fill the start screen; tapping one searches for it.
+const examples = $("examples");
+for (const [fragment, where] of EXAMPLES) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.dataset.query = fragment;
+  button.textContent = exampleLabel(fragment, where);
+  const item = document.createElement("li");
+  item.append(button);
+  examples.append(item);
 }
+examples.addEventListener("click", (event) => {
+  const button = (event.target as Element).closest<HTMLButtonElement>("button[data-query]");
+  if (!button) return;
+  input.value = button.dataset.query ?? "";
+  input.focus();
+  search(input.value);
+});
 
 // The seam sits a fixed share of the row width from the left edge.
 const placeSeam = () => {
