@@ -59,6 +59,7 @@ FORMAT_VERSION = 1
 NORM_ID = "nfd-strip-diacritic-lower-trim/v1"
 FLAG_FREQ = 1
 FLAG_HOT = 2
+FLAG_SHAPE = 4
 TERM, SEP = 0x00, 0x01
 BLOCK_SHIFT, SUPER_SHIFT = 8, 16
 HEADER = struct.Struct("<8s9I48sI")  # 96 bytes; the last u32 is numHot
@@ -229,11 +230,27 @@ def word_frequencies(keys, forms_by_key):
     return freq
 
 
-def rank_order(freq, k):
-    """Word ids by rank: score descending, then id (alphabetical) ascending."""
-    if freq is None:
-        return np.arange(k, dtype=np.int64)
-    return np.lexsort((np.arange(k), -freq.astype(np.int64)))
+# Word shapes, which rank before frequency: one word first, then hyphenated
+# words, then entries with spaces (phrases, names).
+SHAPE_WORD, SHAPE_HYPHENATED, SHAPE_SPACED = 0, 1, 2
+HYPHENS = "-\u2010\u2011\u2012\u2013\u2014"  # hyphen-minus, hyphens and dashes
+
+
+def word_shape(key):
+    """0 = one word, 1 = hyphenated (no spaces), 2 = contains whitespace."""
+    if any(ch in JS_WHITESPACE for ch in key):
+        return SHAPE_SPACED
+    if any(ch in HYPHENS for ch in key):
+        return SHAPE_HYPHENATED
+    return SHAPE_WORD
+
+
+def rank_order(freq, shape, k):
+    """Word ids by rank: shape ascending, then score descending, then id
+    (alphabetical) ascending."""
+    ids = np.arange(k, dtype=np.int64)
+    score = np.zeros(k, dtype=np.int64) if freq is None else -freq.astype(np.int64)
+    return np.lexsort((ids, score, shape.astype(np.int64)))
 
 
 # -------------------------------------------------------------- FM-index ----
@@ -361,6 +378,7 @@ class IndexReader:
         self.voff = view("VOFF", "<u4")
         self.vblob = view("VBLOB", np.uint8)
         self.hot = view("HOTK", np.uint8) if self.flags & FLAG_HOT else None
+        self.shape = view("SHAPE", np.uint8) if self.flags & FLAG_SHAPE else None
 
     def hot_keys(self):
         """Keys of the top-ranked words, in rank order."""
@@ -461,8 +479,9 @@ class Checker:
         self.passed += 1
 
 
-def verify(reader, text, encoded, keys, forms_by_key, freq, rng, py_order):
+def verify(reader, text, encoded, keys, forms_by_key, freq, shape, rng, py_order):
     check = Checker()
+    check.equal("shapes", reader.shape.tolist(), shape.tolist())
     # Hot list = keys of the first numHot words in rank order. py_order is an
     # independent sort (Python's sorted, not numpy's lexsort used to build it).
     check.equal("hot keys in rank order", reader.hot_keys(),
@@ -520,16 +539,20 @@ NORMALIZATION_SAMPLES = [
 ]
 
 
-def golden(reader, text, encoded, keys, forms_by_key, freq, rng, bin_sha256, py_order):
+def golden(reader, text, encoded, keys, forms_by_key, freq, shape, rng, bin_sha256, py_order):
     k = len(encoded)
     out = {
         "file": {"sha256": bin_sha256, "version": FORMAT_VERSION, "normId": NORM_ID,
                  "n": reader.n, "numWords": k, "numHot": reader.num_hot},
         "normalize": [[s, normalize(s)] for s in NORMALIZATION_SAMPLES],
         "exact": [], "prefix": [], "substring": [], "extract": [], "display": [], "freq": [],
-        "rank": [],
+        "rank": [], "shape": [],
     }
-    # Word ids at sample positions of the rank order (score desc, id asc),
+    # A few words of each shape.
+    for s in (SHAPE_WORD, SHAPE_HYPHENATED, SHAPE_SPACED):
+        ids = np.flatnonzero(shape == s).tolist()
+        out["shape"] += [{"id": i, "shape": s} for i in sorted(rng.sample(ids, min(5, len(ids))))]
+    # Word ids at sample positions of the rank order (shape, score desc, id asc),
     # including both sides of the hot-list boundary.
     ranks = {0, 1, 2, k - 1} | set(rng.sample(range(k), min(12, k)))
     if 0 < reader.num_hot < k:
@@ -644,17 +667,19 @@ def main():
         ("VOFF", np.array(voff, dtype="<u4")),
         ("VBLOB", np.frombuffer(b"".join(blobs), dtype=np.uint8)),
     ]
+    shape = np.array([word_shape(key) for key in keys], dtype=np.uint8)
+    sections.append(("SHAPE", shape))
 
     # Hot list: keys of the top-ranked words, in rank order, each ending in SEP.
     # The app scans it with a plain string search, so mid-word hits come out
     # already ranked; the ids are recomputed in the app from FREQ.
     num_hot = min(max(args.hot, 0), k)
     if num_hot:
-        hot_ids = rank_order(freq, k)[:num_hot]
+        hot_ids = rank_order(freq, shape, k)[:num_hot]
         hot_blob = b"".join(encoded[i] + bytes([SEP]) for i in hot_ids)
         sections.append(("HOTK", np.frombuffer(hot_blob, dtype=np.uint8)))
 
-    flags = (FLAG_FREQ if freq is not None else 0) | (FLAG_HOT if num_hot else 0)
+    flags = (FLAG_FREQ if freq is not None else 0) | (FLAG_HOT if num_hot else 0) | FLAG_SHAPE
     out_dir = os.path.dirname(os.path.abspath(args.out))
     os.makedirs(out_dir, exist_ok=True)
     bin_path = args.out + ".bin"
@@ -667,12 +692,17 @@ def main():
     reader = IndexReader(buf)
     rng = random.Random(args.seed)
     score = (lambda i: -int(freq[i])) if freq is not None else (lambda i: 0)
-    py_order = sorted(range(k), key=lambda i: (score(i), i))
-    passed = verify(reader, text, encoded, keys, forms_by_key, freq, rng, py_order)
+    # Independent of rank_order(): Python's sort, and the shape rule re-applied
+    # with regexes (JS_WHITESPACE is the set JavaScript's \s matches).
+    spaced = re.compile("[" + re.escape(JS_WHITESPACE) + "]")
+    hyphen = re.compile("[" + re.escape(HYPHENS) + "]")
+    py_shape = [2 if spaced.search(key) else 1 if hyphen.search(key) else 0 for key in keys]
+    py_order = sorted(range(k), key=lambda i: (py_shape[i], score(i), i))
+    passed = verify(reader, text, encoded, keys, forms_by_key, freq, shape, rng, py_order)
     log(f"  OK: {passed:,} checks passed")
 
     golden_path = args.out + ".golden.json"
-    data = golden(reader, text, encoded, keys, forms_by_key, freq,
+    data = golden(reader, text, encoded, keys, forms_by_key, freq, shape,
                   random.Random(args.seed + 1), sha, py_order)
     with open(golden_path, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=1)
