@@ -19,10 +19,11 @@ const lettersBefore = (page: Page) =>
   );
 
 /** A blank spot near the left of a row whose word starts with the fragment
- *  (nothing sits left of the seam), leaving room to slide right on screen. */
-async function blankSpot(row: Locator) {
+ *  (nothing sits left of the seam), or near its right end, past the word. */
+async function blankSpot(row: Locator, side: "left" | "right" = "left") {
   const box = (await row.boundingBox())!;
-  return { x: Math.round(box.x + 30), y: Math.round(box.y + box.height / 2) };
+  const x = side === "left" ? box.x + 30 : box.x + box.width - 30;
+  return { x: Math.round(x), y: Math.round(box.y + box.height / 2) };
 }
 
 /** Letters before the fragment in the row at the top of the list. */
@@ -62,10 +63,10 @@ test("tapping an example searches without opening the keyboard", async ({ page }
   await expect(page.locator("#q")).not.toBeFocused();
 });
 
-/** Press and hold a blank spot near the left of the first row with a finger
- *  (phone) or the mouse (desktop) until the slider opens. */
-async function holdBlankSpot(page: Page, isMobile: boolean) {
-  const { x, y } = await blankSpot(page.locator("li.word").first());
+/** Press and hold a blank spot near the left (or right) of the first row with
+ *  a finger (phone) or the mouse (desktop) until the slider opens. */
+async function holdBlankSpot(page: Page, isMobile: boolean, side: "left" | "right" = "left") {
+  const { x, y } = await blankSpot(page.locator("li.word").first(), side);
   const cdp = isMobile ? await page.context().newCDPSession(page) : null;
   const touch = (type: "touchStart" | "touchMove" | "touchEnd", at?: { x: number; y: number }) =>
     cdp!.send("Input.dispatchTouchEvent", { type, touchPoints: at ? [{ x: Math.round(at.x), y: Math.round(at.y) }] : [] });
@@ -225,4 +226,30 @@ test("in a browser, the slider pulses when it opens and ticks once per step", as
   await expect(page.locator(".slider-note")).toHaveText(/^3 letters before/);
   expect(await vibrations()).toEqual([15, 5, 5, 5]); // a tick per step
   await finger.lift();
+});
+
+test("held from the right, the scrubber mirrors for a right thumb: 0 at the right edge, more letters leftward", async ({ page, isMobile }) => {
+  await open(page);
+  await page.locator("#q").fill("a");
+  await counted(page);
+  const finger = await holdBlankSpot(page, isMobile, "right");
+  await expect(page.locator(".slider-note")).toHaveText(/^0 letters before/); // where the thumb came down
+
+  // The same scale, read from the right: 6 letters at 75% of the range from the right edge.
+  const box = (await page.locator(".slider-window").boundingBox())!;
+  const fromRight = (share: number) => box.x + box.width * (0.9 - 0.8 * share);
+  await finger.slideTo(fromRight(0.75));
+  await expect(page.locator(".slider-note")).toHaveText(/^6 letters before/);
+  // The bars are drawn mirrored too, so the lit bar stays under the thumb.
+  const bars = page.locator(".slider-track > i");
+  expect((await bars.nth(0).boundingBox())!.x).toBeGreaterThan((await bars.nth(1).boundingBox())!.x);
+  const lit = (await page.locator(".slider-track > i.on").boundingBox())!;
+  expect(finger.x).toBeGreaterThanOrEqual(lit.x - 2);
+  expect(finger.x).toBeLessThanOrEqual(lit.x + lit.width + 4);
+  await finger.slideTo(2); // all the way left: the last position
+  const last = (await bars.count()) - 1;
+  await expect(page.locator(".slider-note")).toHaveText(new RegExp(`^${last} letters before`));
+  await finger.slideTo(fromRight(0.75));
+  await finger.lift();
+  await expect.poll(() => topLetters(page)).toBe(6); // the list stays at 6 letters before
 });
