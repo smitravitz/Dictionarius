@@ -1,0 +1,24 @@
+# What Dictionarius may do. Anything not listed here is out of bounds.
+# scripts/audit_privacy.py checks the code (and, given one, a built APK) against this file,
+# and CI runs it on every push. Change it only on purpose, in the same commit as the code
+# that needs it, and say why.
+
+[android]
+# A dictionary needs no permissions at all: the word list ships inside the app, settings
+# stay in the WebView's own storage, and haptics use View.performHapticFeedback.
+permissions = []
+
+[ios]
+# Info.plist NS*UsageDescription keys. None.
+usage_descriptions = []
+
+[network]
+# Servers the app's own code may contact. None: it works fully offline.
+hosts = []
+# Sites it may link to. A tap hands the link to the user's browser; the app itself never
+# connects. Wiktionary (each word's entry), the data license, and the source code.
+links = ["en.wiktionary.org", "creativecommons.org", "github.com"]
+
+[audit]
+# Where the app's code lives (tests are skipped).
+sources = ["web", "src"]

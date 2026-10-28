@@ -85,6 +85,8 @@ jobs:
       - name: Build a debug APK
         working-directory: android
         run: ./gradlew assembleDebug --no-daemon
+      - name: Check the APK against the privacy budget (privacy.toml)
+        run: python3 scripts/audit_privacy.py --apk android/app/build/outputs/apk/debug/app-debug.apk
 
   bench:
     name: Benchmark (FM-index vs SQLite FTS5)
@@ -99,8 +101,8 @@ jobs:
             bench/requirements.txt
             scripts/requirements.txt
       - run: pip install -r bench/requirements.txt -r scripts/requirements.txt
-      - name: Builder unit tests
-        run: python -m unittest scripts/test_build_fm_index.py
+      - name: Builder and privacy-audit unit tests
+        run: python -m unittest scripts/test_build_fm_index.py scripts/test_audit_privacy.py
       - run: bash bench/fetch_data.sh words
       - name: Build headword index (self-verifying)
         run: |

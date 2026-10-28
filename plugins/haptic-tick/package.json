@@ -1,0 +1,16 @@
+{
+  "name": "dictionarius-haptic-tick",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Haptic ticks without any permission: View.performHapticFeedback on Android, UIFeedbackGenerator on iOS",
+  "license": "GPL-3.0-or-later",
+  "author": "Dictionarius contributors",
+  "files": ["android/src/main/", "android/build.gradle", "ios/Sources", "Package.swift", "DictionariusHapticTick.podspec"],
+  "capacitor": {
+    "android": { "src": "android" },
+    "ios": { "src": "ios" }
+  },
+  "peerDependencies": {
+    "@capacitor/core": ">=8.0.0"
+  }
+}
