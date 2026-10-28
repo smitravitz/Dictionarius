@@ -57,11 +57,11 @@ test("safe search hides explicit words; turning it off shows them, and is rememb
   await expect.poll(() => shown(page)).not.toContain("rudeword");
 });
 
-test("a word typed out in full still shows with safe search on", async ({ page }) => {
+test("safe search hides a word even when it is typed out in full", async ({ page }) => {
   await open(page);
   await page.locator("#q").fill("rudeword");
-  await expect.poll(() => shown(page)).toEqual(["rudeword"]);
-  await expect(page.locator("#summary")).toHaveText(/^1 starts with “rudeword” · 1 ends with it · 1 in all$/);
+  await expect(page.locator("#summary")).toHaveText(/^Safe search hides every word with “rudeword”/);
+  expect(await shown(page)).toEqual([]);
 });
 
 test("words with an ordinary meaning too are not hidden", async ({ page }) => {

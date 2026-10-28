@@ -1,5 +1,6 @@
 # Safe search: hand-picked words to allow (always shown) or block (always
-# hidden), on top of the rule in docs/index-format.md#safe-search.
+# hidden), and pieces that hide every word containing them, on top of the
+# rule in docs/index-format.md#safe-search.
 # Encoded (ROT13, then base64) so the file isn't a readable word list.
 # Show or edit it with: python scripts/safe_search_list.py
 
@@ -20,6 +21,7 @@ UXZydGI=
 cWJ0J2Y=
 U1ZO
 c3Zzdg==
+c2Ji
 c2V2cHg=
 c2ViYWcgb2h6Y3Jl
 dGVuYWFsIHRybmU=
@@ -141,9 +143,19 @@ c250dGJn
 c250dGJnZg==
 c250dGJnbA==
 c250Ymc=
+c250YmcgdmViYQ==
+c250YmcgdmViYWY=
+c250YmcgaWJncg==
+c250YmcgaWJncmU=
+c250YmcgaWJncmVm
+c250YmcgaWJncmY=
 c250YmdycQ==
+c250YmdyZQ==
+c250YmdyZWY=
 c250Ymd2YXQ=
+c250Ymd2YXRm
 c250Ymdm
+c250Ymds
 c250Zg==
 c3Jybw==
 U3J5cHVyZQ==
@@ -277,6 +289,8 @@ ZWJweCBmY3ZxcmU=
 Zm56b2I=
 Zm56b2Jm
 Zm5hcSB6YmF4cmw=
+Zm5jIHNudGJn
+Zm5jIHNudGJnZg==
 RnB1am5lZ21y
 ZnJlb2ItcGJ6emhhdmZnZg==
 ZnVyLW5jcg==
@@ -326,3 +340,7 @@ bXZiZg==
 bXZiZ2hlcWY=
 bXZjY3JldXJucQ==
 bXZjY3JldXJucWY=
+
+[contains]
+c250dGJn
+YXZ0dA==

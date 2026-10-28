@@ -83,14 +83,24 @@ class ExplicitWords(unittest.TestCase):
         )
         self.assertEqual(found, {"rudeword", "rudewords", "rudewurd"})
 
-    def test_one_step_only(self):
-        # The plural of a spelling is two steps away: not hidden.
+    def test_forms_of_forms_follow_too(self):
+        # The plural of a spelling ("sand-niggers" of "sand-nigger" of "sand
+        # nigger"), however many steps, as long as each main meaning is just
+        # a plural, tense or spelling.
         found = self.explicit(
             entry("rudeword", sense("vulgar")),
             entry("rudewurd", sense("alt-of", alt_of="rudeword")),
-            entry("rudewurds", sense("form-of", "plural", form_of="rudewurd")),
+            entry("rude-wurd", sense("alt-of", alt_of="rudewurd")),
+            entry("rude-wurds", sense("form-of", "plural", form_of="rude-wurd")),
+            entry("mixedword", {"glosses": ["a form"], "form_of": [{"word": "rude-wurd"}, {"word": "plainword"}]}),
+            entry("plainword", sense(gloss="plain")),
         )
-        self.assertEqual(found, {"rudeword", "rudewurd"})
+        self.assertEqual(found, {"rudeword", "rudewurd", "rude-wurd", "rude-wurds"})
+        labels = Labels()
+        for e in (entry("rudeword", sense("vulgar")), entry("rudewurd", sense("alt-of", alt_of="rudeword")),
+                  entry("rudewurds", sense("form-of", "plural", form_of="rudewurd"))):
+            labels.add(e)
+        self.assertEqual(labels.explicit_reasons()["rudewurds"], "form of rudewurd")
 
     def test_an_inflection_with_a_vulgar_label_of_its_own_counts(self):
         found = self.explicit(entry("rudeworded", sense("vulgar", "form-of", form_of="plainword")))
@@ -203,6 +213,15 @@ class Keys(unittest.TestCase):
         self.assertEqual(display_forms("rude", forms["rude"]), ["rude", "Rude"])
         self.assertEqual(explicit_keys(["nameword", "rude"], forms, reasons), [(1, "main meaning")])
 
+    def test_a_piece_hides_every_key_that_contains_it(self):
+        # "snigger" reads as the slur in it: a hand-picked piece hides every key
+        # containing it, unless that key is allowed.
+        keys = ["air gap", "gap", "gapword", "plain", "sgappy"]
+        forms = {k: {k} for k in keys}
+        found = explicit_keys(keys, forms, {}, allow={"air gap"}, pieces={"gap"})
+        self.assertEqual(found, [(1, "contains a blocked piece"), (2, "contains a blocked piece"),
+                                 (4, "contains a blocked piece")])
+
     def test_visible_keys_worth_a_look(self):
         build_fm_index.FORM_ZIPF.update({"name": 2.0, "Name": 4.0})
         keys = ["boy", "name", "plain", "rude", "fine"]
@@ -216,11 +235,18 @@ class Keys(unittest.TestCase):
 
 class HandPickedList(unittest.TestCase):
     def test_round_trip_and_normalizing(self):
-        text = safe_search_list.render({"allow": ["Boy", "fun run", "Café"], "block": ["Gapword"]})
+        text = safe_search_list.render({"allow": ["Boy", "fun run", "Café"], "block": ["Gapword"],
+                                        "contains": ["Gapp"]})
         self.assertNotIn("Gapword", text)  # encoded
-        allow, block = read_safe_search_list(text)
+        self.assertNotIn("Gapp", text)
+        allow, block, pieces = read_safe_search_list(text)
         self.assertEqual(allow, {"boy", "fun run", "cafe"})
         self.assertEqual(block, {"gapword"})
+        self.assertEqual(pieces, {"gapp"})
+
+    def test_a_list_without_pieces_reads(self):
+        allow, block, pieces = read_safe_search_list(safe_search_list.render({"allow": ["boy"], "block": []}))
+        self.assertEqual((allow, block, pieces), ({"boy"}, set(), set()))
 
     def test_a_word_outside_a_section_is_an_error(self):
         with self.assertRaises(ValueError):
@@ -236,9 +262,10 @@ class HandPickedList(unittest.TestCase):
 
     def test_the_shipped_list_reads(self):
         with open(safe_search_list.PATH, encoding="utf-8") as f:
-            allow, block = read_safe_search_list(f.read())
+            allow, block, pieces = read_safe_search_list(f.read())
         self.assertTrue(allow)
         self.assertTrue(block)
+        self.assertTrue(pieces)
 
 
 class LabelsCache(unittest.TestCase):
