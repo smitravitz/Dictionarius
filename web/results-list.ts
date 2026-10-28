@@ -26,8 +26,6 @@ export interface ResultsListEvents {
   /** Fetch rows [from, to). */
   needRows(from: number, to: number): void;
   choose(s: Suggestion): void;
-  /** True while another gesture (the position slider) owns the pointer. */
-  busy(): boolean;
 }
 
 export class ResultsList {
@@ -59,7 +57,6 @@ export class ResultsList {
       const s = li ? this.rows.get(Number(li.dataset.row)) : undefined;
       if (s) this.events.choose(s);
     });
-    enableDragScroll(scroller, () => this.events.busy());
   }
 
   /** Start showing results for a new search (its first page is on its way). */
@@ -263,100 +260,4 @@ function span(className: string, text: string): HTMLSpanElement {
   if (className) el.className = className;
   el.textContent = text;
   return el;
-}
-
-/**
- * Drag-to-scroll for mice: up/down moves the list (with momentum on release),
- * sideways moves the row under the pointer. Touch keeps the browser's native
- * scrolling (already a drag, with the platform's own momentum). A drag longer
- * than a few pixels doesn't count as a click on the row under it.
- */
-function enableDragScroll(el: HTMLElement, busy: () => boolean) {
-  const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)");
-  let pointerId = -1;
-  let startX = 0;
-  let startY = 0;
-  let startTop = 0;
-  let startLeft = 0;
-  let row: HTMLElement | null = null; // the row's sideways scroller under the pointer
-  let dragging: "none" | "list" | "row" = "none";
-  let suppressClick = false;
-  let samples: { t: number; y: number }[] = [];
-  let glide = 0;
-
-  el.addEventListener("pointerdown", (e) => {
-    if (e.pointerType !== "mouse" || e.button !== 0) return;
-    cancelAnimationFrame(glide);
-    pointerId = e.pointerId;
-    startX = e.clientX;
-    startY = e.clientY;
-    startTop = el.scrollTop;
-    row = (e.target as Element).closest<HTMLElement>(".track");
-    startLeft = row?.scrollLeft ?? 0;
-    dragging = "none";
-    samples = [{ t: e.timeStamp, y: e.clientY }];
-  });
-
-  el.addEventListener("pointermove", (e) => {
-    if (e.pointerId !== pointerId) return;
-    if (busy()) {
-      // The slider took over this press: let go without scrolling.
-      if (dragging !== "none") el.classList.remove("dragging");
-      pointerId = -1;
-      dragging = "none";
-      return;
-    }
-    const dx = e.clientX - startX;
-    const dy = e.clientY - startY;
-    if (dragging === "none" && Math.max(Math.abs(dx), Math.abs(dy)) > 6) {
-      dragging = Math.abs(dx) > Math.abs(dy) && row ? "row" : "list";
-      el.setPointerCapture(pointerId);
-      el.classList.add("dragging");
-    }
-    if (dragging === "row") {
-      row!.scrollLeft = startLeft - dx;
-    } else if (dragging === "list") {
-      el.scrollTop = startTop - dy;
-      samples.push({ t: e.timeStamp, y: e.clientY });
-      if (samples.length > 6) samples.shift();
-    }
-  });
-
-  const end = (e: PointerEvent) => {
-    if (e.pointerId !== pointerId) return;
-    pointerId = -1;
-    const was = dragging;
-    dragging = "none";
-    if (was === "none") return;
-    el.classList.remove("dragging");
-    suppressClick = true;
-    setTimeout(() => (suppressClick = false), 0);
-    if (was === "row") return;
-
-    const first = samples[0];
-    const last = samples[samples.length - 1];
-    const stillFor = e.timeStamp - last.t;
-    let velocity = last.t > first.t && stillFor < 80 ? (last.y - first.y) / (last.t - first.t) : 0;
-    if (reduceMotion.matches || velocity === 0) return;
-    let previous = performance.now();
-    const step = (now: number) => {
-      const dt = now - previous;
-      previous = now;
-      el.scrollTop -= velocity * dt;
-      velocity *= Math.pow(0.95, dt / 16);
-      if (Math.abs(velocity) > 0.02) glide = requestAnimationFrame(step);
-    };
-    glide = requestAnimationFrame(step);
-  };
-  el.addEventListener("pointerup", end);
-  el.addEventListener("pointercancel", end);
-  el.addEventListener(
-    "click",
-    (e) => {
-      if (!suppressClick) return;
-      e.preventDefault();
-      e.stopPropagation();
-    },
-    true,
-  );
 }

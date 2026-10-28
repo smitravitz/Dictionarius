@@ -38,6 +38,11 @@ decision or module makes it load-bearing.
   jump to a position. Its **active range** is the middle 80% of the screen; the
   **position scale** (`web/position-scale.ts`) gives positions 4–6 the most
   room, puts 6 at about 75%, and squeezes positions 8 and up into the last 18%.
+- **Scroller gestures** — what a press on the results means, decided in one
+  place (`web/scroller-gestures.ts`): a **tap** opens a word (on a touch screen
+  while typing, it only puts the keyboard away); a **hold** on a blank spot
+  opens the position slider; a hold on a word is reserved; a moving finger
+  scrolls; the mouse drags the list or a row.
 - **DictionarySource** — the seam for definitions (`getByHeadword`,
   `getCandidates`); mock, SQLite, and FM-index sources are interchangeable
   behind it. The web app doesn't use it yet: its search runs on the Completer.
