@@ -2,18 +2,19 @@
  * The position slider: hold a blank spot in the results (scroller-gestures.ts
  * decides what counts as a hold), feel a pulse, then slide sideways to choose
  * how many letters come before the match. A histogram sits centred across the
- * middle 80% of the screen (the active range): one bar per position, as tall
- * as the words found there, and as wide as position-scale.ts gives it: 4-6
- * letters wide, 6 at about 75%, the rare far end squeezed. The cursor stays
- * under the finger; the margins either side count as the first and last
- * position, so the ends are easy to reach. Each step ticks; the list scrolls
- * to the words at that position as you go, and stays whole: scroll up or down
- * from there.
+ * middle 80% of the screen (the active range): one bar per position, left to
+ * right, as tall as the words found there, and as wide as position-scale.ts
+ * gives it: 4-6 letters wide, 6 at about 75%, the rare far end squeezed. A
+ * cursor marks the chosen bar; the margins either side count as the first and
+ * last position, so the ends are easy to reach. Each step ticks; the list
+ * scrolls to the words at that position as you go, and stays whole: scroll up
+ * or down from there.
  *
  * Which side the hold starts on says which hand is holding the phone. Held
- * from the right half, everything mirrors: 0 letters at the right edge, more
- * letters as the thumb sweeps left, and the bars drawn right to left so the
- * lit bar stays under the thumb. The scale's shape is the same either way.
+ * from the right half, the thumb's direction flips: 0 letters at the right
+ * edge, more letters as it sweeps left. The histogram still reads left to
+ * right, like the words; the cursor moves across it the opposite way to the
+ * thumb.
  */
 import { pulse, tick } from "./haptics";
 import { positionScale, type PositionScale } from "./position-scale";
@@ -52,7 +53,7 @@ export class OffsetSlider {
   private scale: PositionScale = positionScale(1);
   private rangeX = 0; // where the active range starts inside the window
   private range = 1; // its width in pixels
-  private mirrored = false; // held from the right: 0 letters at the right edge
+  private mirrored = false; // held from the right: the thumb's direction flips
 
   constructor(
     frame: HTMLElement,
@@ -92,14 +93,17 @@ export class OffsetSlider {
     this.el.classList.remove("on");
   }
 
-  /** The finger is at screen x: put the cursor there and pick the position
-   *  under it. Left of the bars is the first position, right of them the last. */
+  /** The finger is at screen x: pick the position there and move the cursor
+   *  to it. Left of the bars is the first position, right of them the last;
+   *  held from the right, the other way round. */
   slideTo(x: number) {
     const box = this.window.getBoundingClientRect();
-    const inside = Math.min(box.width, Math.max(0, x - box.left));
+    const finger = Math.min(box.width, Math.max(0, x - box.left));
+    // Where that is on the histogram: the same spot, or its mirror image for a
+    // right thumb. The active range is centred, so mirroring is width - x.
+    const inside = this.mirrored ? box.width - finger : finger;
     this.thumb.style.transform = `translateX(${inside}px)`;
-    const share = (inside - this.rangeX) / this.range;
-    const value = Math.min(this.max, this.scale.at(this.mirrored ? 1 - share : share));
+    const value = Math.min(this.max, this.scale.at((inside - this.rangeX) / this.range));
     if (value === this.value) return;
     const first = this.value < 0;
     this.value = value;
@@ -128,8 +132,7 @@ export class OffsetSlider {
       const height = count === undefined ? 3 : count === 0 ? 2 : 4 + 36 * Math.sqrt(count / most);
       const step = (edges[i + 1] - edges[i]) * this.range;
       const gap = step > 8 ? 3 : step > 4 ? 1.5 : 0.5;
-      const start = this.mirrored ? 1 - edges[i + 1] : edges[i];
-      bar.style.left = `${this.rangeX + start * this.range}px`;
+      bar.style.left = `${this.rangeX + edges[i] * this.range}px`;
       bar.style.width = `${Math.max(1, step - gap)}px`;
       bar.style.height = `${height}px`;
       if (count === undefined) bar.className = "unknown";
