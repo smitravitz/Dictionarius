@@ -22,5 +22,6 @@
         <item name="android:background">@drawable/splash</item>
         <!-- Android 12+ launch screen: the app icon on the app's background -->
         <item name="windowSplashScreenBackground">@color/splash_background</item>
+        <item name="windowSplashScreenIconBackgroundColor">@color/ic_launcher_background</item>
     </style>
 </resources>
