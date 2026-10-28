@@ -4,9 +4,12 @@
 Reads headwords from a Kaikki/Wiktionary JSONL dump, a JSON file, or a plain
 word list; normalizes them exactly like the app's search box; and writes:
 
-  <out>.bin          the index the app loads straight into typed arrays
-  <out>.golden.json  expected answers computed by brute force, used by the
-                     TypeScript loader's tests
+  <out>.bin               the index the app loads straight into typed arrays
+  <out>.golden.json       expected answers computed by brute force, used by
+                          the TypeScript loader's tests
+  <out>.safe-review.tsv   the words safe search hides, most common first, with why
+  <out>.labels.jsonl.gz   the meanings' labels safe search needs, to rebuild
+                          from a word list without the dump (--labels)
 
 The binary layout is specified in docs/index-format.md.
 
@@ -24,6 +27,7 @@ import argparse
 import bisect
 import gzip
 import hashlib
+import io
 import json
 import os
 import random
@@ -130,6 +134,22 @@ EXPLICIT_TAGS = frozenset({"vulgar", "offensive", "slur"})
 EXPLICIT_CATEGORIES = frozenset({
     "English vulgarities", "English offensive terms", "English ethnic slurs", "English swear words",
 })
+# A slur, or a plainly offensive meaning, hides a word wherever it is listed.
+# Hedged labels ("sometimes offensive", "dated, offensive") only count for
+# the main meaning; further down they would hide everyday words ("colored").
+SLUR_TAGS = frozenset({"slur"})
+SLUR_CATEGORIES = frozenset({"English ethnic slurs"})
+HEDGES = frozenset({"sometimes", "possibly", "potentially", "occasionally", "dated", "archaic",
+                    "obsolete", "historical", "rare"})
+# Labels kept per meaning (and in the labels cache): the ones above and a few
+# more a later rule might weigh. Categories are kept as "cat:<name>".
+KEPT_TAGS = EXPLICIT_TAGS | SLUR_TAGS | HEDGES | {"derogatory", "pejorative", "ethnic", "slang", "often", "now"}
+KEPT_CATEGORIES = EXPLICIT_CATEGORIES | SLUR_CATEGORIES
+EXPLICIT_LABELS = EXPLICIT_TAGS | {"cat:" + c for c in EXPLICIT_CATEGORIES}
+SLUR_LABELS = SLUR_TAGS | {"cat:" + c for c in SLUR_CATEGORIES}
+# Hand corrections (allow / block), shared with the app.
+SAFE_SEARCH_LIST = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data", "safe-search.txt")
+BLOCKED = "blocked by hand"
 
 
 def category_names(categories):
@@ -141,13 +161,28 @@ def category_names(categories):
             yield c["name"]
 
 
-# A slur, or a plainly offensive meaning, hides a word wherever it is listed.
-# Hedged labels ("sometimes offensive", "dated, offensive") only count for
-# the main meaning; further down they would hide everyday words ("colored").
-SLUR_TAGS = frozenset({"slur"})
-SLUR_CATEGORIES = frozenset({"English ethnic slurs"})
-HEDGES = frozenset({"sometimes", "possibly", "potentially", "occasionally", "dated", "archaic",
-                    "obsolete", "historical", "rare"})
+def meaning_of(sense):
+    """(labels, base words) for one meaning: the labels that matter here, and
+    the words it is an inflection or spelling of (form_of, alt_of). None for a
+    meaning without a gloss."""
+    if not isinstance(sense, dict):
+        return None
+    labels = {t for t in sense.get("tags") or () if isinstance(t, str) and t in KEPT_TAGS}
+    labels.update("cat:" + c for c in category_names(sense.get("categories")) if c in KEPT_CATEGORIES)
+    bases = frozenset(
+        t["word"].strip(JS_WHITESPACE)
+        for key in ("form_of", "alt_of")
+        for t in sense.get(key) or ()
+        if isinstance(t, dict) and isinstance(t.get("word"), str)
+    )
+    if labels & EXPLICIT_LABELS or bases or sense.get("glosses") or sense.get("raw_glosses"):
+        return (frozenset(labels), bases)
+    return None
+
+
+def is_slur(labels):
+    """A slur, or a plainly (not "sometimes") offensive meaning."""
+    return bool(labels & SLUR_LABELS) or ("offensive" in labels and not labels & HEDGES)
 
 
 class Labels:
@@ -155,18 +190,22 @@ class Labels:
 
     A word is explicit when
       - its main meaning (the first meaning of its first entry, as the page
-        lists it) is labelled vulgar, offensive or a slur, or is an inflection
-        or spelling of an explicit word ("fucked" of "fuck"); or
-      - any of its meanings, wherever listed, is a slur or plainly offensive,
-        or a spelling of such a word (lowercase "chink" of "Chink").
-    So "faggot" is hidden although "a bundle of sticks" comes first, while
-    words whose only other meanings are vulgar ("cock": a rooster first) or
-    hedged ("colored") stay visible."""
+        lists it) is labelled vulgar, offensive or a slur; or
+      - any of its meanings, wherever listed, is a slur or plainly offensive
+        ("faggot", although "a bundle of sticks" comes first); or
+      - its main meaning is an inflection or spelling of explicit words
+        ("fucked" of "fuck", "faggots" of "faggot").
+    A spelling listed further down doesn't count: "be" is also an old spelling
+    of "by", and that mustn't tie "is" to every word "by" is tied to.
+    Words whose other meanings are only vulgar ("cock": a rooster first) or
+    hedged ("colored") stay visible.
+
+    Hand corrections (data/safe-search.txt) are search keys: `allow` keeps
+    words visible, `block` hides them; inflections follow both."""
 
     def __init__(self):
-        self.first = {}  # word -> ("explicit" | "plain" | "ref", base words): its main meaning
-        self.slur = set()  # words with a slur or plainly offensive meaning anywhere
-        self.refs = {}  # word -> base words of any of its inflection / spelling meanings
+        self.main = {}  # word -> (labels, bases) of its main meaning
+        self.marked = {}  # word -> labels of each meaning that carries any, in order
         self.seen = False  # any entry carried meanings at all
 
     def add(self, obj):
@@ -177,99 +216,124 @@ class Labels:
         word = word.strip(JS_WHITESPACE)  # the same trim as headwords
         self.seen = True
         for sense in senses:
-            kind = classify_sense(sense)
-            if not kind:
+            meaning = meaning_of(sense)
+            if meaning is None:
                 continue
-            if word not in self.first:
-                self.first[word] = kind  # the first meaning of the first entry
-            if is_slur(sense):
-                self.slur.add(word)
-            if kind[0] == "ref":
-                self.refs.setdefault(word, set()).update(kind[1])
+            if word not in self.main:
+                self.main[word] = meaning  # the first meaning of the first entry
+            if meaning[0]:
+                self.marked.setdefault(word, []).append(meaning[0])
 
-    def explicit_reasons(self):
-        """Explicit words, each with why: "main meaning", "a slur meaning", or
-        "form of <word>"."""
-        reasons = {w: "main meaning" for w, (kind, _) in self.first.items() if kind == "explicit"}
-        for w in self.slur:
-            reasons.setdefault(w, "a slur meaning")
-        slurs = set(self.slur)
-        # Spellings and inflections of slurs, wherever listed, are slurs too.
-        grown = True
-        while grown:
-            grown = False
-            for w, bases in self.refs.items():
-                if w in slurs:
-                    continue
-                hit = next((b for b in bases if b in slurs), None)
-                if hit is not None:
-                    slurs.add(w)
-                    reasons.setdefault(w, f"form of {hit}")
-                    grown = True
-        # A main meaning that is a form of a hidden word hides the word.
-        pending = {w: bases for w, (kind, bases) in self.first.items() if kind == "ref" and w not in reasons}
+    def explicit_reasons(self, allow=frozenset(), block=frozenset()):
+        """Explicit words, each with why: "main meaning", "a slur meaning" or
+        "form of <word>". `allow` and `block` are search keys (normalized).
+        Blocked keys themselves are hidden by explicit_keys(); here they pull
+        in their inflections (the cache may not list a blocked word at all)."""
+        reasons = {}
+        for w, (labels, _) in self.main.items():
+            if labels & EXPLICIT_LABELS:
+                reasons[w] = "main meaning"
+        for w, marks in self.marked.items():
+            if w not in reasons and any(is_slur(labels) for labels in marks):
+                reasons[w] = "a slur meaning"
+        if allow:
+            for w in [w for w in reasons if normalize(w) in allow]:
+                del reasons[w]
+
+        # A main meaning that is a form of hidden words hides the word.
+        pending = {w: bases for w, (labels, bases) in self.main.items()
+                   if bases and w not in reasons and not (allow and normalize(w) in allow)}
+        blocked = {b for bases in pending.values() for b in bases if normalize(b) in block} if block else set()
         while True:
-            done = [w for w, bases in pending.items() if bases <= reasons.keys()]
+            done = [w for w, bases in pending.items() if all(b in reasons or b in blocked for b in bases)]
             if not done:
                 return reasons
             for w in done:
                 reasons[w] = f"form of {min(pending.pop(w))}"
 
-    def explicit_words(self):
-        return set(self.explicit_reasons())
+    def explicit_words(self, allow=frozenset(), block=frozenset()):
+        return set(self.explicit_reasons(allow, block))
+
+    def save(self, path):
+        """Write what the rule needs, so the index can be rebuilt (or the rule
+        changed) without reading the whole dump again. Words whose main
+        meaning is plain and that carry no labels are left out."""
+        with open(path, "wb") as raw, gzip.GzipFile(fileobj=raw, mode="wb", filename="", mtime=0) as gz:
+            f = io.TextIOWrapper(gz, encoding="utf-8")  # mtime 0: the same labels give the same file
+            for w, (labels, bases) in self.main.items():
+                marks = self.marked.get(w)
+                if not (labels or bases or marks):
+                    continue
+                row = {"w": w, "m": [sorted(labels), sorted(bases)]}
+                if marks:
+                    row["x"] = [sorted(m) for m in marks]
+                f.write(json.dumps(row, ensure_ascii=False) + "\n")
+            f.flush()
+            f.detach()
+
+    @classmethod
+    def load(cls, path):
+        labels = cls()
+        with open_any(path) as f:
+            for line in f:
+                row = loads(line)
+                labels.main[row["w"]] = (frozenset(row["m"][0]), frozenset(row["m"][1]))
+                if row.get("x"):
+                    labels.marked[row["w"]] = [frozenset(m) for m in row["x"]]
+        labels.seen = True
+        return labels
 
 
-def is_slur(sense):
-    """A slur, or a plainly (not "sometimes") offensive meaning."""
-    if not isinstance(sense, dict):
-        return False
-    tags = set(sense.get("tags") or ())
-    if SLUR_TAGS & tags or SLUR_CATEGORIES.intersection(category_names(sense.get("categories"))):
-        return True
-    return "offensive" in tags and not tags & HEDGES
+def read_safe_search_list(text):
+    """(allow, block) search keys from a corrections list like
+    data/safe-search.txt: "[allow]" and "[block]" sections, one word per
+    line, "#" starts a comment line."""
+    allow, block = set(), set()
+    section = None
+    for n, line in enumerate(text.splitlines(), 1):
+        line = line.strip(JS_WHITESPACE)
+        if not line or line.startswith("#"):
+            continue
+        if line in ("[allow]", "[block]"):
+            section = allow if line == "[allow]" else block
+        elif section is None:
+            raise ValueError(f"line {n}: {line!r} comes before [allow] or [block]")
+        else:
+            section.add(normalize(line))
+    both = allow & block
+    if both:
+        raise ValueError(f"both allowed and blocked: {', '.join(sorted(both))}")
+    return frozenset(allow), frozenset(block)
 
 
-def classify_sense(sense):
-    """("explicit", ()), ("ref", base words) for an inflection or spelling,
-    ("plain", ()), or None for a meaning without a gloss."""
-    if not isinstance(sense, dict):
-        return None
-    tags = sense.get("tags") or ()
-    if EXPLICIT_TAGS.intersection(tags) or EXPLICIT_CATEGORIES.intersection(category_names(sense.get("categories"))):
-        return ("explicit", frozenset())
-    bases = frozenset(
-        t["word"].strip(JS_WHITESPACE)
-        for key in ("form_of", "alt_of")
-        for t in sense.get(key) or ()
-        if isinstance(t, dict) and isinstance(t.get("word"), str)
-    )
-    if bases:
-        return ("ref", bases)
-    if sense.get("glosses") or sense.get("raw_glosses"):
-        return ("plain", frozenset())
-    return None
-
-
-def explicit_key_ids(keys, forms_by_key, explicit_words):
-    """Ids of search keys whose most common written form is explicit ("dick"
-    decides for "Dick" too). Call after word_frequencies(), which ranks forms."""
+def explicit_keys(keys, forms_by_key, reasons, allow=frozenset(), block=frozenset()):
+    """(id, reason) of each search key safe search hides: blocked keys, and
+    keys whose most common written form is explicit ("dick" decides for "Dick"
+    too). Call after word_frequencies(), which ranks forms."""
     out = []
     for i, key in enumerate(keys):
+        if key in allow:
+            continue
+        if key in block:
+            out.append((i, BLOCKED))
+            continue
         forms = display_forms(key, forms_by_key[key])
-        if (forms[0] if forms else key) in explicit_words:
-            out.append(i)
+        word = forms[0] if forms else key
+        if word in reasons:
+            out.append((i, reasons[word]))
     return out
 
 
-def safe_review_rows(keys, forms_by_key, freq, explicit_ids, reasons):
-    """(Zipf, word, reason) for every key safe search hides, most common
-    first, then alphabetical: the list to read through for mistakes."""
+def safe_review_rows(keys, forms_by_key, freq, hidden):
+    """(Zipf, word, reason) for every key safe search hides (`hidden`: (id,
+    reason) pairs), most common first, then alphabetical: the list to read
+    through for mistakes."""
     rows = []
-    for i in explicit_ids:
+    for i, reason in hidden:
         forms = display_forms(keys[i], forms_by_key[keys[i]])
         word = forms[0] if forms else keys[i]
         zipf = int(freq[i]) if freq is not None else 0
-        rows.append((-zipf, re.sub(r"\s", " ", word), reasons.get(word, "")))
+        rows.append((-zipf, re.sub(r"\s", " ", word), reason))
     rows.sort()
     return [(f"{-z / 100:.2f}" if freq is not None else "", w, r) for z, w, r in rows]
 
@@ -776,16 +840,23 @@ def main():
     ap.add_argument("--hot", type=int, default=DEFAULT_HOT,
                     help=f"top-ranked words in the fast mid-word list (default {DEFAULT_HOT:,}; 0 = none)")
     ap.add_argument("--seed", type=int, default=1, help="seed for verification samples")
+    ap.add_argument("--labels", help="read meanings' labels from a labels cache (<out>.labels.jsonl.gz "
+                                     "of an earlier build) instead of the input")
+    ap.add_argument("--safe-search-list", default=SAFE_SEARCH_LIST,
+                    help="safe search's hand corrections (default: data/safe-search.txt; '' for none)")
     args = ap.parse_args()
 
     started = time.time()
     fmt = detect_format(args.input) if args.format == "auto" else args.format
     log(f"reading {args.input} ({fmt})")
-    labels = Labels()
+    labels = Labels.load(args.labels) if args.labels else Labels()
+    if args.labels:
+        log(f"  labels from {args.labels}: {len(labels.main):,} words")
+    collect = None if args.labels else labels
     if fmt == "kaikki":
-        raw = read_kaikki(args.input, args.lang, labels)
+        raw = read_kaikki(args.input, args.lang, collect)
     elif fmt == "json":
-        raw = read_json(args.input, labels)
+        raw = read_json(args.input, collect)
     else:
         raw = read_wordlist(args.input)
     if args.limit:
@@ -841,8 +912,14 @@ def main():
     # Safe search: a key is explicit when its most common written form is.
     explicit_ids = None
     if labels.seen:
-        reasons = labels.explicit_reasons()
-        explicit_ids = explicit_key_ids(keys, forms_by_key, reasons.keys())
+        allow, block = frozenset(), frozenset()
+        if args.safe_search_list:
+            with open(args.safe_search_list, encoding="utf-8") as f:
+                allow, block = read_safe_search_list(f.read())
+            log(f"  safe search corrections: {len(allow):,} allowed, {len(block):,} blocked")
+        reasons = labels.explicit_reasons(allow, block)
+        hidden = explicit_keys(keys, forms_by_key, reasons, allow, block)
+        explicit_ids = [i for i, _ in hidden]
         sections.append(("EXPLICIT", np.array(explicit_ids, dtype="<u4")))
 
     # Hot list: keys of the top-ranked words, in rank order, each ending in SEP.
@@ -887,8 +964,12 @@ def main():
         review_path = args.out + ".safe-review.tsv"
         with open(review_path, "w", encoding="utf-8") as f:
             f.write("zipf\tword\treason\n")
-            for row in safe_review_rows(keys, forms_by_key, freq, explicit_ids, reasons):
+            for row in safe_review_rows(keys, forms_by_key, freq, hidden):
                 f.write("\t".join(row) + "\n")
+    labels_path = None
+    if labels.seen and not args.labels:
+        labels_path = args.out + ".labels.jsonl.gz"
+        labels.save(labels_path)
 
     gz = len(zlib.compress(buf, 6))
     log("")
@@ -907,6 +988,8 @@ def main():
     log(f"wrote {golden_path}")
     if review_path:
         log(f"wrote {review_path} (hidden by safe search, most common first)")
+    if labels_path:
+        log(f"wrote {labels_path} (labels cache: rebuild with --labels, without the dump)")
     log(f"done in {time.time() - started:.0f}s")
 
 

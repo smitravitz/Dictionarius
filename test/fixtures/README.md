@@ -11,6 +11,7 @@ tested in CI without the full 27 MB build.
 | `headwords-sample.bin` | index built from it (format v1, `docs/index-format.md`) |
 | `headwords-sample.golden.json` | brute-force answers the tests compare against |
 | `headwords-sample.safe-review.tsv` | the words safe search hides, with why |
+| `headwords-sample.labels.jsonl.gz` | the labels safe search read (rebuild with `--labels`) |
 
 **Source & license.** Every 6th word of Webster's 1913 dictionary (public
 domain), with ~10% capitalized or upper-cased, plus hand-picked edge cases:
