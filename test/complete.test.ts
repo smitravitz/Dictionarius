@@ -29,13 +29,18 @@ interface Row {
   id: number;
   offset: number;
 }
-function oracle(query: string, fromOffset = 0): Row[] {
+// The fixture's made-up labelled words (test/fixtures/README.md): these four
+// are explicit; "mixedword" has an ordinary meaning too, so it isn't.
+const EXPLICIT = new Set(["rudeword", "rudewords", "rudewurd", "slurword"]);
+
+function oracle(query: string, fromOffset = 0, safe = false): Row[] {
   const q = normalize(query);
   if (!q) return [];
   const rows: (Row & { exact: boolean; shape: number; score: number })[] = [];
   keys.forEach((key, id) => {
     const offset = offsetOf(key, q);
     if (offset < fromOffset) return;
+    if (safe && EXPLICIT.has(key) && key !== q) return; // hidden unless typed in full
     rows.push({ id, offset, exact: key === q, shape: shapeOf(key), score: Math.round(index.frequency(id) * 100) });
   });
   rows.sort(
@@ -154,6 +159,42 @@ describe("Completer", () => {
       expect(m.count(1)).toBe(true);
       expect(m.total).toBe(0);
     }
+  });
+
+  describe("safe search", () => {
+    it("leaves out explicit words, and keeps words with an ordinary meaning", () => {
+      for (const q of ["rude", "word", "urd", "e", "slur", "mixed"]) {
+        expect(drain(completer.search(q, { safe: true }).cursor()), q).toEqual(oracle(q, 0, true));
+      }
+      const shown = drain(completer.search("word", { safe: true }).cursor()).map((r) => keys[r.id]);
+      expect(shown).toContain("mixedword");
+      for (const word of EXPLICIT) expect(shown).not.toContain(word);
+    });
+
+    it("still shows an explicit word typed out in full, but not its relatives", () => {
+      const shown = drain(completer.search("rudeword", { safe: true }).cursor()).map((r) => keys[r.id]);
+      expect(shown).toEqual(["rudeword"]);
+    });
+
+    it("shows everything with safe search off", () => {
+      const shown = drain(completer.search("rude", { safe: false }).cursor()).map((r) => keys[r.id]);
+      for (const word of ["rudeword", "rudewords", "rudewurd"]) expect(shown).toContain(word);
+    });
+
+    it("counts only what it shows", () => {
+      for (const q of ["rude", "word", "s", "rudeword"]) {
+        const m = completer.search(q, { safe: true });
+        const shown = oracle(q, 0, true).map((r) => keys[r.id]);
+        const n = normalize(q);
+        expect(m.starts, `${q} starts`).toBe(shown.filter((k) => k.startsWith(n)).length);
+        expect(m.ends, `${q} ends`).toBe(shown.filter((k) => k.endsWith(n)).length);
+        while (!m.count(1_000));
+        expect(m.total, `${q} total`).toBe(shown.length);
+        const byOffset: number[] = [];
+        for (const r of oracle(q, 0, true)) byOffset[r.offset] = (byOffset[r.offset] ?? 0) + 1;
+        expect([...m.byOffset], `${q} by offset`).toEqual(Array.from(byOffset, (x) => x ?? 0));
+      }
+    });
   });
 
   it("describes each result: display form, all forms, position, frequency", () => {

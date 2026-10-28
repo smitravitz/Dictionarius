@@ -18,6 +18,7 @@ interface Golden {
   display: { id: number; forms: string[] }[];
   freq: { id: number; zipf100: number }[];
   shape?: { id: number; shape: number }[]; // older builds: none
+  explicit?: { count: number; ids: number[]; clean: number[] }; // builds without labels: none
   normalize: [string, string][];
 }
 
@@ -100,6 +101,13 @@ function describeAgainstGolden(name: string, base: string) {
       for (const { id, shape } of golden.shape ?? []) {
         expect(index.shape(id), index.key(id)).toBe(shape);
       }
+    });
+
+    it("marks the words safe search hides", () => {
+      if (!golden.explicit) return expect(index.explicitCount).toBe(0);
+      expect(index.explicitCount).toBe(golden.explicit.count);
+      for (const id of golden.explicit.ids) expect(index.isExplicit(id), index.key(id)).toBe(true);
+      for (const id of golden.explicit.clean) expect(index.isExplicit(id), index.key(id)).toBe(false);
     });
 
     it("exposes the hot list: the top-ranked words' keys, in rank order", () => {
