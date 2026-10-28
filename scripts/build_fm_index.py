@@ -209,7 +209,9 @@ class Labels:
     def __init__(self):
         self.main = {}  # word -> (labels, bases) of its main meaning
         self.marked = {}  # word -> labels of each meaning that carries any, in order
+        self.names = set()  # words whose main meaning is a proper noun (part of speech "name")
         self.seen = False  # any entry carried meanings at all
+        self.pos_seen = False  # any entry said its part of speech (so `names` is known)
 
     def add(self, obj):
         word = obj.get("word")
@@ -218,12 +220,17 @@ class Labels:
             return
         word = word.strip(JS_WHITESPACE)  # the same trim as headwords
         self.seen = True
+        pos = obj.get("pos")
+        if isinstance(pos, str):
+            self.pos_seen = True
         for sense in senses:
             meaning = meaning_of(sense)
             if meaning is None:
                 continue
             if word not in self.main:
                 self.main[word] = meaning  # the first meaning of the first entry
+                if pos == "name":
+                    self.names.add(word)
             if meaning[0]:
                 self.marked.setdefault(word, []).append(meaning[0])
 
@@ -260,18 +267,25 @@ class Labels:
                 if w not in reasons and any(is_slur(labels) for labels in marks)}
 
     def save(self, path):
-        """Write what the rule needs, so the index can be rebuilt (or the rule
-        changed) without reading the whole dump again. Words whose main
-        meaning is plain and that carry no labels are left out."""
+        """Write what the rules need (safe search, names), so the index can be
+        rebuilt (or a rule changed) without reading the whole dump again.
+        Words whose main meaning is plain, carries no labels and isn't a name
+        are left out. A first line {"pos": true} says parts of speech were
+        read, so a word missing from the names is known not to be one."""
         with open(path, "wb") as raw, gzip.GzipFile(fileobj=raw, mode="wb", filename="", mtime=0) as gz:
             f = io.TextIOWrapper(gz, encoding="utf-8")  # mtime 0: the same labels give the same file
+            if self.pos_seen:
+                f.write('{"pos": true}\n')
             for w, (labels, bases) in self.main.items():
                 marks = self.marked.get(w)
-                if not (labels or bases or marks):
+                name = w in self.names
+                if not (labels or bases or marks or name):
                     continue
                 row = {"w": w, "m": [sorted(labels), sorted(bases)]}
                 if marks:
                     row["x"] = [sorted(m) for m in marks]
+                if name:
+                    row["n"] = 1
                 f.write(json.dumps(row, ensure_ascii=False) + "\n")
             f.flush()
             f.detach()
@@ -282,9 +296,14 @@ class Labels:
         with open_any(path) as f:
             for line in f:
                 row = loads(line)
+                if "w" not in row:
+                    labels.pos_seen = labels.pos_seen or row.get("pos") is True
+                    continue
                 labels.main[row["w"]] = (frozenset(row["m"][0]), frozenset(row["m"][1]))
                 if row.get("x"):
                     labels.marked[row["w"]] = [frozenset(m) for m in row["x"]]
+                if row.get("n"):
+                    labels.names.add(row["w"])
         labels.seen = True
         return labels
 
@@ -315,11 +334,31 @@ def explicit_keys(keys, forms_by_key, reasons, allow=frozenset(), block=frozense
         if any(p in key for p in pieces):
             out.append((i, CONTAINS))
             continue
-        forms = display_forms(key, forms_by_key[key])
-        word = forms[0] if forms else key
+        word = main_form(key, forms_by_key[key])
         if word in reasons:
             out.append((i, reasons[word]))
     return out
+
+
+def name_ids(keys, forms_by_key, names):
+    """Ids of the search keys whose most common written form is a name (a
+    proper noun), decided like explicit words: "turkey" ties with "Turkey"
+    and stays a common word. Call after word_frequencies()."""
+    return [i for i, key in enumerate(keys) if main_form(key, forms_by_key[key]) in names]
+
+
+def bitset(ids, k):
+    """A "bits" column: word id i is bit (i % 32) of little-endian u32 word i // 32."""
+    words = np.zeros((k + 31) // 32, dtype="<u4")
+    ids = np.asarray(ids, dtype=np.int64)
+    np.bitwise_or.at(words, ids >> 5, (np.uint32(1) << (ids & 31).astype(np.uint32)))
+    return words
+
+
+def word_lengths(keys):
+    """Characters (code points) per search key, as u8, capped at 255: the
+    LEN column. The app counts letters before a match the same way."""
+    return np.array([min(len(key), 255) for key in keys], dtype=np.uint8)
 
 
 def candidate_keys(keys, forms_by_key, notes, hidden, allow=frozenset()):
@@ -441,6 +480,12 @@ FORM_ZIPF = {}
 # Written forms whose main meaning is explicit, filled in from the labels
 # before display forms are ranked.
 EXPLICIT_FORMS = set()
+
+
+def main_form(key, forms):
+    """The written form a key is judged by: its most common display form."""
+    ranked = display_forms(key, forms)
+    return ranked[0] if ranked else key
 
 
 def display_forms(key, forms):
@@ -789,7 +834,8 @@ NORMALIZATION_SAMPLES = [
 ]
 
 
-def golden(reader, text, encoded, keys, forms_by_key, freq, shape, explicit_ids, rng, bin_sha256, py_order):
+def golden(reader, text, encoded, keys, forms_by_key, freq, shape, explicit_ids, rng, bin_sha256, py_order,
+           names=None):
     k = len(encoded)
     out = {
         "file": {"sha256": bin_sha256, "version": FORMAT_VERSION, "normId": NORM_ID,
@@ -804,6 +850,13 @@ def golden(reader, text, encoded, keys, forms_by_key, freq, shape, explicit_ids,
         out["explicit"] = {"count": len(explicit_ids),
                            "ids": sorted(rng.sample(explicit_ids, min(20, len(explicit_ids)))),
                            "clean": sorted(clean)}
+    # Word columns: lengths re-counted here, and names with some that aren't.
+    sample = sorted(rng.sample(range(k), min(20, k)) + [0, k - 1])
+    out["columns"] = {"LEN": [{"id": i, "value": min(len(keys[i]), 255)} for i in sample]}
+    if names is not None:
+        named = set(names)
+        out["columns"]["NAME"] = {"count": len(names), "ids": sorted(rng.sample(names, min(20, len(names)))),
+                                  "clean": [i for i in sample if i not in named]}
     # A few words of each shape.
     for s in (SHAPE_WORD, SHAPE_HYPHENATED, SHAPE_SPACED):
         ids = np.flatnonzero(shape == s).tolist()
@@ -953,6 +1006,15 @@ def main():
         explicit_ids = [i for i, _ in hidden]
         sections.append(("EXPLICIT", np.array(explicit_ids, dtype="<u4")))
 
+    # Per-word columns the app filters by (see "Word columns" in docs/index-format.md).
+    lengths = word_lengths(keys)
+    sections.append(("LEN", lengths))
+    names = None
+    if labels.pos_seen:  # without parts of speech, which words are names isn't known
+        names = name_ids(keys, forms_by_key, labels.names)
+        sections.append(("NAME", bitset(names, k)))
+        log(f"  names: {len(names):,} of {k:,} words")
+
     # Hot list: keys of the top-ranked words, in rank order, each ending in SEP.
     # The app scans it with a plain string search, so mid-word hits come out
     # already ranked; the ids are recomputed in the app from FREQ.
@@ -987,7 +1049,7 @@ def main():
 
     golden_path = args.out + ".golden.json"
     data = golden(reader, text, encoded, keys, forms_by_key, freq, shape, explicit_ids,
-                  random.Random(args.seed + 1), sha, py_order)
+                  random.Random(args.seed + 1), sha, py_order, names)
     with open(golden_path, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=1)
     review_path = None

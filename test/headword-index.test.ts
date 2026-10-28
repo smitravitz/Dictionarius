@@ -19,6 +19,10 @@ interface Golden {
   freq: { id: number; zipf100: number }[];
   shape?: { id: number; shape: number }[]; // older builds: none
   explicit?: { count: number; ids: number[]; clean: number[] }; // builds without labels: none
+  columns?: {
+    LEN: { id: number; value: number }[];
+    NAME?: { count: number; ids: number[]; clean: number[] }; // builds without parts of speech: none
+  }; // older builds: none
   normalize: [string, string][];
 }
 
@@ -110,6 +114,22 @@ function describeAgainstGolden(name: string, base: string) {
       for (const id of golden.explicit.clean) expect(index.isExplicit(id), index.key(id)).toBe(false);
     });
 
+    it("reads word columns by name: LEN (characters per word) and NAME (proper nouns)", () => {
+      const len = index.column("LEN", "u8");
+      const names = index.column("NAME", "bits");
+      if (!golden.columns) return expect([len, names]).toEqual([null, null]);
+      expect(len).toHaveLength(index.size);
+      for (const { id, value } of golden.columns.LEN) expect(len![id], index.key(id)).toBe(value);
+      if (!golden.columns.NAME) return expect(names).toBeNull();
+      const isName = (id: number) => ((names![id >>> 5] >>> (id & 31)) & 1) === 1;
+      let count = 0;
+      for (let id = 0; id < index.size; id++) if (isName(id)) count++;
+      expect(count).toBe(golden.columns.NAME.count);
+      for (const id of golden.columns.NAME.ids) expect(isName(id), index.key(id)).toBe(true);
+      for (const id of golden.columns.NAME.clean) expect(isName(id), index.key(id)).toBe(false);
+      expect(index.column("NO SUCH", "u8")).toBeNull();
+    });
+
     it("exposes the hot list: the top-ranked words' keys, in rank order", () => {
       const numHot = golden.file.numHot ?? 0; // files built before the hot list: none
       expect(index.hotCount).toBe(numHot);
@@ -158,6 +178,11 @@ describe("HeadwordIndex rejects files it can't trust", () => {
 
   it("rejects a truncated file instead of reading garbage", () => {
     expect(() => HeadwordIndex.fromBytes(bytes.slice(0, bytes.length >> 1))).toThrow(/truncated|corrupt/);
+  });
+
+  it("rejects a word column of the wrong size for its type", () => {
+    const index = HeadwordIndex.fromBytes(new Uint8Array(readFileSync(`${FIXTURE}.bin`)));
+    expect(() => index.column("LEN", "bits")).toThrow(/column LEN/);
   });
 
   it("opens bytes that do not start on an 8-byte boundary", () => {

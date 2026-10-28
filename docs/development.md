@@ -24,7 +24,7 @@ The build checks itself against brute force and also writes:
 
 - `headwords.golden.json`: answers the tests compare against
 - `headwords.safe-review.tsv`: every word safe search hides, and visible words worth a look, most common first, with why. Corrections go in the hand-picked list, `data/safe-search.list` (encoded; `python scripts/safe_search_list.py show`, `add`, `remove`; quote phrases). See the [rule](index-format.md#safe-search). To check an outside bad-word list (such as cuss) against what safe search shows: `npx vite-node scripts/safe-search-candidates.ts list.txt`
-- `headwords.labels.jsonl.gz`: the labels safe search reads. With it and a list of the headwords, a rule change rebuilds without re-reading the dump: `python scripts/build_fm_index.py words.json --labels headwords.labels.jsonl.gz`
+- `headwords.labels.jsonl.gz`: the labels safe search reads, and which words are names (proper nouns). With it and a list of the headwords, a rule change rebuilds without re-reading the dump: `python scripts/build_fm_index.py words.json --labels headwords.labels.jsonl.gz`. A cache from before names were kept has no parts of speech; an index rebuilt from it has no `NAME` column, so the app doesn't offer *Disable names* until the next build from the dump.
 
 ## Android
 

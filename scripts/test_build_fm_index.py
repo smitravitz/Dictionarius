@@ -12,12 +12,16 @@ sys.path.insert(0, os.path.dirname(__file__))
 import build_fm_index  # noqa: E402
 import safe_search_list  # noqa: E402
 from build_fm_index import (  # noqa: E402
-    Labels, candidate_keys, display_forms, explicit_keys, read_safe_search_list, safe_review_rows,
+    Labels, bitset, candidate_keys, display_forms, explicit_keys, name_ids, read_safe_search_list, safe_review_rows,
+    word_lengths,
 )
 
 
-def entry(word, *senses):
-    return {"word": word, "lang_code": "en", "senses": list(senses)}
+def entry(word, *senses, pos=None):
+    e = {"word": word, "lang_code": "en", "senses": list(senses)}
+    if pos:
+        e["pos"] = pos
+    return e
 
 
 def sense(*tags, gloss="a meaning", categories=(), form_of=None, alt_of=None):
@@ -176,6 +180,34 @@ class FurtherDown(unittest.TestCase):
         self.assertEqual(set(found), {"boyword", "cookieword", "insultword"})
 
 
+class Names(unittest.TestCase):
+    """A word is a name when its main meaning (the first meaning of its first
+    entry) is a proper noun: part of speech "name" in Wiktionary's data."""
+
+    def labels(self, *entries):
+        labels = Labels()
+        for e in entries:
+            labels.add(e)
+        return labels
+
+    def test_a_proper_noun_main_meaning_makes_a_name(self):
+        labels = self.labels(
+            entry("Zorbleton", sense(gloss="a made-up town"), pos="name"),
+            entry("zorble", sense(gloss="to wobble"), pos="verb"),
+            entry("Smithword", sense(gloss="a made-up trade"), pos="noun"),
+            entry("Smithword", sense(gloss="a made-up surname"), pos="name"),  # a later entry
+            entry("Glossless", {"tags": ["no-gloss"]}, pos="noun"),
+            entry("Glossless", sense(gloss="a made-up river"), pos="name"),  # the first with a meaning
+        )
+        self.assertEqual(labels.names, {"Zorbleton", "Glossless"})
+        self.assertTrue(labels.pos_seen)
+
+    def test_entries_without_a_part_of_speech_say_nothing(self):
+        labels = self.labels(entry("Zorbleton", sense(gloss="a made-up town")))
+        self.assertEqual(labels.names, set())
+        self.assertFalse(labels.pos_seen)
+
+
 class Keys(unittest.TestCase):
     """A search key is hidden when it is blocked, or when its most common
     written form is explicit; allowed keys never are."""
@@ -221,6 +253,26 @@ class Keys(unittest.TestCase):
         found = explicit_keys(keys, forms, {}, allow={"air gap"}, pieces={"gap"})
         self.assertEqual(found, [(1, "contains a blocked piece"), (2, "contains a blocked piece"),
                                  (4, "contains a blocked piece")])
+
+    def test_a_key_is_a_name_when_its_most_common_spelling_is(self):
+        # "turkey" (the bird) ties with "Turkey" (the country): the plain key
+        # wins, as for safe search. "bill" is mostly the common noun.
+        build_fm_index.FORM_ZIPF.update({"turkey": 4.0, "Turkey": 4.0, "Ingrid": 3.0, "bill": 4.5, "Bill": 3.0})
+        keys = ["bill", "ingrid", "turkey", "zorble"]
+        forms = {"bill": {"bill", "Bill"}, "ingrid": {"Ingrid"}, "turkey": {"turkey", "Turkey"}, "zorble": {"zorble"}}
+        self.assertEqual(name_ids(keys, forms, {"Bill", "Ingrid", "Turkey"}), [1])
+
+    def test_word_length_is_characters_of_the_key(self):
+        # Code points, as the app counts letters before a match; capped at 255.
+        lengths = word_lengths(["a", "ice cream", "hawaiʻi", "x" * 300, "naïve"])
+        self.assertEqual(lengths.tolist(), [1, 9, 7, 255, 5])
+        self.assertEqual(lengths.dtype.str, "|u1")
+
+    def test_a_bits_column_sets_bit_id_mod_32_of_little_endian_word_id_div_32(self):
+        bits = bitset([0, 31, 32, 34], 40)
+        self.assertEqual(bits.dtype.str, "<u4")
+        self.assertEqual(bits.tolist(), [0x80000001, 0b101])
+        self.assertEqual(bitset([], 0).tolist(), [])
 
     def test_visible_keys_worth_a_look(self):
         build_fm_index.FORM_ZIPF.update({"name": 2.0, "Name": 4.0})
@@ -289,6 +341,26 @@ class LabelsCache(unittest.TestCase):
         for allow in (set(), {"rudeword"}):
             self.assertEqual(loaded.explicit_reasons(allow), labels.explicit_reasons(allow))
         self.assertEqual(loaded.candidates({}), labels.candidates({}))
+
+    def test_the_cache_keeps_names_and_whether_parts_of_speech_were_read(self):
+        import gzip
+        import tempfile
+        labels = Labels()
+        for e in (entry("Zorbleton", sense(gloss="a made-up town"), pos="name"),
+                  entry("zorble", sense(gloss="to wobble"), pos="verb")):
+            labels.add(e)
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "labels.jsonl.gz")
+            labels.save(path)
+            loaded = Labels.load(path)
+            # A cache written before names were kept: nothing is known about them.
+            old = os.path.join(tmp, "old.jsonl.gz")
+            with gzip.open(old, "wt", encoding="utf-8") as f:
+                f.write('{"w": "rudeword", "m": [["vulgar"], []]}\n')
+            before = Labels.load(old)
+        self.assertEqual((loaded.names, loaded.pos_seen), ({"Zorbleton"}, True))
+        self.assertEqual((before.names, before.pos_seen), (set(), False))
+        self.assertEqual(before.explicit_words(), {"rudeword"})
 
 
 class SafeReview(unittest.TestCase):

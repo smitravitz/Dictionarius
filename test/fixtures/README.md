@@ -21,7 +21,9 @@ non-breaking space, words that repeat a fragment (`banana`, `cancan`), and eight
 with Wiktionary-style labels for safe search: `rudeword` (vulgar), its plural and spelling, and
 `slurword` are hidden; `gapword` (an everyday meaning, then a slur) and its plural, `mixedword` (an
 everyday meaning, then a vulgar one) and `hedgeword` (an everyday meaning, then a dated, offensive
-one) stay visible. No Wiktionary content. Built without the hand-picked list (`--safe-search-list ''`),
+one) stay visible. Five made-up entries with a part of speech: `Zorbleton` and `Quillmarch` are names;
+`turkeyword` (a bird) and `Turkeyword` (a country) share a key that stays a common word; `zorble` is a
+verb. No Wiktionary content. Built without the hand-picked list (`--safe-search-list ''`),
 so the tests don't depend on it.
 
 **Rebuild** (after a format or normalization change):
