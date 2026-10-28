@@ -1,8 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<!--
+  Dictionarius asks for no permissions (privacy.toml; scripts/audit_privacy.py checks the
+  built APK in CI). The word list ships inside the app, haptics use the WebView's own
+  View.performHapticFeedback, and links open in the user's browser.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
+    <!--
+      allowBackup="false": app data isn't copied to the phone maker's or Google's cloud.
+      (On Android 12+ a direct phone-to-phone transfer still carries the settings over.)
+    -->
     <application
-        android:allowBackup="true"
+        android:allowBackup="false"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
@@ -23,19 +33,17 @@
             </intent-filter>
 
         </activity>
-
-        <provider
-            android:name="androidx.core.content.FileProvider"
-            android:authorities="${applicationId}.fileprovider"
-            android:exported="false"
-            android:grantUriPermissions="true">
-            <meta-data
-                android:name="android.support.FILE_PROVIDER_PATHS"
-                android:resource="@xml/file_paths"></meta-data>
-        </provider>
     </application>
 
-    <!-- Permissions -->
-
-    <uses-permission android:name="android.permission.INTERNET" />
+    <!--
+      androidx.core adds a signature permission of the app's own, used only by
+      ContextCompat.registerReceiver(..., RECEIVER_NOT_EXPORTED) on Android 12 and older.
+      Nothing in the app or Capacitor registers receivers, so it goes.
+    -->
+    <permission
+        android:name="${applicationId}.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
+        tools:node="remove" />
+    <uses-permission
+        android:name="${applicationId}.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
+        tools:node="remove" />
 </manifest>

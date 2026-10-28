@@ -42,6 +42,7 @@ See [`docs/adr/0001-frequency-tiered-gloss-storage.md`](docs/adr/0001-frequency-
 - ✅ Safe search (⚙️ Settings, on by default): hides vulgar words and slurs unless you type them out in full ([rule](docs/index-format.md#safe-search))
 - ✅ Speed in Chromium on the full index: ready in ~0.3–0.7 s; keystroke to results ~33 ms (~35–135 ms with the CPU slowed 4× to mimic a mid-range phone)
 - ✅ Android app with the full word list inside; signed APKs on GitHub releases
+- ✅ No permissions at all: no network, storage or sensors, and nothing leaves your phone. The haptic tick uses the platform's built-in feedback, which needs none. CI checks every APK against [`privacy.toml`](privacy.toml)
 
 **⏳ Next**
 

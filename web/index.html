@@ -2,6 +2,16 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
+    <!--
+      Offline by construction: the page may load and request only its own files (privacy.toml
+      allows no servers). Links the user taps still open, in the browser.
+      style-src allows inline styles because Vite injects CSS that way while developing.
+    -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; connect-src 'self'; img-src 'self' data:; font-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; worker-src 'self'; manifest-src 'self'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'"
+    />
+    <meta name="referrer" content="no-referrer" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="description" content="An offline, open-source English dictionary that finds words from any part of them." />
     <meta name="theme-color" content="#f3f5f8" media="(prefers-color-scheme: light)" />

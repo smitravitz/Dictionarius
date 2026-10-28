@@ -8,6 +8,7 @@ npm test            # unit tests
 npm run typecheck   # strict TypeScript check
 npm run test:e2e    # browser tests (desktop + phone) on a small sample index
 python -m unittest scripts/test_build_fm_index.py   # the index builder's safe-search rule and list
+python scripts/audit_privacy.py                      # the code against privacy.toml (add --apk path/to.apk for a build)
 ```
 
 ## Run the app on the full word list
@@ -28,6 +29,8 @@ The build checks itself against brute force and also writes:
 ## Android
 
 Needs Android Studio, or the Android SDK and JDK 21. The app is packaged with [Capacitor](https://capacitorjs.com).
+
+The app asks for no permissions, and [`privacy.toml`](../privacy.toml) says so; CI fails if a build requests one. Capacitor's template and many plugins add permissions (INTERNET, VIBRATE), so check a new plugin's manifest before adding it. The haptic tick comes from a small local plugin, [`plugins/haptic-tick`](../plugins/haptic-tick), that needs none.
 
 ```bash
 npm run build && npx cap sync android   # copy the web app and dist/headwords.bin into android/
