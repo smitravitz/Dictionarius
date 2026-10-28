@@ -1,11 +1,16 @@
 // Behaviour that applies only inside the native app shells (Capacitor).
 import { Capacitor } from "@capacitor/core";
 
-/**
- * Wire up the Android back button and outbound links.
- * `clearSearch` empties the search box and returns whether there was anything to clear.
- */
-export async function setUpNativeShell(clearSearch: () => boolean): Promise<void> {
+/** Steps the Android back button takes, each returning whether it did anything. */
+export interface BackSteps {
+  /** Close an open panel (settings). */
+  closePanel(): boolean;
+  /** Empty the search box. */
+  clearSearch(): boolean;
+}
+
+/** Wire up the Android back button and outbound links. */
+export async function setUpNativeShell(back: BackSteps): Promise<void> {
   if (!Capacitor.isNativePlatform()) return;
 
   // A plain navigation to another site is handed to the system browser;
@@ -14,10 +19,12 @@ export async function setUpNativeShell(clearSearch: () => boolean): Promise<void
     link.removeAttribute("target");
   }
 
-  // Back closes an open word, then clears the search, then leaves the app.
+  // Back closes a panel, then an open word, then clears the search, then
+  // leaves the app.
   const { App } = await import("@capacitor/app");
   await App.addListener("backButton", ({ canGoBack }) => {
+    if (back.closePanel()) return;
     if (canGoBack) history.back();
-    else if (!clearSearch()) void App.exitApp();
+    else if (!back.clearSearch()) void App.exitApp();
   });
 }

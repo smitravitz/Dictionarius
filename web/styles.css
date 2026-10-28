@@ -105,6 +105,31 @@ body {
   letter-spacing: -0.01em;
 }
 
+.masthead-end {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-right: -0.625rem; /* the cog's tap area reaches into the padding */
+}
+
+/* The settings cog: a plain pencil-grey glyph with a full-size tap target. */
+.cog {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--pencil);
+  cursor: pointer;
+}
+
+.cog:hover {
+  color: var(--ink);
+}
+
 .status {
   margin: 0;
   color: var(--pencil);
@@ -526,5 +551,120 @@ a:focus-visible {
   }
   .search input {
     font-size: 2.125rem;
+  }
+}
+
+/* -------------------------------------------------------------- settings */
+
+.settings {
+  width: min(26rem, calc(100vw - 2 * var(--pad)));
+  margin: max(4.5rem, calc(env(safe-area-inset-top) + 4rem)) auto auto;
+  padding: 1.25rem 1.25rem 1rem;
+  border: 1px solid var(--hairline);
+  border-radius: 0.75rem;
+  background: var(--paper);
+  color: var(--ink);
+  box-shadow: 0 24px 48px -24px rgb(0 0 0 / 0.45);
+}
+
+.settings::backdrop {
+  background: rgb(8 10 13 / 0.35);
+}
+
+.settings-title {
+  margin: 0 0 1rem;
+  font-family: var(--font-word);
+  font-size: 1.3125rem;
+  font-style: italic;
+  font-weight: 500;
+}
+
+.setting {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem 0;
+  border-top: 1px solid var(--hairline);
+  border-bottom: 1px solid var(--hairline);
+  cursor: pointer;
+}
+
+.setting-text {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.setting-name {
+  font-weight: 700;
+}
+
+.setting-help {
+  color: var(--pencil);
+  font-size: 0.8125rem;
+  line-height: 1.4;
+}
+
+/* A switch: a pill with a knob, magenta when on. */
+.switch {
+  flex: none;
+  position: relative;
+  width: 3rem;
+  height: 1.75rem;
+  margin: 0;
+  border: 1.5px solid var(--hairline);
+  border-radius: 999px;
+  background: var(--hairline);
+  appearance: none;
+  -webkit-appearance: none;
+  cursor: pointer;
+  transition: background 0.15s ease-out, border-color 0.15s ease-out;
+}
+
+.switch::after {
+  content: "";
+  position: absolute;
+  top: 0.125rem;
+  left: 0.125rem;
+  width: 1.25rem;
+  height: 1.25rem;
+  border-radius: 50%;
+  background: var(--paper);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.25);
+  transition: transform 0.15s ease-out;
+}
+
+.switch:checked {
+  border-color: var(--proof);
+  background: var(--proof);
+}
+
+.switch:checked::after {
+  transform: translateX(1.25rem);
+}
+
+.switch:focus-visible {
+  outline: 2px solid var(--proof);
+  outline-offset: 2px;
+}
+
+.settings-done {
+  display: block;
+  min-height: 44px;
+  margin: 1rem 0 0 auto;
+  padding: 0.5rem 1.25rem;
+  border: 1px solid var(--hairline);
+  border-radius: 0.375rem;
+  background: transparent;
+  color: var(--proof);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .switch,
+  .switch::after {
+    transition: none;
   }
 }

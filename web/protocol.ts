@@ -15,11 +15,15 @@ export interface Counts {
   byOffset: number[];
   /** words containing it; null until every position has been counted */
   total: number | null;
+  /** counted with safe search on (explicit words left out) */
+  safe: boolean;
 }
 
 /** Messages from the page to the search worker. */
 export type ToWorker =
   | { type: "load"; url: string }
+  /** Search settings; the next search uses them. */
+  | { type: "settings"; safe: boolean }
   /** List matches with at least `fromOffset` letters before the query. */
   | { type: "search"; seq: number; query: string; fromOffset: number }
   | { type: "more"; seq: number };

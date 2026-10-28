@@ -12,7 +12,15 @@
     <main class="app">
       <header class="masthead">
         <h1 class="wordmark">Dictionarius</h1>
-        <p class="status" id="status">Loading the word list…</p>
+        <div class="masthead-end">
+          <p class="status" id="status">Loading the word list…</p>
+          <button class="cog" id="settings-open" type="button" aria-label="Settings" aria-haspopup="dialog" aria-controls="settings">
+            <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round">
+              <path d="M10.3 2.75h3.4l.55 2.6c.68.25 1.31.61 1.87 1.07l2.52-.84 1.7 2.94-1.98 1.77a7.2 7.2 0 0 1 0 2.16l1.98 1.77-1.7 2.94-2.52-.84a7.2 7.2 0 0 1-1.87 1.07l-.55 2.6h-3.4l-.55-2.6a7.2 7.2 0 0 1-1.87-1.07l-2.52.84-1.7-2.94 1.98-1.77a7.2 7.2 0 0 1 0-2.16L3.86 8.52l1.7-2.94 2.52.84a7.2 7.2 0 0 1 1.87-1.07z" />
+              <circle cx="12" cy="12" r="2.9" />
+            </svg>
+          </button>
+        </div>
       </header>
 
       <div class="search">
@@ -60,6 +68,20 @@
         <a href="https://github.com/smitravitz/Dictionarius">Source code</a>, GPL-3.0
       </footer>
     </main>
+
+    <dialog class="settings" id="settings" aria-labelledby="settings-title">
+      <form method="dialog">
+        <h2 class="settings-title" id="settings-title">Settings</h2>
+        <label class="setting">
+          <span class="setting-text">
+            <span class="setting-name">Safe search</span>
+            <span class="setting-help" id="safe-search-help">Leaves vulgar and offensive words out of the results. A word you type out in full still shows.</span>
+          </span>
+          <input class="switch" id="safe-search" type="checkbox" role="switch" aria-describedby="safe-search-help" checked />
+        </label>
+        <button class="settings-done" value="done">Done</button>
+      </form>
+    </dialog>
     <script type="module" src="./main.ts"></script>
   </body>
 </html>
