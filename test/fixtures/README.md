@@ -7,17 +7,20 @@ tested in CI without the full 27 MB build.
 
 | File | What |
 |---|---|
-| `headwords-sample.words.json` | source: 17,087 headwords |
+| `headwords-sample.words.json` | source: 17,090 headwords |
 | `headwords-sample.bin` | index built from it (format v1, `docs/index-format.md`) |
 | `headwords-sample.golden.json` | brute-force answers the tests compare against |
+| `headwords-sample.safe-review.tsv` | the words safe search hides, with why |
 
 **Source & license.** Every 6th word of Webster's 1913 dictionary (public
 domain), with ~10% capitalized or upper-cased, plus hand-picked edge cases:
 diacritic variants that collide on one key (`Résumé` / `résumé` / `Resume`),
 Greek final sigma, `Hawaiʻi`, `İstanbul`, Cyrillic, CJK, emoji, a BOM, a
-non-breaking space, words that repeat a fragment (`banana`, `cancan`), and five made-up words
-with Wiktionary-style labels for safe search (`rudeword`, its plural and spelling, `slurword`,
-and `mixedword`, whose main meaning is ordinary). No Wiktionary content.
+non-breaking space, words that repeat a fragment (`banana`, `cancan`), and eight made-up words
+with Wiktionary-style labels for safe search: `rudeword` (vulgar), its plural and spelling,
+`slurword`, `gapword` (an everyday meaning, then a slur) and its plural, `mixedword` (an everyday
+meaning, then a vulgar one) and `hedgeword` (an everyday meaning, then a dated, offensive one);
+the last two stay visible. No Wiktionary content.
 
 **Rebuild** (after a format or normalization change):
 

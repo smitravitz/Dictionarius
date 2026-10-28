@@ -29,18 +29,20 @@ interface Row {
   id: number;
   offset: number;
 }
-// The fixture's made-up labelled words (test/fixtures/README.md): these four
-// are explicit; "mixedword" has an ordinary meaning too, so it isn't.
-const EXPLICIT = new Set(["rudeword", "rudewords", "rudewurd", "slurword"]);
+// The fixture's made-up labelled words (test/fixtures/README.md): these are
+// explicit ("gapword" has an everyday main meaning, but a slur further down);
+// "mixedword" (a vulgar meaning further down) and "hedgeword" (a dated,
+// offensive one) aren't.
+const EXPLICIT = new Set(["rudeword", "rudewords", "rudewurd", "slurword", "gapword", "gapwords"]);
 
-function oracle(query: string, fromOffset = 0, safe = false): Row[] {
+function oracle(query: string, fromOffset = 0, safe = false, explicit = EXPLICIT): Row[] {
   const q = normalize(query);
   if (!q) return [];
   const rows: (Row & { exact: boolean; shape: number; score: number })[] = [];
   keys.forEach((key, id) => {
     const offset = offsetOf(key, q);
     if (offset < fromOffset) return;
-    if (safe && EXPLICIT.has(key) && key !== q) return; // hidden unless typed in full
+    if (safe && explicit.has(key) && key !== q) return; // hidden unless typed in full
     rows.push({ id, offset, exact: key === q, shape: shapeOf(key), score: Math.round(index.frequency(id) * 100) });
   });
   rows.sort(
@@ -193,11 +195,12 @@ describe("Completer", () => {
 
   describe("safe search", () => {
     it("leaves out explicit words, and keeps words with an ordinary meaning", () => {
-      for (const q of ["rude", "word", "urd", "e", "slur", "mixed"]) {
+      for (const q of ["rude", "word", "urd", "e", "slur", "mixed", "gap", "hedge"]) {
         expect(drain(completer.search(q, { safe: true }).cursor()), q).toEqual(oracle(q, 0, true));
       }
       const shown = drain(completer.search("word", { safe: true }).cursor()).map((r) => keys[r.id]);
       expect(shown).toContain("mixedword");
+      expect(shown).toContain("hedgeword");
       for (const word of EXPLICIT) expect(shown).not.toContain(word);
     });
 
@@ -224,6 +227,36 @@ describe("Completer", () => {
         for (const r of oracle(q, 0, true)) byOffset[r.offset] = (byOffset[r.offset] ?? 0) + 1;
         expect([...m.byOffset], `${q} by offset`).toEqual(Array.from(byOffset, (x) => x ?? 0));
       }
+    });
+
+    describe("with overrides", () => {
+      // Words the labels missed are blocked; words they caught by mistake are allowed.
+      const tuned = new Completer(index, { block: ["Banana", "air gap", "no such word"], allow: ["rudewords"] });
+      const explicit = new Set([...EXPLICIT, "banana", "air gap"]);
+      explicit.delete("rudewords");
+
+      it("hides blocked words and shows allowed ones, and counts what it shows", () => {
+        for (const q of ["an", "rude", "gap", "word", "e", "banana"]) {
+          const m = tuned.search(q, { safe: true });
+          const rows = oracle(q, 0, true, explicit);
+          expect(drain(m.cursor()), q).toEqual(rows);
+          const shown = rows.map((r) => keys[r.id]);
+          const n = normalize(q);
+          expect(m.starts, `${q} starts`).toBe(shown.filter((k) => k.startsWith(n)).length);
+          expect(m.ends, `${q} ends`).toBe(shown.filter((k) => k.endsWith(n)).length);
+          while (!m.count(1_000));
+          expect(m.total, `${q} total`).toBe(shown.length);
+        }
+        const an = drain(tuned.search("an", { safe: true }).cursor()).map((r) => keys[r.id]);
+        expect(an).not.toContain("banana");
+        const rude = drain(tuned.search("rude", { safe: true }).cursor()).map((r) => keys[r.id]);
+        expect(rude).toContain("rudewords");
+        expect(rude).not.toContain("rudeword");
+      });
+
+      it("leaves safe search off alone", () => {
+        for (const q of ["an", "rude"]) expect(drain(tuned.search(q).cursor()), q).toEqual(oracle(q));
+      });
     });
   });
 

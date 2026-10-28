@@ -155,16 +155,33 @@ combined key, such as `(2 − shape) × 2000 + FREQ`.
 a word; a meaning is explicit when its tags include `vulgar`, `offensive` or
 `slur`, or its categories include *English vulgarities*, *English offensive
 terms*, *English ethnic slurs* or *English swear words*. A headword is explicit
-when its **main meaning** is: the first meaning of its first entry, as the page
-lists it. When that meaning is an inflection or spelling of another word
-(`form_of`, `alt_of`), the headword follows that word. A search key is explicit
-when its most common written form is (by wordfreq, as in *Display forms*).
+when either:
 
-Dictionaries list the main meaning first, so a word with a double meaning
-follows its everyday sense: "cock" (a rooster) and "ass" (a donkey) stay
-visible, while "shit" stays hidden although a later meaning is labelled only
-`slang`. `derogatory`, `pejorative` and `slang` alone don't count. A slur whose
-main meaning is innocent (one that is also an everyday word) stays visible.
+- its **main meaning** is explicit: the first meaning of its first entry, as
+  the page lists it. When that meaning is an inflection or spelling of another
+  word (`form_of`, `alt_of`), the headword follows that word; or
+- **any meaning**, at any position and in any entry, is a **slur**: tagged
+  `slur`, in *English ethnic slurs*, or tagged `offensive` without a hedge
+  (`sometimes`, `possibly`, `potentially`, `occasionally`, `dated`, `archaic`,
+  `obsolete`, `historical`, `rare`). Inflections and spellings of such a word
+  follow it wherever they list it (lowercase "chink" lists "alternative
+  letter-case form of Chink" after "a narrow gap").
+
+A search key is explicit when its most common written form is (by wordfreq, as
+in *Display forms*).
+
+So "faggot" is hidden although "a bundle of sticks" comes first, and so is
+"coon" (a raccoon first). A word whose other meanings are only vulgar keeps its
+everyday sense: "cock" (a rooster) and "ass" (a donkey) stay visible, while
+"shit" stays hidden although a later meaning is labelled only `slang`.
+`derogatory`, `pejorative` and `slang` alone don't count, and neither does a
+hedged label further down ("colored": dated, offensive).
+
+Some everyday words carry a rare slur meaning too; the app's override list
+(`src/safe-search-overrides.ts`) shows those again, and hides words the labels
+missed, without rebuilding the index. Each build writes
+`<out>.safe-review.tsv`: every hidden word, most common first, with why
+(`main meaning`, `a slur meaning`, `form of <word>`), to review the list by.
 
 ## Hot list
 
