@@ -224,8 +224,8 @@ body {
 }
 
 .examples {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);  /* exactly 3 equal columns */
   gap: 0.5rem;
   margin: 0;
   padding: 0;
@@ -234,6 +234,7 @@ body {
 
 /* The ellipsis shows where the piece sits in the words it finds. */
 .examples button {
+  width: 100%;
   min-height: 44px;
   padding: 0.4rem 0.9rem;
   border: 1px solid var(--hairline);

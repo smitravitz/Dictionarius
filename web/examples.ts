@@ -56,7 +56,6 @@ export const EXAMPLES: readonly (readonly [fragment: string, where: Where])[] = 
   ["under", "start"],
   ["anti", "start"],
   ["sea", "start"],
-  ["qu", "start"],
 ];
 
 /** How a chip shows where the fragment usually sits: "…ing", "pre…", "…ough…". */
