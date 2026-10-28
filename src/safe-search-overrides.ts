@@ -1,4 +1,4 @@
-import type { SafeSearchOverrides } from "./complete";
+import type { SafeSearchOverrides } from "./filters";
 import { normalize } from "./normalize";
 import list from "../data/safe-search.list?raw";
 

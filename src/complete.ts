@@ -1,5 +1,8 @@
 import type { HeadwordIndex, OffsetWalk } from "./headword-index";
 import { normalize } from "./normalize";
+import { Filters, type FilterInfo, type FilterState, type SafeSearchOverrides, type WordFilter } from "./filters";
+
+export type { SafeSearchOverrides } from "./filters";
 
 /**
  * Type-ahead results, produced lazily, a page at a time.
@@ -43,43 +46,21 @@ const MAX_SCORE = SHAPE_STEP - 1;
 const SMALL_CHUNK = 256;
 
 export interface SearchOptions {
-  /** Leave out explicit words, even one typed out in full. */
-  safe?: boolean;
-}
-
-/** Corrections to the index's explicit words, as written ("Banana" or "banana"). */
-export interface SafeSearchOverrides {
-  /** Hide these too: words the labels missed. */
-  block?: readonly string[];
-  /** Hide every word containing one of these pieces ("snigger" reads as the slur in it). */
-  contains?: readonly string[];
-  /** Show these after all: words the labels caught by mistake. Wins over block and contains. */
-  allow?: readonly string[];
-}
-
-/** What safe search hides. */
-interface Hidden {
-  /** True for a hidden word. */
-  has(id: number): boolean;
-  /** Hidden words with ids in [lo, hi). */
-  countIn(lo: number, hi: number): number;
-  /** Hidden words whose key ends with `query`. */
-  countEndingWith(query: string): number;
+  /** Words to leave out (src/filters.ts), even one typed out in full. */
+  filters?: FilterState;
 }
 
 export class Completer {
   /** Per id: (2 - shape) x SHAPE_STEP + score; higher ranks first. */
   private readonly ranks: Uint16Array;
   private readonly maxRank: number;
-  /** Words safe search hides (the index's, corrected), ascending; built on first use. */
-  private hiddenIds: Uint32Array | null = null;
-  private hiddenBits: Uint32Array | null = null;
-  private hiddenKeys: string[] | null = null;
+  private readonly filters: Filters;
 
   constructor(
     private readonly index: HeadwordIndex,
-    private readonly overrides: SafeSearchOverrides = {},
+    overrides: SafeSearchOverrides = {},
   ) {
+    this.filters = new Filters({ index, overrides });
     const k = index.size;
     this.ranks = new Uint16Array(k);
     let maxRank = 0;
@@ -98,73 +79,31 @@ export class Completer {
     const query = normalize(typed);
     // Separator bytes would match word boundaries; a normalized query has none.
     const exactId = query && !/[\u0000\u0001]/.test(query) ? this.index.exact(query) : null;
-    const hidden = options.safe && this.safeIds().length > 0 ? this.hidden() : null;
-    return new Matches(this.index, this.ranks, this.maxRank, query, exactId, hidden);
+    const filter = this.filters.compile(options.filters);
+    return new Matches(this.index, this.ranks, this.maxRank, query, exactId, filter);
   }
 
-  /** Read the hidden words' keys out of the index now rather than on the
-   *  first safe search (a few thousand words: tens of milliseconds). */
-  prepareSafeSearch(): void {
-    if (this.hiddenKeys) return;
-    this.hiddenKeys = Array.from(this.safeIds(), (id) => this.index.key(id));
+  /** Work out which words `filters` leaves out now rather than on the next
+   *  search (the first time a filter is used: tens of milliseconds). */
+  prepare(filters: FilterState): void {
+    this.filters.compile(filters);
   }
 
-  /** Ids safe search hides: the index's explicit words, plus `block` and
-   *  every word containing a piece in `contains`, minus `allow`. Words missing
-   *  from the index are ignored. */
-  private safeIds(): Uint32Array {
-    if (this.hiddenIds) return this.hiddenIds;
-    const index = this.index;
-    const lookup = (words: readonly string[] = []) =>
-      words.map((w) => index.exact(normalize(w))).filter((id): id is number => id !== null);
-    const allowed = new Set(lookup(this.overrides.allow));
-    const ids = new Set(index.explicitIds());
-    for (const id of lookup(this.overrides.block)) ids.add(id);
-    for (const piece of this.overrides.contains ?? []) {
-      const key = normalize(piece);
-      if (key) for (const id of index.wordsContaining(key)) ids.add(id);
-    }
-    for (const id of allowed) ids.delete(id);
-    this.hiddenIds = Uint32Array.from(ids).sort();
-    this.hiddenBits = new Uint32Array((index.size + 31) >>> 5);
-    for (const id of this.hiddenIds) this.hiddenBits[id >>> 5] |= 1 << (id & 31);
-    return this.hiddenIds;
+  /** The filters this index has the data for (src/filters.ts). */
+  availableFilters(): FilterInfo[] {
+    return this.filters.available();
   }
-
-  private hidden(): Hidden {
-    const ids = this.safeIds();
-    const bits = this.hiddenBits!;
-    this.prepareSafeSearch();
-    const keys = this.hiddenKeys!;
-    return {
-      has: (id) => (bits[id >>> 5] & (1 << (id & 31))) !== 0,
-      countIn: (lo, hi) => lowerBound(ids, hi) - lowerBound(ids, lo),
-      countEndingWith(query) {
-        let n = 0;
-        for (const key of keys) if (key.endsWith(query)) n++;
-        return n;
-      },
-    };
-  }
-}
-
-/** First position in ascending `values` whose value is >= x. */
-function lowerBound(values: Uint32Array, x: number): number {
-  let lo = 0;
-  let hi = values.length;
-  while (lo < hi) {
-    const mid = (lo + hi) >>> 1;
-    if (values[mid] < x) lo = mid + 1;
-    else hi = mid;
-  }
-  return lo;
 }
 
 export class Matches {
   /** Words that start with the query (the exact match included). */
   readonly starts: number;
-  /** Words that end with the query. */
-  readonly ends: number;
+  /** Words that end with the query; with filters, null until `complete`
+   *  (they are counted as the positions are worked out). */
+  get ends(): number | null {
+    if (!this.filter) return this.endsNow;
+    return this.complete ? this.endsCounted : null;
+  }
   /** Times the query occurs inside headwords; an upper bound on `total`. */
   readonly occurrences: number;
 
@@ -173,6 +112,14 @@ export class Matches {
   private readonly chunks: Uint32Array[] = [];
   private seen: Uint32Array | null = null; // bitset: word already placed in a chunk
   private rankCounts: Uint32Array | null = null;
+  /** Words ending with the query, all of them (exact, at once). */
+  private readonly endsNow: number;
+  /** With filters: shown words found ending with the query so far. */
+  private endsCounted = 0;
+  /** The query's length in characters, as LEN counts them. */
+  private readonly queryLength: number;
+  /** Characters per word (the LEN column), to count ends as positions are worked out. */
+  private readonly lengths: Uint8Array | null;
 
   constructor(
     private readonly index: HeadwordIndex,
@@ -181,14 +128,16 @@ export class Matches {
     /** the normalized query */
     readonly query: string,
     private readonly exactId: number | null,
-    /** safe search's hidden words, or null when off */
-    private readonly hidden: Hidden | null,
+    /** the words left out, or null when none are */
+    private readonly filter: WordFilter | null,
   ) {
     // Separator bytes would match word boundaries; a normalized query has none.
     const usable = query !== "" && !/[\u0000\u0001]/.test(query);
     const { start, count } = usable ? index.prefix(query) : { start: 0, count: 0 };
-    this.starts = count - (hidden && count ? hidden.countIn(start, start + count) : 0);
-    this.ends = usable ? index.countEndingWith(query) - (hidden ? hidden.countEndingWith(query) : 0) : 0;
+    this.starts = count - (filter && count ? filter.countIn(start, start + count) : 0);
+    this.endsNow = usable ? index.countEndingWith(query) : 0;
+    this.queryLength = Array.from(query).length;
+    this.lengths = filter ? index.column("LEN", "u8") : null;
     this.occurrences = usable ? index.countOccurrences(query) : 0;
     this.walk = usable && this.occurrences > 0 ? index.offsetWalk(query) : null;
   }
@@ -206,6 +155,11 @@ export class Matches {
   /** True once every position has been worked out. */
   get complete(): boolean {
     return !this.walk || (this.walk.finished && this.chunks.length > this.walk.maxOffset);
+  }
+
+  /** True when filters leave words out of this search. */
+  get filtered(): boolean {
+    return this.filter !== null;
   }
 
   /** Words containing the query, once `complete`; null until then. */
@@ -309,12 +263,15 @@ export class Matches {
     const seen = (this.seen ??= new Uint32Array((this.index.size + 31) >>> 5));
     const { ranges, singles } = this.walk!.idsAt(offset);
     const ids: number[] = [];
-    const hidden = this.hidden;
+    const { filter, lengths } = this;
+    const end = offset + this.queryLength; // a word this long ends with the query found here
     const take = (id: number) => {
+      if (filter?.has(id)) return;
+      if (lengths && lengths[id] === end) this.endsCounted++;
       const bit = 1 << (id & 31);
       if (seen[id >>> 5] & bit) return;
       seen[id >>> 5] |= bit;
-      if (!hidden?.has(id)) ids.push(id);
+      ids.push(id);
     };
     for (let i = 0; i < ranges.length; i += 2) for (let id = ranges[i]; id < ranges[i + 1]; id++) take(id);
     for (const id of singles) take(id);

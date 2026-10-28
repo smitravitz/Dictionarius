@@ -130,6 +130,30 @@ body {
   color: var(--ink);
 }
 
+/* The Filters funnel sits right under the cog, at the end of the search line;
+   a proof-magenta dot says a filter is set. */
+.funnel {
+  position: relative;
+  flex: none;
+  margin: 0 -0.625rem 0.125rem 0;
+}
+
+.funnel[data-active] {
+  color: var(--proof);
+}
+
+.funnel[data-active]::after {
+  content: "";
+  position: absolute;
+  top: 9px;
+  right: 8px;
+  width: 7px;
+  height: 7px;
+  border: 1.5px solid var(--paper);
+  border-radius: 50%;
+  background: var(--proof);
+}
+
 .status {
   margin: 0;
   color: var(--pencil);
@@ -140,10 +164,15 @@ body {
 /* ---------------------------------------------------------------- search */
 
 .search {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.25rem;
   padding: 1.5rem var(--pad) 0.5rem;
 }
 
 .search input {
+  flex: 1 1 auto;
+  min-width: 0;
   width: 100%;
   padding: 0.25rem 0 0.5rem;
   border: 0;
@@ -614,6 +643,10 @@ a:focus-visible {
   cursor: pointer;
 }
 
+.setting + .setting {
+  border-top: 0; /* stacked switches share one hairline */
+}
+
 .setting-text {
   display: grid;
   gap: 0.25rem;
@@ -691,4 +724,118 @@ a:focus-visible {
   .switch::after {
     transition: none;
   }
+}
+
+/* --------------------------------------------------------------- filters */
+
+.range {
+  display: grid;
+  gap: 0.25rem;
+  padding: 0.75rem 0 1rem;
+  border-top: 1px solid var(--hairline);
+  border-bottom: 1px solid var(--hairline);
+}
+
+.range .setting-name,
+.range .setting-help {
+  margin: 0;
+  font-size: inherit;
+}
+
+.range .setting-help {
+  font-size: 0.8125rem;
+}
+
+.wheels {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+}
+
+.wheel-field {
+  display: grid;
+  justify-items: center;
+  gap: 0.375rem;
+}
+
+.wheel-label {
+  color: var(--pencil);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.wheels-to {
+  padding-top: 1.25rem;
+  color: var(--pencil);
+  font-family: var(--font-word);
+  font-style: italic;
+}
+
+/* A roller wheel: five rows on a drum, the middle one ruled off like the line
+   being proofread. Turned by dragging; the page mustn't scroll instead. */
+.wheel {
+  --wheel-row: 36px; /* ROW in wheel.ts */
+  position: relative;
+  width: 100%;
+  max-width: 7.5rem;
+  height: calc(var(--wheel-row) * 5);
+  overflow: hidden;
+  border-radius: 0.5rem;
+  outline: none;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  perspective: 420px;
+  -webkit-mask-image: linear-gradient(transparent, #000 32%, #000 68%, transparent);
+  mask-image: linear-gradient(transparent, #000 32%, #000 68%, transparent);
+}
+
+.wheel:active {
+  cursor: grabbing;
+}
+
+.wheel::before {
+  content: "";
+  position: absolute;
+  inset: calc(var(--wheel-row) * 2) 0 auto;
+  height: var(--wheel-row);
+  border-top: 1px solid var(--hairline);
+  border-bottom: 1px solid var(--hairline);
+  background: var(--proof-wash);
+  pointer-events: none;
+}
+
+.wheel:focus-visible::before {
+  border-color: var(--proof);
+}
+
+.wheel-track {
+  position: relative;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  transform-style: preserve-3d;
+  will-change: transform;
+}
+
+.wheel-track li {
+  display: grid;
+  place-items: center;
+  height: var(--wheel-row);
+  color: var(--pencil);
+  font-family: var(--font-word);
+  font-size: 1.375rem;
+  font-variant-numeric: tabular-nums lining-nums;
+  font-variation-settings: "opsz" 24;
+  backface-visibility: hidden;
+}
+
+.wheel-track li.on {
+  color: var(--proof);
+  font-weight: 650;
 }

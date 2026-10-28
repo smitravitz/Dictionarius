@@ -12,6 +12,9 @@ import { OffsetSlider } from "./offset-slider";
 import { ScrollerGestures } from "./scroller-gestures";
 import { setUpNativeShell } from "./native";
 import { EXAMPLES, exampleLabel } from "./examples";
+import { FILTERS, filterKey, type FilterInfo } from "../src/filters";
+import { loadFilters, saveFilter } from "./saved-filters";
+import { FiltersPanel } from "./filters-panel";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const input = $<HTMLInputElement>("q");
@@ -23,7 +26,8 @@ const scroller = $("scroller");
 const entry = $("entry");
 const hint = $("hint");
 const settings = $<HTMLDialogElement>("settings");
-const safeSwitch = $<HTMLInputElement>("safe-search");
+const switches = $("switches");
+const panels = [settings, $<HTMLDialogElement>("filters")];
 
 const worker = new Worker(new URL("./search-worker.ts", import.meta.url), { type: "module" });
 const send = (message: ToWorker) => worker.postMessage(message);
@@ -62,10 +66,48 @@ new ScrollerGestures(scroller, {
   holdEnd: () => slider.close(),
 });
 
-// Settings live in browser storage; safe search is on unless turned off.
-const SAFE_SEARCH = "dictionarius.safe-search";
-safeSwitch.checked = read(SAFE_SEARCH) !== "off";
-send({ type: "settings", safe: safeSwitch.checked });
+// Which words to leave out (src/filters.ts), as saved on this device. Settings
+// draws a switch per switch filter; the Filters panel holds the ranges.
+const filters = loadFilters();
+send({ type: "settings", filters });
+
+/** A filter changed: remember it, and show the list again under it. */
+function setFilter(id: string, value: (typeof filters)[string]) {
+  filters[id] = value;
+  saveFilter(id, value);
+  send({ type: "settings", filters });
+  counts = null; // counted under the old filters
+  if (query) search(input.value);
+}
+
+for (const f of FILTERS) {
+  if (f.kind !== "switch") continue;
+  const row = document.createElement("label");
+  row.className = "setting";
+  row.dataset.filter = f.id;
+  row.innerHTML = `<span class="setting-text"><span class="setting-name"></span><span class="setting-help"></span></span>
+    <input class="switch" type="checkbox" role="switch" />`;
+  row.querySelector(".setting-name")!.textContent = f.label;
+  const help = row.querySelector<HTMLElement>(".setting-help")!;
+  help.textContent = f.help;
+  help.id = `${f.id}-help`;
+  const toggle = row.querySelector<HTMLInputElement>("input")!;
+  toggle.id = f.id;
+  toggle.setAttribute("aria-describedby", help.id);
+  toggle.checked = filters[f.id] === true;
+  toggle.addEventListener("change", () => setFilter(f.id, toggle.checked));
+  switches.append(row);
+}
+
+// The ranges (word length) are wheels in the Filters panel, under the cog.
+const filtersPanel = new FiltersPanel($<HTMLDialogElement>("filters"), $("ranges"), $<HTMLButtonElement>("filters-open"), filters, setFilter);
+
+/** Offer only the filters this index has the data for. */
+function offerFilters(available: FilterInfo[]) {
+  const ids = new Set(available.map((f) => f.id));
+  for (const row of switches.querySelectorAll<HTMLElement>("[data-filter]")) row.hidden = !ids.has(row.dataset.filter!);
+  filtersPanel.offer(available);
+}
 
 // The word list file: ?index= overrides it (tests use a small one), but only
 // with a file of the app's own: a link mustn't make the app fetch from elsewhere.
@@ -78,6 +120,7 @@ worker.onmessage = ({ data }: MessageEvent<FromWorker>) => {
     case "ready":
       ready = true;
       status.textContent = `${data.words.toLocaleString()} words`;
+      offerFilters(data.filters);
       if (normalize(input.value)) summary.textContent = "Searching…";
       break;
     case "failed":
@@ -95,7 +138,7 @@ worker.onmessage = ({ data }: MessageEvent<FromWorker>) => {
       describe();
       break;
     case "counts":
-      if (data.query !== query || data.counts.safe !== safeSwitch.checked) return;
+      if (data.query !== query || data.counts.filters !== filterKey(filters)) return;
       counts = data.counts;
       list.grow(sum(counts.byOffset), counts.total !== null);
       describe();
@@ -168,15 +211,18 @@ function describe() {
     return;
   }
   if (counts.total === 0) {
-    summary.textContent = `Safe search hides every word with ${q}. You can turn it off in Settings.`;
+    summary.textContent = `Settings or filters hide every word with ${q}.`;
     hint.hidden = true;
     return;
   }
-  const total = counts.total !== null ? fmt(counts.total) : `about ${roughly(counts.occurrences)}`;
+  // Unknown counts: the occurrences are close to the total without filters,
+  // but filters can leave out most of them, so then just wait for the count.
+  const total =
+    counts.total !== null ? fmt(counts.total) : counts.filtered ? "…" : `about ${roughly(counts.occurrences)}`;
   const { starts, ends } = counts;
   summary.textContent =
     `${fmt(starts)} ${starts === 1 ? "starts" : "start"} with ${q} · ` +
-    `${fmt(ends)} ${ends === 1 ? "ends" : "end"} with it · ${total} in all`;
+    `${ends === null ? "…" : fmt(ends)} ${ends === 1 ? "ends" : "end"} with it · ${total} in all`;
   hint.hidden = seen(HINT_SEEN);
 }
 
@@ -238,9 +284,9 @@ window.addEventListener("popstate", () => {
 
 void setUpNativeShell({
   closePanel: () => {
-    if (!settings.open) return false;
-    settings.close();
-    return true;
+    const open = panels.find((panel) => panel.open);
+    open?.close();
+    return !!open;
   },
   clearSearch: () => {
     if (!input.value) return false;
@@ -250,17 +296,14 @@ void setUpNativeShell({
   },
 });
 
-// Settings: the cog opens them; Done, Escape, or a tap outside closes them.
+// Settings: the cog opens them; the funnel opens Filters. Done, Escape, Back
+// or a tap outside closes either.
 $("settings-open").addEventListener("click", () => settings.showModal());
-settings.addEventListener("click", (event) => {
-  if (event.target === settings) settings.close(); // the backdrop, outside the panel
-});
-safeSwitch.addEventListener("change", () => {
-  write(SAFE_SEARCH, safeSwitch.checked ? "on" : "off");
-  send({ type: "settings", safe: safeSwitch.checked });
-  counts = null; // counted under the old setting
-  if (query) search(input.value); // show the list again under the new setting
-});
+for (const panel of panels) {
+  panel.addEventListener("click", (event) => {
+    if (event.target === panel) panel.close(); // the backdrop, outside the panel
+  });
+}
 
 // Example fragments fill the start screen; tapping one searches for it.
 const examples = $("examples");

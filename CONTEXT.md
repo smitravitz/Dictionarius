@@ -46,6 +46,14 @@ decision or module makes it load-bearing.
   while typing, it only puts the keyboard away); a **hold** on a blank spot
   opens the position slider; a hold on a word is reserved; a moving finger
   scrolls; the mouse drags the list or a row.
+- **Filter** — a rule that leaves words out of every search (`src/filters.ts`):
+  a **switch** in Settings (safe search; *Disable phrases*, entries with spaces;
+  *Disable names*, proper nouns; all on by default, so only common words show)
+  or a **range** in the **Filters panel** under the cog (word length, set with
+  two **roller wheels**, Min and Max: each starts on "Any"; Max starts from the
+  chosen minimum, and a new minimum puts Max back on Any). Filters read
+  **word columns** in the index (`LEN`, `NAME`, `SHAPE`); a choice compiles to
+  one **WordFilter** that every list and count goes through (ADR-0003).
 - **DictionarySource** — the seam for definitions (`getByHeadword`,
   `getCandidates`); mock, SQLite, and FM-index sources are interchangeable
   behind it. The web app doesn't use it yet: its search runs on the Completer.

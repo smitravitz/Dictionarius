@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { readFileSync } from "node:fs";
 import { HeadwordIndex } from "../src/headword-index";
-import { Completer, type ResultCursor } from "../src/complete";
+import { Completer, type Matches, type ResultCursor } from "../src/complete";
 import { normalize } from "../src/normalize";
 
 const index = HeadwordIndex.fromBytes(new Uint8Array(readFileSync("test/fixtures/headwords-sample.bin")));
@@ -34,14 +34,14 @@ interface Row {
 // further down) and "hedgeword" (a dated, offensive one) aren't.
 const EXPLICIT = new Set(["rudeword", "rudewords", "rudewurd", "slurword"]);
 
-function oracle(query: string, fromOffset = 0, safe = false, explicit = EXPLICIT): Row[] {
+function oracle(query: string, fromOffset = 0, safe = false, explicit = EXPLICIT, hide = (_key: string) => false): Row[] {
   const q = normalize(query);
   if (!q) return [];
   const rows: (Row & { exact: boolean; shape: number; score: number })[] = [];
   keys.forEach((key, id) => {
     const offset = offsetOf(key, q);
     if (offset < fromOffset) return;
-    if (safe && explicit.has(key)) return; // hidden, even typed out in full
+    if ((safe && explicit.has(key)) || hide(key)) return; // hidden, even typed out in full
     rows.push({ id, offset, exact: key === q, shape: shapeOf(key), score: Math.round(index.frequency(id) * 100) });
   });
   rows.sort(
@@ -53,6 +53,23 @@ function oracle(query: string, fromOffset = 0, safe = false, explicit = EXPLICIT
       a.id - b.id,
   );
   return rows.map(({ id, offset }) => ({ id, offset }));
+}
+
+/** Safe search on, nothing else. */
+const SAFE = { filters: { "safe-search": true } };
+
+/** A search's rows and every count it reports agree with the oracle's rows. */
+function expectAgrees(m: Matches, rows: Row[], q: string, label = q) {
+  const shown = rows.map((r) => keys[r.id]);
+  const n = normalize(q);
+  expect(m.starts, `${label} starts`).toBe(shown.filter((k) => k.startsWith(n)).length);
+  expect(drain(m.cursor()), `${label} rows`).toEqual(rows);
+  while (!m.count(1_000));
+  expect(m.ends, `${label} ends`).toBe(shown.filter((k) => k.endsWith(n)).length);
+  expect(m.total, `${label} total`).toBe(shown.length);
+  const byOffset: number[] = [];
+  for (const r of rows) byOffset[r.offset] = (byOffset[r.offset] ?? 0) + 1;
+  expect([...m.byOffset], `${label} by offset`).toEqual(Array.from(byOffset, (x) => x ?? 0));
 }
 
 /** Page through a cursor until it is done. */
@@ -195,15 +212,15 @@ describe("Completer", () => {
   describe("safe search", () => {
     it("leaves out explicit words, and keeps words with an ordinary meaning", () => {
       for (const q of ["rude", "word", "urd", "e", "slur", "mixed", "gap", "hedge"]) {
-        expect(drain(completer.search(q, { safe: true }).cursor()), q).toEqual(oracle(q, 0, true));
+        expect(drain(completer.search(q, SAFE).cursor()), q).toEqual(oracle(q, 0, true));
       }
-      const shown = drain(completer.search("word", { safe: true }).cursor()).map((r) => keys[r.id]);
+      const shown = drain(completer.search("word", SAFE).cursor()).map((r) => keys[r.id]);
       for (const word of ["mixedword", "hedgeword", "gapword", "gapwords"]) expect(shown).toContain(word);
       for (const word of EXPLICIT) expect(shown).not.toContain(word);
     });
 
     it("hides an explicit word even when it is typed out in full", () => {
-      const m = completer.search("rudeword", { safe: true });
+      const m = completer.search("rudeword", SAFE);
       expect(drain(m.cursor())).toEqual([]);
       while (!m.count(1_000));
       expect([m.starts, m.ends, m.total]).toEqual([0, 0, 0]);
@@ -211,23 +228,12 @@ describe("Completer", () => {
     });
 
     it("shows everything with safe search off", () => {
-      const shown = drain(completer.search("rude", { safe: false }).cursor()).map((r) => keys[r.id]);
+      const shown = drain(completer.search("rude", {}).cursor()).map((r) => keys[r.id]);
       for (const word of ["rudeword", "rudewords", "rudewurd"]) expect(shown).toContain(word);
     });
 
     it("counts only what it shows", () => {
-      for (const q of ["rude", "word", "s", "rudeword"]) {
-        const m = completer.search(q, { safe: true });
-        const shown = oracle(q, 0, true).map((r) => keys[r.id]);
-        const n = normalize(q);
-        expect(m.starts, `${q} starts`).toBe(shown.filter((k) => k.startsWith(n)).length);
-        expect(m.ends, `${q} ends`).toBe(shown.filter((k) => k.endsWith(n)).length);
-        while (!m.count(1_000));
-        expect(m.total, `${q} total`).toBe(shown.length);
-        const byOffset: number[] = [];
-        for (const r of oracle(q, 0, true)) byOffset[r.offset] = (byOffset[r.offset] ?? 0) + 1;
-        expect([...m.byOffset], `${q} by offset`).toEqual(Array.from(byOffset, (x) => x ?? 0));
-      }
+      for (const q of ["rude", "word", "s", "rudeword"]) expectAgrees(completer.search(q, SAFE), oracle(q, 0, true), q);
     });
 
     describe("with overrides", () => {
@@ -238,19 +244,11 @@ describe("Completer", () => {
 
       it("hides blocked words and shows allowed ones, and counts what it shows", () => {
         for (const q of ["an", "rude", "gap", "word", "e", "banana"]) {
-          const m = tuned.search(q, { safe: true });
-          const rows = oracle(q, 0, true, explicit);
-          expect(drain(m.cursor()), q).toEqual(rows);
-          const shown = rows.map((r) => keys[r.id]);
-          const n = normalize(q);
-          expect(m.starts, `${q} starts`).toBe(shown.filter((k) => k.startsWith(n)).length);
-          expect(m.ends, `${q} ends`).toBe(shown.filter((k) => k.endsWith(n)).length);
-          while (!m.count(1_000));
-          expect(m.total, `${q} total`).toBe(shown.length);
+          expectAgrees(tuned.search(q, SAFE), oracle(q, 0, true, explicit), q);
         }
-        const an = drain(tuned.search("an", { safe: true }).cursor()).map((r) => keys[r.id]);
+        const an = drain(tuned.search("an", SAFE).cursor()).map((r) => keys[r.id]);
         expect(an).not.toContain("banana");
-        const rude = drain(tuned.search("rude", { safe: true }).cursor()).map((r) => keys[r.id]);
+        const rude = drain(tuned.search("rude", SAFE).cursor()).map((r) => keys[r.id]);
         expect(rude).toContain("rudewords");
         expect(rude).not.toContain("rudeword");
       });
@@ -268,16 +266,74 @@ describe("Completer", () => {
       it("hides every word containing it, except allowed ones, and counts what it shows", () => {
         const explicit = new Set([...EXPLICIT, ...keys.filter((k) => k.includes("gap") && k !== "air gap")]);
         expect(explicit.size).toBeGreaterThan(EXPLICIT.size + 1);
-        for (const q of ["ga", "a", "gap", "air"]) {
-          const m = netted.search(q, { safe: true });
-          const rows = oracle(q, 0, true, explicit);
-          expect(drain(m.cursor()), q).toEqual(rows);
-          while (!m.count(1_000));
-          expect(m.total, `${q} total`).toBe(rows.length);
-        }
-        const air = drain(netted.search("air", { safe: true }).cursor()).map((r) => keys[r.id]);
+        for (const q of ["ga", "a", "gap", "air"]) expectAgrees(netted.search(q, SAFE), oracle(q, 0, true, explicit), q);
+        const air = drain(netted.search("air", SAFE).cursor()).map((r) => keys[r.id]);
         expect(air).toContain("air gap");
       });
+    });
+  });
+
+  describe("filters", () => {
+    // Each filter's rule, written independently of the index's columns.
+    const phrase = (key: string) => /\s/.test(key);
+
+    it("leaves out phrases (entries with spaces) but keeps hyphenated words, and counts what it shows", () => {
+      for (const q of ["e", "an", "-", "ice", "a b"]) {
+        expectAgrees(completer.search(q, { filters: { phrases: true } }), oracle(q, 0, false, EXPLICIT, phrase), q);
+      }
+      const hyphen = drain(completer.search("-", { filters: { phrases: true } }).cursor()).map((r) => keys[r.id]);
+      expect(hyphen.length).toBeGreaterThan(0);
+      expect(hyphen.some(phrase)).toBe(false);
+    });
+
+    it("leaves out names: words whose most common spelling is a proper noun", () => {
+      // The fixture's made-up names. "turkeyword" (a bird) outranks "Turkeyword" (a country).
+      const NAMES = new Set(["zorbleton", "quillmarch"]);
+      const name = (key: string) => NAMES.has(key);
+      for (const q of ["zorble", "quill", "turkeyword", "o", "march"]) {
+        expectAgrees(completer.search(q, { filters: { names: true } }), oracle(q, 0, false, EXPLICIT, name), q);
+      }
+      const turkey = drain(completer.search("turkeyword", { filters: { names: true } }).cursor());
+      expect(turkey.map((r) => keys[r.id])).toEqual(["turkeyword"]);
+    });
+
+    it("keeps words whose length is within a range, either end of which can be any", () => {
+      const chars = (key: string) => Array.from(key).length;
+      const ranges: [number | null, number | null][] = [[4, null], [null, 3], [4, 6], [5, 5], [null, null]];
+      for (const [min, max] of ranges) {
+        const outside = (key: string) => (min !== null && chars(key) < min) || (max !== null && chars(key) > max);
+        for (const q of ["e", "an", "ing", "résumé"]) {
+          const m = completer.search(q, { filters: { length: [min, max] } });
+          expectAgrees(m, oracle(q, 0, false, EXPLICIT, outside), q, `${q} [${min}, ${max}]`);
+        }
+      }
+    });
+
+    it("combines every filter: the defaults, with a length range", () => {
+      const NAMES = new Set(["zorbleton", "quillmarch"]);
+      const hide = (key: string) => /\s/.test(key) || NAMES.has(key) || Array.from(key).length < 4;
+      const filters = { "safe-search": true, phrases: true, names: true, length: [4, null] as const };
+      for (const q of ["e", "word", "or", "rude", "a b"]) {
+        expectAgrees(completer.search(q, { filters }), oracle(q, 0, true, EXPLICIT, hide), q);
+      }
+    });
+
+    it("offers the filters this index has data for, with each range's largest value", () => {
+      const longest = Math.min(255, Math.max(...keys.map((k) => Array.from(k).length)));
+      expect(completer.availableFilters().map((f) => (f.kind === "range" ? [f.id, f.min, f.max] : f.id))).toEqual([
+        "safe-search",
+        "phrases",
+        "names",
+        ["length", 1, longest],
+      ]);
+    });
+
+    it("knows what ends with the query at once without filters, and once counted with them", () => {
+      expect(completer.search("e").ends).toBe(keys.filter((k) => k.endsWith("e")).length);
+      const m = completer.search("e", { filters: { phrases: true } });
+      expect(m.ends).toBeNull();
+      while (!m.count(1_000));
+      expect(m.ends).toBe(keys.filter((k) => k.endsWith("e") && !phrase(k)).length);
     });
   });
 
