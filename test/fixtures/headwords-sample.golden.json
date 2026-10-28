@@ -1,6 +1,6 @@
 {
  "file": {
-  "sha256": "e96a2824db528aac003389322f9d2933b1d862cce0147608e1122b0eeaa9cfdb",
+  "sha256": "bb81705f390a3777ca5c87d44d54f27558267f45c859b5c2d2352bfde7468cc0",
   "version": 1,
   "normId": "nfd-strip-diacritic-lower-trim/v1",
   "n": 166679,
@@ -674,10 +674,8 @@
   }
  ],
  "explicit": {
-  "count": 6,
+  "count": 4,
   "ids": [
-   6177,
-   6178,
    13010,
    13011,
    13012,

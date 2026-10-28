@@ -155,40 +155,35 @@ combined key, such as `(2 − shape) × 2000 + FREQ`.
 a word; a meaning is explicit when its tags include `vulgar`, `offensive` or
 `slur`, or its categories include *English vulgarities*, *English offensive
 terms*, *English ethnic slurs* or *English swear words*. A headword is explicit
-when:
+when its **main meaning** is: the first meaning of its first entry, as the page
+lists it. So is a word whose main meaning is just a plural, tense or spelling
+(`form_of`, `alt_of`) of such a word. That is one step: nothing is hidden for
+being linked to a linked word.
 
-- its **main meaning** is explicit: the first meaning of its first entry, as
-  the page lists it; or
-- **any meaning**, at any position and in any entry, is a **slur**: tagged
-  `slur`, in *English ethnic slurs*, or tagged `offensive` without a hedge
-  (`sometimes`, `possibly`, `potentially`, `occasionally`, `dated`, `archaic`,
-  `obsolete`, `historical`, `rare`); or
-- its main meaning is an inflection or spelling (`form_of`, `alt_of`) of
-  explicit words ("fucked" of "fuck", "faggots" of "faggot").
-
-A spelling listed further down doesn't count: "be" is also an old spelling of
-"by", and that mustn't tie "is" to every word "by" is tied to.
+Labels further down a word's meanings hide nothing. Plenty of everyday words
+carry a rare slur or vulgar sense that almost nobody means, and a word with an
+innocent first meaning can still be mostly known as a bad word; telling those
+apart takes a person, not a rule. `derogatory`, `pejorative` and `slang` alone
+don't count.
 
 A search key is explicit when its most common written form is (by wordfreq, as
-in *Display forms*).
+in *Display forms*; ties go to the lowercase form).
 
-So "faggot" is hidden although "a bundle of sticks" comes first. A word whose
-other meanings are only vulgar keeps its everyday sense: "cock" (a rooster) and
-"ass" (a donkey) stay visible, while "shit" stays hidden although a later
-meaning is labelled only `slang`. `derogatory`, `pejorative` and `slang` alone
-don't count, and neither does a hedged label further down ("colored": dated,
-offensive).
+**Hand-picked list.** [`data/safe-search.list`](../data/safe-search.list)
+names search keys to **block** (bad words whose first meaning is innocent, and
+ones the labels miss) and to **allow** (names and ordinary words that share a
+key with an offensive word). It is stored encoded so the repository doesn't
+carry a readable list of slurs; `python scripts/safe_search_list.py show`
+decodes it, and `add` / `remove` edit it. A blocked key is just that key (list
+its plural too); an allowed word's plurals and tenses stay visible with it.
+The builder applies the list, and the app applies it again when it loads, so
+an edit reaches the app without rebuilding the index.
 
-**Hand corrections.** Many everyday words also carry a rare slur meaning ("boy",
-"white", "it"), and the labels miss a few slurs. [`data/safe-search.txt`](../data/safe-search.txt)
-lists search keys to allow (always shown) or block (always hidden); inflections
-follow both. The builder applies it, and the app applies it again at load, so
-an edit reaches the app at once for the word itself and for its inflections at
-the next index build. Each build writes `<out>.safe-review.tsv` (every hidden
-word, most common first, with why: `main meaning`, `a slur meaning`,
-`blocked by hand`, `form of <word>`) and `<out>.labels.jsonl.gz`, the labels
-this rule reads, so a rule change can be rebuilt from a word list
-(`--labels`) without the multi-GB dump.
+Each build writes `<out>.safe-review.tsv`: every hidden word, and every
+visible word labelled a slur or plainly offensive further down, most common
+first, with why. That is where candidates for the list come from. It also
+writes `<out>.labels.jsonl.gz`, the labels this rule reads, so a rule change
+can be rebuilt (`--labels`) without the multi-GB dump.
 
 A word typed out in full always shows.
 

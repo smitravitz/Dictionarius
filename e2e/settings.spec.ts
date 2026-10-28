@@ -15,9 +15,8 @@ const shown = (page: Page) =>
   );
 
 // The fixture's made-up labelled words: rudeword, rudewords and rudewurd are
-// explicit (vulgar, and its plural and spelling); so are gapword and gapwords
-// (a slur, listed after an everyday meaning). mixedword's main meaning is
-// ordinary and its other one only vulgar, so it stays.
+// explicit (vulgar, and its plural and spelling). mixedword and gapword have
+// an ordinary main meaning, so they stay: labels further down hide nothing.
 
 test("the cog opens settings, with safe search on by default", async ({ page }) => {
   await open(page);
@@ -71,14 +70,11 @@ test("words with an ordinary meaning too are not hidden", async ({ page }) => {
   await expect.poll(() => shown(page)).toContain("mixedword");
 });
 
-test("a slur listed after an everyday meaning still hides the word", async ({ page }) => {
+test("labels further down a word's meanings don't hide it", async ({ page }) => {
   await open(page);
   await page.locator("#q").fill("gap");
-  await expect.poll(() => shown(page)).toContain("gapeworm");
-  const words = await shown(page);
-  expect(words).not.toContain("gapword");
-  expect(words).not.toContain("gapwords");
-  await page.locator("#q").fill("hedge"); // a dated, offensive meaning further down doesn't count
+  await expect.poll(() => shown(page)).toContain("gapword");
+  await page.locator("#q").fill("hedge");
   await expect.poll(() => shown(page)).toEqual(["hedge", "hedger", "hedgeword"]);
 });
 

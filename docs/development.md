@@ -7,7 +7,7 @@ npm install
 npm test            # unit tests
 npm run typecheck   # strict TypeScript check
 npm run test:e2e    # browser tests (desktop + phone) on a small sample index
-python -m unittest scripts/test_build_fm_index.py   # the index builder's safe-search rule
+python -m unittest scripts/test_build_fm_index.py   # the index builder's safe-search rule and list
 ```
 
 ## Run the app on the full word list
@@ -22,7 +22,7 @@ npm run dev
 The build checks itself against brute force and also writes:
 
 - `headwords.golden.json`: answers the tests compare against
-- `headwords.safe-review.tsv`: every word safe search hides, most common first, with why. Corrections go in [`data/safe-search.txt`](../data/safe-search.txt) ([rule](index-format.md#safe-search))
+- `headwords.safe-review.tsv`: every word safe search hides, and visible words worth a look, most common first, with why. Corrections go in the hand-picked list, `data/safe-search.list` (encoded; `python scripts/safe_search_list.py show`, `add`, `remove`). See the [rule](index-format.md#safe-search)
 - `headwords.labels.jsonl.gz`: the labels safe search reads. With it and a list of the headwords, a rule change rebuilds without re-reading the dump: `python scripts/build_fm_index.py words.json --labels headwords.labels.jsonl.gz`
 
 ## Android
