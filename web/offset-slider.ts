@@ -9,6 +9,11 @@
  * position, so the ends are easy to reach. Each step ticks; the list scrolls
  * to the words at that position as you go, and stays whole: scroll up or down
  * from there.
+ *
+ * Which side the hold starts on says which hand is holding the phone. Held
+ * from the right half, everything mirrors: 0 letters at the right edge, more
+ * letters as the thumb sweeps left, and the bars drawn right to left so the
+ * lit bar stays under the thumb. The scale's shape is the same either way.
  */
 import { pulse, tick } from "./haptics";
 import { positionScale, type PositionScale } from "./position-scale";
@@ -47,6 +52,7 @@ export class OffsetSlider {
   private scale: PositionScale = positionScale(1);
   private rangeX = 0; // where the active range starts inside the window
   private range = 1; // its width in pixels
+  private mirrored = false; // held from the right: 0 letters at the right edge
 
   constructor(
     frame: HTMLElement,
@@ -71,6 +77,8 @@ export class OffsetSlider {
   open(x: number): boolean {
     const state = this.events.state();
     if (!state) return false;
+    const box = this.window.getBoundingClientRect();
+    this.mirrored = x > box.left + box.width / 2;
     pulse();
     this.events.used();
     this.el.classList.add("on");
@@ -90,7 +98,8 @@ export class OffsetSlider {
     const box = this.window.getBoundingClientRect();
     const inside = Math.min(box.width, Math.max(0, x - box.left));
     this.thumb.style.transform = `translateX(${inside}px)`;
-    const value = Math.min(this.max, this.scale.at((inside - this.rangeX) / this.range));
+    const share = (inside - this.rangeX) / this.range;
+    const value = Math.min(this.max, this.scale.at(this.mirrored ? 1 - share : share));
     if (value === this.value) return;
     const first = this.value < 0;
     this.value = value;
@@ -119,7 +128,8 @@ export class OffsetSlider {
       const height = count === undefined ? 3 : count === 0 ? 2 : 4 + 36 * Math.sqrt(count / most);
       const step = (edges[i + 1] - edges[i]) * this.range;
       const gap = step > 8 ? 3 : step > 4 ? 1.5 : 0.5;
-      bar.style.left = `${this.rangeX + edges[i] * this.range}px`;
+      const start = this.mirrored ? 1 - edges[i + 1] : edges[i];
+      bar.style.left = `${this.rangeX + start * this.range}px`;
       bar.style.width = `${Math.max(1, step - gap)}px`;
       bar.style.height = `${height}px`;
       if (count === undefined) bar.className = "unknown";

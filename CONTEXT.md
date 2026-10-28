@@ -38,6 +38,8 @@ decision or module makes it load-bearing.
   jump to a position. Its **active range** is the middle 80% of the screen; the
   **position scale** (`web/position-scale.ts`) gives positions 4–6 the most
   room, puts 6 at about 75%, and squeezes positions 8 and up into the last 18%.
+  Held from the right half of the screen (a right thumb), it mirrors: 0 at the
+  right edge, more letters leftward, bars drawn right to left.
 - **Scroller gestures** — what a press on the results means, decided in one
   place (`web/scroller-gestures.ts`): a **tap** opens a word (on a touch screen
   while typing, it only puts the keyboard away); a **hold** on a blank spot
