@@ -47,6 +47,9 @@ html,
 body {
   height: 100%;
   margin: 0;
+  /* No swipe-to-go-back in browsers: sideways swipes belong to the rows and
+     the position slider. */
+  overscroll-behavior-x: none;
 }
 
 body {
@@ -167,6 +170,13 @@ body {
   font-size: 0.8125rem;
 }
 
+.hint {
+  margin: -0.25rem 0 0;
+  padding: 0 var(--pad) 0.5rem;
+  color: var(--pencil);
+  font-size: 0.75rem;
+}
+
 /* ----------------------------------------------------------------- intro */
 
 /* The examples fill whatever height the start screen has, and scroll past it. */
@@ -263,6 +273,109 @@ a:focus-visible {
   cursor: grabbing;
 }
 
+.scroller {
+  -webkit-touch-callout: none; /* a long press opens the position slider, not a menu */
+}
+
+/* ------------------------------------------------------- position slider */
+
+/* Opens over the top of the list while a blank spot is held. The label spells
+   the position out as dots before the fragment: ••ing = two letters before. */
+.slider {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  z-index: 2;
+  padding: 0.75rem var(--pad) 0.625rem;
+  border-bottom: 1px solid var(--hairline);
+  background: var(--paper);
+  box-shadow: 0 10px 24px -18px rgb(0 0 0 / 0.45);
+  opacity: 0;
+  transform: translateY(-0.5rem);
+  transition:
+    opacity 0.14s ease-out,
+    transform 0.14s ease-out;
+  pointer-events: none;
+}
+
+.slider.on {
+  opacity: 1;
+  transform: none;
+}
+
+.slider-label {
+  margin: 0;
+  font-family: var(--font-word);
+  font-size: 1.75rem;
+  font-variation-settings: "opsz" 36;
+  line-height: 1.15;
+  white-space: nowrap;
+}
+
+.slider-dots {
+  color: var(--pencil);
+  letter-spacing: 0.06em;
+}
+
+.slider-frag {
+  color: var(--proof);
+  font-weight: 650;
+}
+
+.slider-note {
+  margin: 0.125rem 0 0.5rem;
+  color: var(--pencil);
+  font-size: 0.8125rem;
+  font-variant-numeric: tabular-nums;
+}
+
+/* One bar per position, as tall as the words there; the chosen one in magenta. */
+.slider-window {
+  position: relative;
+  height: 2.75rem;
+  overflow: hidden;
+}
+
+.slider-track {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 100%;
+}
+
+.slider-track > i {
+  position: absolute;
+  bottom: 0;
+  border-radius: 2px 2px 0 0;
+  background: var(--hairline);
+}
+
+.slider-track > i.unknown {
+  background: repeating-linear-gradient(90deg, var(--hairline) 0 2px, transparent 2px 4px);
+}
+
+.slider-track > i.on {
+  background: var(--proof);
+}
+
+/* Where the finger is: the seam again. */
+.slider-thumb {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 1.5px;
+  background: var(--proof);
+  opacity: 0.45;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .slider {
+    transition: none;
+  }
+}
+
 .list {
   position: relative;
   margin: 0;
@@ -290,8 +403,11 @@ a:focus-visible {
   -webkit-tap-highlight-color: transparent;
 }
 
-.word:hover {
-  background: color-mix(in srgb, var(--proof-wash) 55%, transparent);
+/* Only with a real pointer: on touch screens :hover sticks after a tap. */
+@media (hover: hover) {
+  .word:hover {
+    background: color-mix(in srgb, var(--proof-wash) 55%, transparent);
+  }
 }
 
 .word[aria-selected="true"] {

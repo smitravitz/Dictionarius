@@ -16,6 +16,8 @@ const PREFETCH_ROWS = 25; // ask for more when this close to the end
 export interface ResultsListEvents {
   needMore(): void;
   choose(s: Suggestion): void;
+  /** True while another gesture (the position slider) owns the pointer. */
+  busy(): boolean;
 }
 
 export class ResultsList {
@@ -46,7 +48,7 @@ export class ResultsList {
       const s = li ? this.rows[Number(li.dataset.row)] : undefined;
       if (s) this.events.choose(s);
     });
-    enableDragScroll(scroller);
+    enableDragScroll(scroller, () => this.events.busy());
   }
 
   /** Start showing results for a new search (the first page is on its way). */
@@ -193,7 +195,7 @@ function span(className: string, text: string): HTMLSpanElement {
  * scrolling (already a drag, with the platform's own momentum). A drag longer
  * than a few pixels doesn't count as a click on the row under it.
  */
-function enableDragScroll(el: HTMLElement) {
+function enableDragScroll(el: HTMLElement, busy: () => boolean) {
   const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)");
   let pointerId = -1;
   let startX = 0;
@@ -221,6 +223,13 @@ function enableDragScroll(el: HTMLElement) {
 
   el.addEventListener("pointermove", (e) => {
     if (e.pointerId !== pointerId) return;
+    if (busy()) {
+      // The slider took over this press: let go without scrolling.
+      if (dragging !== "none") el.classList.remove("dragging");
+      pointerId = -1;
+      dragging = "none";
+      return;
+    }
     const dx = e.clientX - startX;
     const dy = e.clientY - startY;
     if (dragging === "none" && Math.max(Math.abs(dx), Math.abs(dy)) > 6) {
