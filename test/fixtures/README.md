@@ -17,7 +17,7 @@ diacritic variants that collide on one key (`Résumé` / `résumé` / `Resume`),
 Greek final sigma, `Hawaiʻi`, `İstanbul`, Cyrillic, CJK, emoji, a BOM, a
 non-breaking space, words that repeat a fragment (`banana`, `cancan`), and five made-up words
 with Wiktionary-style labels for safe search (`rudeword`, its plural and spelling, `slurword`,
-`mixedword`). No Wiktionary content.
+and `mixedword`, whose main meaning is ordinary). No Wiktionary content.
 
 **Rebuild** (after a format or normalization change):
 

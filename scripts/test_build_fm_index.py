@@ -9,7 +9,8 @@ import sys
 import unittest
 
 sys.path.insert(0, os.path.dirname(__file__))
-from build_fm_index import Labels  # noqa: E402
+import build_fm_index  # noqa: E402
+from build_fm_index import Labels, explicit_key_ids  # noqa: E402
 
 
 def entry(word, *senses):
@@ -26,15 +27,17 @@ def sense(*tags, gloss="a meaning", categories=(), form_of=None, alt_of=None):
 
 
 class ExplicitWords(unittest.TestCase):
+    """A word is explicit when its main meaning (the first one listed) is."""
+
     def explicit(self, *entries):
         labels = Labels()
         for e in entries:
             labels.add(e)
         return labels.explicit_words()
 
-    def test_a_word_whose_every_meaning_is_vulgar_offensive_or_a_slur(self):
+    def test_main_meaning_vulgar_offensive_or_a_slur(self):
         found = self.explicit(
-            entry("rudeword", sense("vulgar"), sense("slang", "vulgar")),
+            entry("rudeword", sense("vulgar")),
             entry("slurword", sense("ethnic", "slur", "offensive")),
             entry("insultword", sense("offensive")),
         )
@@ -44,14 +47,24 @@ class ExplicitWords(unittest.TestCase):
         found = self.explicit(entry("catword", sense(categories=["English vulgarities"])))
         self.assertEqual(found, {"catword"})
 
-    def test_one_ordinary_meaning_keeps_a_word_visible(self):
-        # Like "cock" (a rooster) or "ass" (a donkey).
-        found = self.explicit(entry("mixedword", sense("vulgar"), sense(gloss="a farm bird")))
+    def test_an_ordinary_main_meaning_keeps_a_word_visible(self):
+        # Like "cock" (a rooster first) or "ass" (a donkey first).
+        found = self.explicit(entry("roosterword", sense(gloss="a farm bird"), sense("vulgar")))
         self.assertEqual(found, set())
 
-    def test_ordinary_meanings_in_another_entry_of_the_same_word_count_too(self):
-        found = self.explicit(entry("twoword", sense("vulgar")), entry("twoword", sense(gloss="a verb meaning")))
-        self.assertEqual(found, set())
+    def test_later_ordinary_meanings_dont_save_a_vulgar_word(self):
+        # Like "shit": vulgar first, with a meaning labelled only "slang" later.
+        found = self.explicit(entry("rudeword", sense("vulgar"), sense("slang"), sense(gloss="plain")))
+        self.assertEqual(found, {"rudeword"})
+
+    def test_the_first_entry_decides(self):
+        found = self.explicit(
+            entry("nounfirst", sense(gloss="a plain noun")),
+            entry("nounfirst", sense("vulgar")),  # a later part of speech
+            entry("vulgarfirst", sense("vulgar")),
+            entry("vulgarfirst", sense(gloss="a plain verb")),
+        )
+        self.assertEqual(found, {"vulgarfirst"})
 
     def test_derogatory_or_slang_alone_is_not_enough(self):
         found = self.explicit(entry("meanword", sense("derogatory")), entry("slangword", sense("slang")))
@@ -63,24 +76,21 @@ class ExplicitWords(unittest.TestCase):
             entry("rudewords", sense("form-of", "plural", form_of="rudeword")),
             entry("rudewurd", sense("alt-of", alt_of="rudeword")),
             entry("rudewurds", sense("form-of", "plural", form_of="rudewurd")),  # a chain
-            entry("plainword", sense()),
-            entry("plainwords", sense("form-of", "plural", form_of="plainword")),
+            entry("roosterword", sense(gloss="a farm bird"), sense("vulgar")),
+            entry("roosterwords", sense("form-of", "plural", form_of="roosterword")),
             entry("orphans", sense("form-of", "plural", form_of="no-such-entry")),
         )
         self.assertEqual(found, {"rudeword", "rudewords", "rudewurd", "rudewurds"})
 
-    def test_an_inflection_that_also_has_its_own_ordinary_meaning_stays(self):
-        found = self.explicit(
-            entry("rudeword", sense("vulgar")),
-            entry("rudewords", sense("form-of", form_of="rudeword"), sense(gloss="a town")),
-        )
+    def test_an_inflection_with_a_vulgar_label_of_its_own_counts(self):
+        found = self.explicit(entry("rudeworded", sense("vulgar", "form-of", form_of="plainword")))
+        self.assertEqual(found, {"rudeworded"})
+
+    def test_meanings_without_a_gloss_are_skipped(self):
+        found = self.explicit(entry("rudeword", {"tags": ["no-gloss"]}, sense("vulgar")))
         self.assertEqual(found, {"rudeword"})
 
-    def test_meanings_without_a_gloss_are_ignored(self):
-        found = self.explicit(entry("rudeword", sense("vulgar"), {"tags": ["no-gloss"]}))
-        self.assertEqual(found, {"rudeword"})
-
-    def test_other_languages_and_words_without_senses_are_ignored(self):
+    def test_words_without_senses_are_ignored(self):
         labels = Labels()
         labels.add({"word": "rudeword", "lang_code": "en", "senses": [sense("vulgar")]})
         labels.add({"word": "plain"})
@@ -91,6 +101,25 @@ class ExplicitWords(unittest.TestCase):
     def test_surrounding_whitespace_is_trimmed_like_headwords(self):
         found = self.explicit(entry(" rudeword ", sense("vulgar")))
         self.assertEqual(found, {"rudeword"})
+
+
+class ExplicitKeys(unittest.TestCase):
+    """A search key is explicit when its most common written form is."""
+
+    def setUp(self):
+        self.saved = dict(build_fm_index.FORM_ZIPF)
+
+    def tearDown(self):
+        build_fm_index.FORM_ZIPF.clear()
+        build_fm_index.FORM_ZIPF.update(self.saved)
+
+    def test_the_most_common_form_decides(self):
+        build_fm_index.FORM_ZIPF.update({"rude": 4.0, "Rude": 2.0, "name": 2.0, "Name": 4.0})
+        keys = ["name", "rude", "plain"]
+        forms = {"name": {"name", "Name"}, "rude": {"rude", "Rude"}, "plain": {"plain"}}
+        # "rude" (common) is explicit, "Name" (the common form of "name") isn't.
+        explicit = {"rude", "name"}
+        self.assertEqual(explicit_key_ids(keys, forms, explicit), [1])
 
 
 if __name__ == "__main__":

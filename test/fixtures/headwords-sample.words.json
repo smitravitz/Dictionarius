@@ -17085,5 +17085,5 @@
 {"word": "rudewords", "senses": [{"glosses": ["plural of rudeword"], "tags": ["form-of", "plural"], "form_of": [{"word": "rudeword"}]}]},
 {"word": "rudewurd", "senses": [{"glosses": ["alternative spelling of rudeword"], "tags": ["alt-of"], "alt_of": [{"word": "rudeword"}]}]},
 {"word": "slurword", "senses": [{"glosses": ["a made-up meaning"], "tags": ["ethnic", "slur", "offensive"]}]},
-{"word": "mixedword", "senses": [{"glosses": ["a made-up meaning"], "tags": ["vulgar"]}, {"glosses": ["an everyday meaning"], "tags": []}]}
+{"word": "mixedword", "senses": [{"glosses": ["an everyday meaning"], "tags": []}, {"glosses": ["a made-up meaning"], "tags": ["vulgar"]}]}
 ]
