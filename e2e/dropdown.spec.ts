@@ -15,8 +15,7 @@ const listRows = (page: Page) =>
 
 /** Wait until every match is counted: the summary's total is exact. */
 async function counted(page: Page) {
-  await expect(page.locator("#summary")).toHaveText(/ in all$/);
-  await expect(page.locator("#summary")).not.toHaveText(/about/);
+  await expect(page.locator("#summary")).toHaveText(/ [\d,]+ in all$/); // not "about …" or "…"
   return Number((await page.locator("#summary").textContent())!.match(/([\d,]+) in all$/)![1].replace(/,/g, ""));
 }
 
@@ -34,7 +33,7 @@ const scroller = (page: Page) => page.locator("#scroller");
 
 test("shows how many words are loaded", async ({ page }) => {
   await open(page);
-  await expect(page.locator("#status")).toHaveText("17,077 words");
+  await expect(page.locator("#status")).toHaveText("17,081 words");
 });
 
 test("typing shows results straight away, exact match first", async ({ page }) => {

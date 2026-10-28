@@ -60,7 +60,7 @@ test("safe search hides explicit words; turning it off shows them, and is rememb
 test("safe search hides a word even when it is typed out in full", async ({ page }) => {
   await open(page);
   await page.locator("#q").fill("rudeword");
-  await expect(page.locator("#summary")).toHaveText(/^Safe search hides every word with “rudeword”/);
+  await expect(page.locator("#summary")).toHaveText("Settings or filters hide every word with “rudeword”.");
   expect(await shown(page)).toEqual([]);
 });
 
@@ -78,9 +78,41 @@ test("labels further down a word's meanings don't hide it", async ({ page }) => 
   await expect.poll(() => shown(page)).toEqual(["hedge", "hedger", "hedgeword"]);
 });
 
-test("says so when safe search hides every match", async ({ page }) => {
+test("says so when safe search or a filter hides every match", async ({ page }) => {
   await open(page);
   await page.locator("#q").fill("slurw");
-  await expect(page.locator("#summary")).toHaveText("Safe search hides every word with “slurw”. You can turn it off in Settings.");
+  await expect(page.locator("#summary")).toHaveText("Settings or filters hide every word with “slurw”.");
   await expect(page.locator("li.word")).toHaveCount(0);
+});
+
+// The fixture's made-up names: Zorbleton and Quillmarch (proper nouns);
+// "turkeyword" (a bird) is more common than "Turkeyword" (a country), so it stays.
+
+test("only common words by default: phrases and names start hidden, and come back when switched off", async ({ page }) => {
+  await open(page);
+  await page.getByRole("button", { name: "Settings" }).click();
+  const dialog = page.getByRole("dialog", { name: "Settings" });
+  await expect(dialog.getByRole("switch", { name: /Disable phrases/ })).toBeChecked();
+  await expect(dialog.getByRole("switch", { name: /Disable names/ })).toBeChecked();
+  await dialog.getByRole("button", { name: "Done" }).click();
+
+  await page.locator("#q").fill("zorble");
+  await expect(page.locator("#summary")).toHaveText(/in all$/);
+  expect(await shown(page)).toEqual(["zorble"]);
+  await page.locator("#q").fill("air");
+  await expect(page.locator("#summary")).toHaveText(/in all$/);
+  expect((await shown(page)).filter((w) => w!.includes(" "))).toEqual([]);
+
+  await page.getByRole("button", { name: "Settings" }).click();
+  await dialog.getByRole("switch", { name: /Disable phrases/ }).uncheck();
+  await dialog.getByRole("switch", { name: /Disable names/ }).uncheck();
+  await dialog.getByRole("button", { name: "Done" }).click();
+  await expect.poll(() => shown(page)).toContain("air gap");
+  await page.locator("#q").fill("zorble");
+  await expect.poll(() => shown(page)).toEqual(["zorble", "Zorbleton"]);
+
+  await page.reload();
+  await expect(page.locator("#status")).toHaveText(/^[\d,]+ words$/);
+  await page.locator("#q").fill("zorble");
+  await expect.poll(() => shown(page)).toEqual(["zorble", "Zorbleton"]); // still off after a reload
 });

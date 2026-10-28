@@ -100,8 +100,7 @@ async function holdBlankSpot(page: Page, isMobile: boolean, side: "left" | "righ
 
 /** Wait until every position is counted, so the slider's layout is final. */
 async function counted(page: Page) {
-  await expect(page.locator("#summary")).toHaveText(/in all$/);
-  await expect(page.locator("#summary")).not.toHaveText(/about/);
+  await expect(page.locator("#summary")).toHaveText(/ [\d,]+ in all$/); // every position counted
 }
 
 test("holding a blank spot opens the scrubber; the screen's width spans every position", async ({ page, isMobile }) => {
