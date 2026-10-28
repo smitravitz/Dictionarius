@@ -1,20 +1,18 @@
-import type { HeadwordIndex } from "./headword-index";
+import type { HeadwordIndex, OffsetWalk } from "./headword-index";
 import { normalize } from "./normalize";
 
 /**
- * Type-ahead results, ranked and produced lazily, a page at a time.
+ * Type-ahead results, produced lazily, a page at a time.
  *
- * Order: the exact match first. Then every other match, grouped by shape:
- * single words, then hyphenated words, then entries with spaces. Within a
- * group, by score (word frequency), where words that start with the query get
- * a head start of `prefixBonus` on the Zipf scale. Ties: prefix before
- * mid-word, then alphabetical (= word id order). So a common word containing
- * the query ("criticism" for "ism") can outrank a rare word starting with it
- * ("Ismay"), but no phrase outranks a single word.
- * Asking for the next page never enumerates the whole result set.
+ * Order: the exact match first. Then words by how many characters come before
+ * the (first) match: every word that starts with the query, then words with
+ * one character in front of it, then two, and so on. Within one position:
+ * single words, then hyphenated words, then entries with spaces; then common
+ * words first; then alphabetical.
+ *
+ * Positions are worked out on demand (see HeadwordIndex.offsetWalk), so the
+ * first page never waits for words deep inside long ones.
  */
-
-export type Tier = "exact" | "prefix" | "midword";
 
 export interface Suggestion {
   id: number;
@@ -24,477 +22,226 @@ export interface Suggestion {
   display: string;
   /** all ways the word is written, e.g. ["resume", "résumé"] */
   forms: string[];
-  tier: Tier;
+  /** characters before the match (0 = the word starts with the query) */
+  offset: number;
+  /** the word is exactly the query */
+  exact: boolean;
   /** Zipf scale; 0 = unknown */
   frequency: number;
 }
 
-export interface CompleterOptions {
-  /** Mid-word sets with at most this many occurrences are located in full and
-   *  sorted; larger ones are scanned in frequency order, which stops early. */
-  locateLimit: number;
-  /** Max words examined per next() call while scanning, so no call stalls.
-   *  A page can come back short with done = false; just ask again. */
-  scanBudget: number;
-  /** Search the index's hot list (top-ranked words as one string) first, so
-   *  mid-word results for common fragments are instant. */
-  useHot: boolean;
-  /** Head start (Zipf) for words that start with the query: 1.5 means a prefix
-   *  match beats a mid-word match up to ~30x more frequent. */
-  prefixBonus: number;
-}
-
-const DEFAULTS: CompleterOptions = {
-  locateLimit: 10_000,
-  scanBudget: 20_000,
-  useHot: true,
-  prefixBonus: 1.5,
-};
-const BLOCK_SHIFT = 5; // 32 ids per tree leaf
-/** Rank points per shape step. Above any score plus prefix bonus (Zipf tops
- *  out near 8 = 800 points), so shape always decides before frequency. */
+/** Rank points per shape step. Above any score (Zipf tops out near 8 = 800
+ *  points), so shape always decides before frequency. */
 const SHAPE_STEP = 2000;
-const MAX_SCORE = SHAPE_STEP / 2 - 1;
-
-/** Ranks + a max tree over blocks of ids, shared by all cursors. */
-interface Ranks {
-  /** per id: (2 - shape) x SHAPE_STEP + rank score x 100; higher ranks first */
-  freq: Uint16Array;
-  tree: Uint16Array; // tree[1] = root; leaves at [leafBase, leafBase + numBlocks)
-  leafBase: number;
-}
-
-/** The index's hot list, with each entry's word id and start offset. */
-interface Hot {
-  text: string; // keys in rank order, each followed by "\u0001"
-  ids: Uint32Array; // entry i -> word id
-  starts: Uint32Array; // entry i -> offset in text
-  /** True for the words in the hot list (the top `count` in rank order). */
-  contains(id: number): boolean;
-}
+const MAX_SCORE = SHAPE_STEP - 1;
+/** Chunks smaller than this are sorted directly; bigger ones by counting sort. */
+const SMALL_CHUNK = 256;
 
 export class Completer {
-  private readonly ranks: Ranks;
-  private readonly hot: Hot | null;
-  private readonly options: CompleterOptions;
+  /** Per id: (2 - shape) x SHAPE_STEP + score; higher ranks first. */
+  private readonly ranks: Uint16Array;
+  private readonly maxRank: number;
 
-  constructor(
-    private readonly index: HeadwordIndex,
-    options: Partial<CompleterOptions> = {},
-  ) {
-    this.options = { ...DEFAULTS, ...options };
+  constructor(private readonly index: HeadwordIndex) {
     const k = index.size;
-    const freq = new Uint16Array(k);
+    this.ranks = new Uint16Array(k);
+    let maxRank = 0;
     for (let id = 0; id < k; id++) {
       const score = Math.min(MAX_SCORE, Math.round(index.frequency(id) * 100));
-      freq[id] = (2 - index.shape(id)) * SHAPE_STEP + score;
+      const rank = (2 - index.shape(id)) * SHAPE_STEP + score;
+      this.ranks[id] = rank;
+      if (rank > maxRank) maxRank = rank;
     }
-
-    const numBlocks = (k + (1 << BLOCK_SHIFT) - 1) >>> BLOCK_SHIFT;
-    let leafBase = 1;
-    while (leafBase < numBlocks) leafBase <<= 1;
-    const tree = new Uint16Array(2 * leafBase);
-    for (let id = 0; id < k; id++) {
-      const leaf = leafBase + (id >>> BLOCK_SHIFT);
-      if (freq[id] > tree[leaf]) tree[leaf] = freq[id];
-    }
-    for (let i = leafBase - 1; i >= 1; i--) tree[i] = Math.max(tree[2 * i], tree[2 * i + 1]);
-    this.ranks = { freq, tree, leafBase };
-    this.hot = this.options.useHot ? loadHot(index, freq) : null;
+    this.maxRank = maxRank;
   }
 
-  /** Start a ranked, lazily paged search for what the user typed. */
-  complete(typed: string): ResultCursor {
-    return new ResultCursor(this.index, this.ranks, this.hot, this.options, normalize(typed));
+  /** All matches for what the user typed. Cheap to create; work happens as
+   *  cursors and counts ask for it. */
+  search(typed: string): Matches {
+    return new Matches(this.index, this.ranks, this.maxRank, normalize(typed));
   }
 }
 
-/**
- * Pair the hot list's entries with word ids. The list holds the top-ranked
- * words in rank order, so its ids are the first `hotCount` ids of the rank
- * order, rebuilt here with one counting-sort pass over the scores.
- * Returns null (search still works, just without the fast path) if the file
- * has no hot list or it doesn't line up with the scores.
- */
-function loadHot(index: HeadwordIndex, freq: Uint16Array): Hot | null {
-  const count = index.hotCount;
-  if (count === 0) return null;
-
-  let maxScore = 0;
-  for (let id = 0; id < freq.length; id++) if (freq[id] > maxScore) maxScore = freq[id];
-  const perScore = new Uint32Array(maxScore + 1);
-  for (let id = 0; id < freq.length; id++) perScore[freq[id]]++;
-  const next = new Uint32Array(maxScore + 1); // next rank position per score, high scores first
-  for (let score = maxScore, pos = 0; score >= 0; score--) {
-    next[score] = pos;
-    pos += perScore[score];
-  }
-  const ids = new Uint32Array(count);
-  for (let id = 0; id < freq.length; id++) {
-    const rank = next[freq[id]]++;
-    if (rank < count) ids[rank] = id;
-  }
-
-  const text = index.hotText();
-  const starts = new Uint32Array(count);
-  let entries = 0;
-  for (let at = 0; at < text.length; at = text.indexOf("\u0001", at) + 1) {
-    if (entries === count) return null; // more entries than declared
-    starts[entries++] = at;
-  }
-  if (entries !== count) return null;
-  // Spot-check that entries and ids agree at both ends.
-  const keyOf = (entry: number) =>
-    text.slice(starts[entry], entry + 1 < count ? starts[entry + 1] - 1 : text.length - 1);
-  if (keyOf(0) !== index.key(ids[0]) || keyOf(count - 1) !== index.key(ids[count - 1])) return null;
-
-  const lastId = ids[count - 1];
-  const lastScore = freq[lastId];
-  return {
-    text,
-    ids,
-    starts,
-    contains: (id) => freq[id] > lastScore || (freq[id] === lastScore && id <= lastId),
-  };
-}
-
-/** A stream ran out of work budget; ask again on the next call. */
-const WAIT = -2;
-/** A stream has no more ids. */
-const END = -1;
-
-const enum Midword {
-  Start,
-  Hot,
-  Rest,
-  List,
-  Scan,
-  Done,
-}
-
-/**
- * Words containing the query anywhere except at the start, in rank order.
- * Two ranked runs: words in the hot list (found by string search, instant),
- * then the rest, which all rank below every hot word: located in full and
- * sorted (small sets) or scanned in rank order under a work budget (large).
- */
-class MidwordStream {
-  private stage = Midword.Start;
-  private hotFrom = 0; // where the next hot-list search starts
-  private list: number[] = [];
-  private listPos = 0;
-  private scan: RankedIds | null = null;
-
-  constructor(
-    private readonly index: HeadwordIndex,
-    private readonly ranks: Ranks,
-    private readonly hot: Hot | null,
-    private readonly options: CompleterOptions,
-    private readonly query: string,
-    private readonly occurrences: number,
-    private readonly isPrefixMatch: (id: number) => boolean,
-  ) {}
-
-  /** Next id, END, or WAIT when `budget.left` is used up. */
-  next(budget: { left: number }): number {
-    for (;;) {
-      switch (this.stage) {
-        case Midword.Start:
-          if (this.occurrences === 0) this.stage = Midword.Done;
-          else this.stage = this.hot ? Midword.Hot : Midword.Rest;
-          break;
-
-        case Midword.Hot: {
-          const hot = this.hot!;
-          const at = hot.text.indexOf(this.query, this.hotFrom);
-          if (at < 0) {
-            this.stage = hot.ids.length < this.index.size ? Midword.Rest : Midword.Done;
-            break;
-          }
-          const entry = lastAtOrBefore(hot.starts, at);
-          // Resume after this word, so a word matching twice appears once.
-          this.hotFrom = entry + 1 < hot.starts.length ? hot.starts[entry + 1] : hot.text.length;
-          const id = hot.ids[entry];
-          if (!this.isPrefixMatch(id)) return id;
-          break;
-        }
-
-        case Midword.Rest:
-          if (this.occurrences <= this.options.locateLimit) {
-            const { freq } = this.ranks;
-            this.list = this.index
-              .wordsContaining(this.query)
-              .filter((id) => !this.isPrefixMatch(id) && !this.hot?.contains(id))
-              .sort((a, b) => freq[b] - freq[a] || a - b);
-            this.stage = Midword.List;
-          } else {
-            this.scan = new RankedIds(this.ranks, 0, this.index.size);
-            this.stage = Midword.Scan;
-          }
-          break;
-
-        case Midword.List:
-          if (this.listPos < this.list.length) return this.list[this.listPos++];
-          this.stage = Midword.Done;
-          break;
-
-        case Midword.Scan: {
-          if (budget.left-- <= 0) return WAIT;
-          const id = this.scan!.next();
-          if (id < 0) {
-            this.stage = Midword.Done;
-            break;
-          }
-          if (
-            !this.isPrefixMatch(id) &&
-            !this.hot?.contains(id) && // already returned from the hot list
-            this.index.key(id).includes(this.query)
-          ) {
-            return id;
-          }
-          break;
-        }
-
-        case Midword.Done:
-          return END;
-      }
-    }
-  }
-}
-
-export class ResultCursor {
-  /** How many words start with the query (exact match included). */
-  readonly prefixCount: number;
-  /** How many times the query occurs anywhere inside headwords. */
+export class Matches {
+  /** Words that start with the query (the exact match included). */
+  readonly starts: number;
+  /** Words that end with the query. */
+  readonly ends: number;
+  /** Times the query occurs inside headwords; an upper bound on `total`. */
   readonly occurrences: number;
 
-  private exactPending: boolean;
-  private finished: boolean;
   private readonly exactId: number | null;
-  private readonly prefixStart: number;
-  private readonly prefix: RankedIds | null;
-  private readonly midword: MidwordStream | null;
-  private readonly bonus: number;
-  private readonly scanBudget: number;
-  // The next id of each stream, once pulled: an id, END, or undefined (not pulled).
-  private prefixHead: number | undefined;
-  private midwordHead: number | undefined;
+  private readonly walk: OffsetWalk | null;
+  /** Finished positions: word ids in rank order, each word at its first match. */
+  private readonly chunks: Uint32Array[] = [];
+  private seen: Uint32Array | null = null; // bitset: word already placed in a chunk
+  private rankCounts: Uint32Array | null = null;
 
   constructor(
     private readonly index: HeadwordIndex,
-    private readonly ranks: Ranks,
-    hot: Hot | null,
-    options: CompleterOptions,
+    private readonly ranks: Uint16Array,
+    private readonly maxRank: number,
     /** the normalized query */
     readonly query: string,
   ) {
-    this.bonus = Math.round(options.prefixBonus * 100);
-    this.scanBudget = options.scanBudget;
-    if (query === "") {
-      this.exactPending = false;
-      this.finished = true;
-      this.exactId = null;
-      this.prefixStart = this.prefixCount = this.occurrences = 0;
-      this.prefix = this.midword = null;
-      return;
+    // Separator bytes would match word boundaries; a normalized query has none.
+    const usable = query !== "" && !/[\u0000\u0001]/.test(query);
+    this.starts = usable ? index.prefix(query).count : 0;
+    this.ends = usable ? index.countEndingWith(query) : 0;
+    this.occurrences = usable ? index.countOccurrences(query) : 0;
+    this.exactId = usable ? index.exact(query) : null;
+    this.walk = usable && this.occurrences > 0 ? index.offsetWalk(query) : null;
+  }
+
+  /** Words found at each position so far: byOffset[n] = words with n
+   *  characters before their first match. Grows as positions are worked out. */
+  get byOffset(): readonly number[] {
+    const sizes = this.chunks.map((c) => c.length);
+    // A word holding the query twice is also found at its later position; when
+    // nothing else is there, the last positions end up empty. Drop them.
+    if (this.complete) while (sizes.length > 0 && sizes[sizes.length - 1] === 0) sizes.pop();
+    return sizes;
+  }
+
+  /** True once every position has been worked out. */
+  get complete(): boolean {
+    return !this.walk || (this.walk.finished && this.chunks.length > this.walk.maxOffset);
+  }
+
+  /** Words containing the query, once `complete`; null until then. */
+  get total(): number | null {
+    if (!this.complete) return null;
+    let sum = 0;
+    for (const c of this.chunks) sum += c.length;
+    return sum;
+  }
+
+  /** Work out more positions without listing them, using about `budget`
+   *  units of work. Returns true once complete. */
+  count(budget: number): boolean {
+    let left = budget;
+    while (!this.complete && left > 0) {
+      left -= Math.max(1, this.walk!.step(left));
+      this.settle();
     }
-    const { start, count } = index.prefix(query);
-    this.prefixStart = start;
-    this.prefixCount = count;
-    this.occurrences = index.countOccurrences(query);
-    this.exactId = index.exact(query);
-    // The exact key sorts first among words that start with it.
-    const from = this.exactId === null ? start : start + 1;
-    this.prefix = new RankedIds(ranks, from, start + count);
-    this.midword = new MidwordStream(index, ranks, hot, options, query, this.occurrences, (id) =>
-      this.isPrefixMatch(id),
-    );
-    this.exactPending = true;
-    this.finished = false;
+    return this.complete;
   }
 
-  /** True once every match has been returned. */
-  get done(): boolean {
-    return this.finished;
+  /** Results from `fromOffset` characters before the match onwards (the exact
+   *  match comes first only from 0). Several cursors can share one search. */
+  cursor(fromOffset = 0): ResultCursor {
+    return new ResultCursor(this, fromOffset, fromOffset === 0 ? this.exactId : null);
   }
 
-  /** Up to `n` more results. May return fewer (even none) before `done` when a
-   *  large mid-word scan hits its work budget; call again to continue. */
-  next(n: number): Suggestion[] {
-    const out: Suggestion[] = [];
-    if (this.finished) return out;
-    if (this.exactPending) {
-      this.exactPending = false;
-      if (this.exactId !== null) out.push(this.suggestion(this.exactId, "exact"));
+  /** Ranked word ids of position `offset`, working it out if needed; null when
+   *  there is no such position (past the last word). */
+  chunk(offset: number): Uint32Array | null {
+    while (this.chunks.length <= offset && !this.complete) {
+      this.walk!.step(Infinity); // one level of the walk
+      this.settle();
     }
-    const budget = { left: this.scanBudget };
-    while (out.length < n) {
-      if (this.prefixHead === undefined) this.prefixHead = this.prefix!.next();
-      if (this.midwordHead === undefined) {
-        const id = this.midword!.next(budget);
-        if (id === WAIT) return out; // decide later, once the mid-word head is known
-        this.midwordHead = id;
-      }
-      const p = this.prefixHead;
-      const m = this.midwordHead;
-      if (p === END && m === END) {
-        this.finished = true;
-        break;
-      }
-      if (m === END || (p !== END && this.prefixFirst(p, m))) {
-        out.push(this.suggestion(p, "prefix"));
-        this.prefixHead = undefined;
-      } else {
-        out.push(this.suggestion(m, "midword"));
-        this.midwordHead = undefined;
-      }
-    }
-    return out;
+    return this.chunks[offset] ?? null;
   }
 
-  /** Whether prefix match `p` comes before mid-word match `m`: the better
-   *  shape wins; with the same shape, the score plus the prefix head start. */
-  private prefixFirst(p: number, m: number): boolean {
-    const { freq } = this.ranks;
-    const shapeP = Math.floor(freq[p] / SHAPE_STEP);
-    const shapeM = Math.floor(freq[m] / SHAPE_STEP);
-    return shapeP !== shapeM ? shapeP > shapeM : freq[p] + this.bonus >= freq[m];
-  }
-
-  private isPrefixMatch(id: number): boolean {
-    return id >= this.prefixStart && id < this.prefixStart + this.prefixCount;
-  }
-
-  private suggestion(id: number, tier: Tier): Suggestion {
+  /** @internal */
+  suggestion(id: number, offset: number): Suggestion {
     const forms = this.index.displayForms(id);
     return {
       id,
       key: this.index.key(id),
       display: forms[0],
       forms,
-      tier,
+      offset,
+      exact: id === this.exactId,
       frequency: this.index.frequency(id),
     };
   }
+
+  /** Turn every position the walk has settled into a ranked chunk. */
+  private settle() {
+    const walk = this.walk!;
+    const last = Math.min(walk.settled, walk.maxOffset + 1);
+    while (this.chunks.length < last) this.chunks.push(this.buildChunk(this.chunks.length));
+  }
+
+  /** Words first found at `offset`: the walk's ids minus words already placed
+   *  at a smaller offset, in rank order (rank desc, then id asc). */
+  private buildChunk(offset: number): Uint32Array {
+    const seen = (this.seen ??= new Uint32Array((this.index.size + 31) >>> 5));
+    const { ranges, singles } = this.walk!.idsAt(offset);
+    const ids: number[] = [];
+    const take = (id: number) => {
+      const bit = 1 << (id & 31);
+      if (seen[id >>> 5] & bit) return;
+      seen[id >>> 5] |= bit;
+      ids.push(id);
+    };
+    for (let i = 0; i < ranges.length; i += 2) for (let id = ranges[i]; id < ranges[i + 1]; id++) take(id);
+    for (const id of singles) take(id);
+
+    const out = Uint32Array.from(ids).sort(); // ascending ids: ties stay alphabetical
+    const { ranks, maxRank } = this;
+    if (out.length < SMALL_CHUNK) {
+      return out.sort((a, b) => ranks[b] - ranks[a] || a - b);
+    }
+    // Counting sort by rank, highest first; stable, so ids stay ascending.
+    const starts = (this.rankCounts ??= new Uint32Array(maxRank + 2));
+    starts.fill(0);
+    for (const id of out) starts[maxRank - ranks[id] + 1]++;
+    for (let r = 1; r < starts.length; r++) starts[r] += starts[r - 1];
+    const sorted = new Uint32Array(out.length);
+    for (const id of out) sorted[starts[maxRank - ranks[id]]++] = id;
+    return sorted;
+  }
 }
 
-/**
- * Ids in [lo, hi) in rank order (frequency desc, id asc), produced lazily by a
- * best-first walk of the max tree: a node's max frequency and first id bound
- * every id below it, so popping the best entry always yields the next id.
- */
-class RankedIds {
-  private readonly heap = new EntryHeap();
+export class ResultCursor {
+  private offset: number;
+  private pos = 0;
+  private exactPending: boolean;
+  private finished = false;
 
   constructor(
-    private readonly ranks: Ranks,
-    lo: number,
-    hi: number,
+    private readonly matches: Matches,
+    /** where this cursor started: characters before the match */
+    readonly fromOffset: number,
+    private readonly exactId: number | null,
   ) {
-    const size = 1 << BLOCK_SHIFT;
-    const firstFull = Math.ceil(lo / size);
-    const endFull = Math.floor(hi / size);
-    if (firstFull >= endFull) {
-      for (let id = lo; id < hi; id++) this.pushId(id);
-      return;
-    }
-    for (let id = lo; id < firstFull * size; id++) this.pushId(id);
-    for (let id = endFull * size; id < hi; id++) this.pushId(id);
-    // Canonical cover of the full blocks [firstFull, endFull) by tree nodes.
-    let l = firstFull + ranks.leafBase;
-    let r = endFull + ranks.leafBase;
-    for (let level = 0; l < r; level++, l >>= 1, r >>= 1) {
-      if (l & 1) this.pushNode(l++, level);
-      if (r & 1) this.pushNode(--r, level);
-    }
+    this.offset = fromOffset;
+    this.exactPending = exactId !== null;
   }
 
-  /** Next id in rank order, or -1 when exhausted. */
-  next(): number {
-    const { tree } = this.ranks;
-    for (;;) {
-      const e = this.heap.pop();
-      if (!e) return -1;
-      if (e.node === 0) return e.first;
-      if (e.level === 0) {
-        for (let id = e.first; id < e.first + (1 << BLOCK_SHIFT); id++) this.pushId(id);
-      } else {
-        const half = (1 << (e.level - 1)) << BLOCK_SHIFT;
-        this.heap.push({ score: tree[2 * e.node], first: e.first, node: 2 * e.node, level: e.level - 1 });
-        this.heap.push({ score: tree[2 * e.node + 1], first: e.first + half, node: 2 * e.node + 1, level: e.level - 1 });
+  get query(): string {
+    return this.matches.query;
+  }
+
+  /** True once every match from `fromOffset` on has been returned. */
+  get done(): boolean {
+    return this.finished && !this.exactPending;
+  }
+
+  /** Up to `n` more results. */
+  next(n: number): Suggestion[] {
+    const out: Suggestion[] = [];
+    if (this.exactPending && n > 0) {
+      this.exactPending = false;
+      out.push(this.matches.suggestion(this.exactId!, 0));
+    }
+    while (out.length < n && !this.finished) {
+      const ids = this.matches.chunk(this.offset);
+      if (!ids) {
+        this.finished = true;
+        break;
+      }
+      while (this.pos < ids.length && out.length < n) {
+        const id = ids[this.pos++];
+        if (id !== this.exactId) out.push(this.matches.suggestion(id, this.offset));
+      }
+      if (this.pos >= ids.length) {
+        this.offset++;
+        this.pos = 0;
       }
     }
+    return out;
   }
-
-  private pushId(id: number) {
-    this.heap.push({ score: this.ranks.freq[id], first: id, node: 0, level: 0 });
-  }
-
-  private pushNode(node: number, level: number) {
-    const firstBlock = (node << level) - this.ranks.leafBase;
-    this.heap.push({ score: this.ranks.tree[node], first: firstBlock << BLOCK_SHIFT, node, level });
-  }
-}
-
-/** Index of the last value <= `x` in an ascending array (values[0] must be <= x). */
-function lastAtOrBefore(values: Uint32Array, x: number): number {
-  let lo = 0;
-  let hi = values.length;
-  while (hi - lo > 1) {
-    const mid = (lo + hi) >>> 1;
-    if (values[mid] <= x) lo = mid;
-    else hi = mid;
-  }
-  return lo;
-}
-
-/** node 0 = a single id (`first`); otherwise a tree node covering ids from `first`. */
-interface Entry {
-  score: number;
-  first: number;
-  node: number;
-  level: number;
-}
-
-/** Binary heap: highest score first, then lowest first id. */
-class EntryHeap {
-  private readonly items: Entry[] = [];
-
-  push(e: Entry) {
-    const a = this.items;
-    a.push(e);
-    let i = a.length - 1;
-    while (i > 0) {
-      const parent = (i - 1) >>> 1;
-      if (!before(a[i], a[parent])) break;
-      [a[i], a[parent]] = [a[parent], a[i]];
-      i = parent;
-    }
-  }
-
-  pop(): Entry | undefined {
-    const a = this.items;
-    if (a.length === 0) return undefined;
-    const top = a[0];
-    const last = a.pop()!;
-    if (a.length > 0) {
-      a[0] = last;
-      let i = 0;
-      for (;;) {
-        const l = 2 * i + 1;
-        const r = l + 1;
-        let best = i;
-        if (l < a.length && before(a[l], a[best])) best = l;
-        if (r < a.length && before(a[r], a[best])) best = r;
-        if (best === i) break;
-        [a[i], a[best]] = [a[best], a[i]];
-        i = best;
-      }
-    }
-    return top;
-  }
-}
-
-function before(x: Entry, y: Entry): boolean {
-  return x.score > y.score || (x.score === y.score && x.first < y.first);
 }
