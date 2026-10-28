@@ -174,7 +174,9 @@ names search keys to **block** (bad words whose first meaning is innocent, and
 ones the labels miss) and to **allow** (names and ordinary words that share a
 key with an offensive word). It is stored encoded so the repository doesn't
 carry a readable list of slurs; `python scripts/safe_search_list.py show`
-decodes it, and `add` / `remove` edit it. A blocked key is just that key (list
+decodes it, and `add` / `remove` edit it. Part of the block list was picked by hand from
+[cuss](https://github.com/wooorm/cuss)'s likely-profane words (MIT; see `data/README.md`);
+`scripts/safe-search-candidates.ts` lists the words of any such list that safe search still shows. A blocked key is just that key (list
 its plural too); an allowed word's plurals and tenses stay visible with it.
 The builder applies the list, and the app applies it again when it loads, so
 an edit reaches the app without rebuilding the index.

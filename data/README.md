@@ -56,3 +56,31 @@ license.
 Datasets used only by the benchmarks in [`bench/`](../bench/) (a public-domain
 Webster's 1913 dictionary and an Unlicense word list) are downloaded on demand,
 never committed, and never shipped in the app.
+
+## Safe search's hand-picked list
+
+`safe-search.list` (encoded; `python scripts/safe_search_list.py show` decodes it) names search
+keys safe search always hides or always shows. Most entries are the project's own choices. Part of
+the block list was chosen from **[cuss](https://github.com/wooorm/cuss)** by Titus Wormer: a
+person reviewed the English words cuss rates as likely profane and kept only the bad words the
+Wiktionary labels missed (everyday words and names in it were left out).
+`scripts/safe-search-candidates.ts` repeats that comparison against a newer cuss.
+
+cuss is used under the MIT License:
+
+> Copyright (c) 2016 Titus Wormer <tituswormer@gmail.com>
+>
+> Permission is hereby granted, free of charge, to any person obtaining a copy of this software
+> and associated documentation files (the 'Software'), to deal in the Software without
+> restriction, including without limitation the rights to use, copy, modify, merge, publish,
+> distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the
+> Software is furnished to do so, subject to the following conditions:
+>
+> The above copyright notice and this permission notice shall be included in all copies or
+> substantial portions of the Software.
+>
+> THE SOFTWARE IS PROVIDED 'AS IS', WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING
+> BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+> DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+> OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
