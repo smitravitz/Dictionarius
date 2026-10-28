@@ -9,6 +9,10 @@ bench/data/
 __pycache__/
 *.pyc
 
+# the full index, built in the repo's top folder from the Wiktionary download
+/headwords.*
+/fm index create/
+
 # editors & OS
 .DS_Store
 .vscode/

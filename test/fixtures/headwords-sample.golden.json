@@ -1,10 +1,10 @@
 {
  "file": {
-  "sha256": "c81536a906c8e876fb9c814154c5af3acdfbca941871aa10cde05ef0fa11cb38",
+  "sha256": "e96a2824db528aac003389322f9d2933b1d862cce0147608e1122b0eeaa9cfdb",
   "version": 1,
   "normId": "nfd-strip-diacritic-lower-trim/v1",
-  "n": 166652,
-  "numWords": 17074,
+  "n": 166679,
+  "numWords": 17077,
   "numHot": 3000
  },
  "normalize": [
@@ -111,11 +111,11 @@
    "id": 1602
   },
   {
-   "q": "mainprise",
+   "q": "mailclad",
    "id": 8948
   },
   {
-   "q": "imphee",
+   "q": "imperturbed",
    "id": 7425
   },
   {
@@ -127,15 +127,15 @@
    "id": 4472
   },
   {
-   "q": "lithonthryptic",
+   "q": "lithoglyphic",
    "id": 8711
   },
   {
-   "q": "irreceptive",
+   "q": "ironwort",
    "id": 8022
   },
   {
-   "q": "here-at",
+   "q": "herbose",
    "id": 6896
   },
   {
@@ -143,7 +143,7 @@
    "id": 1978
   },
   {
-   "q": "sixpenny",
+   "q": "sittine",
    "id": 13858
   },
   {
@@ -155,11 +155,11 @@
    "id": 1861
   },
   {
-   "q": "principate",
+   "q": "princedom",
    "id": 11873
   },
   {
-   "q": "preponderance",
+   "q": "preparable",
    "id": 11803
   },
   {
@@ -167,7 +167,7 @@
    "id": null
   },
   {
-   "q": "jostleqzx",
+   "q": "joltinglyqzx",
    "id": null
   },
   {
@@ -191,7 +191,7 @@
   },
   {
    "q": "i",
-   "start": 7273,
+   "start": 7276,
    "count": 817
   },
   {
@@ -201,12 +201,12 @@
   },
   {
    "q": "wo",
-   "start": 16839,
+   "start": 16842,
    "count": 50
   },
   {
    "q": "tur",
-   "start": 15775,
+   "start": 15778,
    "count": 25
   },
   {
@@ -215,9 +215,9 @@
    "count": 61
   },
   {
-   "q": "outl",
-   "start": 10499,
-   "count": 4
+   "q": "sahi",
+   "start": 13088,
+   "count": 1
   },
   {
    "q": "adult",
@@ -225,31 +225,26 @@
    "count": 3
   },
   {
-   "q": "strido",
+   "q": "striat",
    "start": 14535,
    "count": 1
   },
   {
-   "q": "drawbolt",
-   "start": 4586,
+   "q": "homileti",
+   "start": 7052,
    "count": 1
   }
  ],
  "substring": [
   {
-   "q": "t",
-   "occurrences": 10632,
-   "wordCount": 8436
+   "q": "o",
+   "occurrences": 10731,
+   "wordCount": 8240
   },
   {
-   "q": "ce",
-   "occurrences": 695,
-   "wordCount": 672
-  },
-  {
-   "q": "n",
-   "occurrences": 9858,
-   "wordCount": 7998
+   "q": "ca",
+   "occurrences": 1000,
+   "wordCount": 978
   },
   {
    "q": "n",
@@ -257,14 +252,19 @@
    "wordCount": 7998
   },
   {
-   "q": "h",
-   "occurrences": 3992,
-   "wordCount": 3589
+   "q": "w",
+   "occurrences": 1110,
+   "wordCount": 1048
   },
   {
-   "q": "ric",
-   "occurrences": 204,
-   "wordCount": 204
+   "q": "c",
+   "occurrences": 6793,
+   "wordCount": 5770
+  },
+  {
+   "q": "p",
+   "occurrences": 4860,
+   "wordCount": 4286
   },
   {
    "q": "trans",
@@ -272,16 +272,13 @@
    "wordCount": 46,
    "wordIds": [
     2308,
-    7421,
-    7950,
-    9500,
-    10785,
-    11116,
-    13533,
-    14669,
-    15540,
-    15541,
-    15542,
+    7424,
+    7953,
+    9503,
+    10788,
+    11119,
+    13536,
+    14672,
     15543,
     15544,
     15545,
@@ -316,33 +313,60 @@
     15574,
     15575,
     15576,
-    15577
+    15577,
+    15578,
+    15579,
+    15580
    ]
   },
   {
-   "q": "be",
-   "occurrences": 361,
-   "wordCount": 358
+   "q": "km",
+   "occurrences": 15,
+   "wordCount": 15,
+   "wordIds": [
+    1718,
+    1845,
+    2889,
+    4308,
+    4884,
+    7357,
+    7394,
+    8099,
+    8301,
+    9385,
+    15041,
+    15516,
+    15634,
+    15807,
+    16877
+   ]
   },
   {
-   "q": "e",
-   "occurrences": 16445,
-   "wordCount": 11318
+   "q": "avulsi",
+   "occurrences": 1,
+   "wordCount": 1,
+   "wordIds": [
+    1250
+   ]
   },
   {
-   "q": "l",
-   "occurrences": 8524,
-   "wordCount": 7080
+   "q": "ly",
+   "occurrences": 711,
+   "wordCount": 706
   },
   {
    "q": "s",
-   "occurrences": 9085,
-   "wordCount": 6997
+   "occurrences": 9086,
+   "wordCount": 6998
   },
   {
-   "q": "om",
-   "occurrences": 680,
-   "wordCount": 674
+   "q": "olyb",
+   "occurrences": 2,
+   "wordCount": 2,
+   "wordIds": [
+    9561,
+    11559
+   ]
   },
   {
    "q": "qzxqzx",
@@ -374,38 +398,38 @@
   },
   {
    "id": 8920,
-   "word": "magi"
+   "word": "magazining"
   },
   {
    "id": 9087,
-   "word": "martialness"
+   "word": "marsupian"
   },
   {
    "id": 9745,
-   "word": "multivalvular"
+   "word": "multiseptate"
   },
   {
    "id": 10627,
-   "word": "oxeye"
+   "word": "oxalurate"
   },
   {
    "id": 13522,
-   "word": "seminific"
+   "word": "semilunar"
   },
   {
    "id": 13613,
-   "word": "seta"
+   "word": "sess"
   },
   {
    "id": 14921,
-   "word": "syndesmography"
+   "word": "synclinorium"
   },
   {
    "id": 16986,
-   "word": "yttria"
+   "word": "yow"
   },
   {
-   "id": 17073,
+   "id": 17076,
    "word": "🫀"
   }
  ],
@@ -417,13 +441,13 @@
    ]
   },
   {
-   "id": 8782,
+   "id": 8785,
    "forms": [
     "Longtail"
    ]
   },
   {
-   "id": 7016,
+   "id": 7019,
    "forms": [
     "HOCKEY"
    ]
@@ -435,37 +459,37 @@
    ]
   },
   {
-   "id": 11116,
+   "id": 11119,
    "forms": [
     "Pertransient"
    ]
   },
   {
-   "id": 15149,
+   "id": 15152,
    "forms": [
     "Tergiversate"
    ]
   },
   {
-   "id": 8156,
+   "id": 8159,
    "forms": [
     "Jin"
    ]
   },
   {
-   "id": 12666,
+   "id": 12669,
    "forms": [
     "Repetitional"
    ]
   },
   {
-   "id": 10846,
+   "id": 10849,
    "forms": [
     "PARTICIPATOR"
    ]
   },
   {
-   "id": 15610,
+   "id": 15613,
    "forms": [
     "TRESTLEWORK"
    ]
@@ -474,11 +498,11 @@
  "freq": [
   {
    "id": 6591,
-   "zipf100": 179
+   "zipf100": 0
   },
   {
    "id": 14081,
-   "zipf100": 220
+   "zipf100": 324
   },
   {
    "id": 4218,
@@ -494,11 +518,11 @@
   },
   {
    "id": 14893,
-   "zipf100": 234
+   "zipf100": 0
   },
   {
    "id": 11332,
-   "zipf100": 324
+   "zipf100": 0
   },
   {
    "id": 12545,
@@ -506,7 +530,7 @@
   },
   {
    "id": 15507,
-   "zipf100": 0
+   "zipf100": 155
   },
   {
    "id": 8342,
@@ -516,19 +540,19 @@
  "rank": [
   {
    "rank": 0,
-   "id": 7474
+   "id": 7477
   },
   {
    "rank": 1,
-   "id": 7273
+   "id": 7276
   },
   {
    "rank": 2,
-   "id": 8047
+   "id": 8050
   },
   {
    "rank": 2999,
-   "id": 16843
+   "id": 16846
   },
   {
    "rank": 3000,
@@ -536,7 +560,7 @@
   },
   {
    "rank": 5441,
-   "id": 7637
+   "id": 7640
   },
   {
    "rank": 7268,
@@ -556,35 +580,35 @@
   },
   {
    "rank": 11494,
-   "id": 8393
+   "id": 8389
   },
   {
    "rank": 11597,
-   "id": 8627
+   "id": 8624
   },
   {
    "rank": 14899,
-   "id": 14996
+   "id": 14990
   },
   {
    "rank": 14960,
-   "id": 15102
+   "id": 15100
   },
   {
    "rank": 15106,
-   "id": 15394
+   "id": 15393
   },
   {
    "rank": 15720,
-   "id": 16449
+   "id": 16445
   },
   {
    "rank": 15945,
-   "id": 16984
+   "id": 16976
   },
   {
-   "rank": 17073,
-   "id": 16609
+   "rank": 17076,
+   "id": 16612
   }
  ],
  "shape": [
@@ -605,27 +629,27 @@
    "shape": 0
   },
   {
-   "id": 16813,
+   "id": 16812,
    "shape": 0
   },
   {
-   "id": 7476,
+   "id": 7479,
    "shape": 1
   },
   {
-   "id": 13151,
+   "id": 13154,
    "shape": 1
   },
   {
-   "id": 13811,
+   "id": 13814,
    "shape": 1
   },
   {
-   "id": 14883,
+   "id": 14886,
    "shape": 1
   },
   {
-   "id": 15804,
+   "id": 15807,
    "shape": 1
   },
   {
@@ -633,29 +657,31 @@
    "shape": 2
   },
   {
-   "id": 9777,
+   "id": 9780,
    "shape": 2
   },
   {
-   "id": 9796,
+   "id": 9799,
    "shape": 2
   },
   {
-   "id": 9986,
+   "id": 9989,
    "shape": 2
   },
   {
-   "id": 17072,
+   "id": 17075,
    "shape": 2
   }
  ],
  "explicit": {
-  "count": 4,
+  "count": 6,
   "ids": [
-   13007,
-   13008,
-   13009,
-   13947
+   6177,
+   6178,
+   13010,
+   13011,
+   13012,
+   13950
   ],
   "clean": [
    899,

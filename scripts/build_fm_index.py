@@ -141,18 +141,32 @@ def category_names(categories):
             yield c["name"]
 
 
-class Labels:
-    """What Wiktionary says each headword means first, gathered while reading.
+# A slur, or a plainly offensive meaning, hides a word wherever it is listed.
+# Hedged labels ("sometimes offensive", "dated, offensive") only count for
+# the main meaning; further down they would hide everyday words ("colored").
+SLUR_TAGS = frozenset({"slur"})
+SLUR_CATEGORIES = frozenset({"English ethnic slurs"})
+HEDGES = frozenset({"sometimes", "possibly", "potentially", "occasionally", "dated", "archaic",
+                    "obsolete", "historical", "rare"})
 
-    A word is explicit when its main meaning (the first meaning of its first
-    entry, as the page lists it) is labelled vulgar, offensive or a slur, or
-    is an inflection or spelling of an explicit word ("fucked" of "fuck").
-    Dictionaries list the main meaning first, so double meanings follow their
-    everyday sense: "cock" (a rooster) and "ass" (a donkey) stay visible,
-    while "shit" stays hidden despite a later meaning labelled only "slang"."""
+
+class Labels:
+    """What Wiktionary says each headword means, gathered while reading.
+
+    A word is explicit when
+      - its main meaning (the first meaning of its first entry, as the page
+        lists it) is labelled vulgar, offensive or a slur, or is an inflection
+        or spelling of an explicit word ("fucked" of "fuck"); or
+      - any of its meanings, wherever listed, is a slur or plainly offensive,
+        or a spelling of such a word (lowercase "chink" of "Chink").
+    So "faggot" is hidden although "a bundle of sticks" comes first, while
+    words whose only other meanings are vulgar ("cock": a rooster first) or
+    hedged ("colored") stay visible."""
 
     def __init__(self):
-        self.first = {}  # word -> ("explicit" | "plain" | "ref", base words)
+        self.first = {}  # word -> ("explicit" | "plain" | "ref", base words): its main meaning
+        self.slur = set()  # words with a slur or plainly offensive meaning anywhere
+        self.refs = {}  # word -> base words of any of its inflection / spelling meanings
         self.seen = False  # any entry carried meanings at all
 
     def add(self, obj):
@@ -162,24 +176,57 @@ class Labels:
             return
         word = word.strip(JS_WHITESPACE)  # the same trim as headwords
         self.seen = True
-        if word in self.first:
-            return  # a later entry (another part of speech): the first decided
         for sense in senses:
             kind = classify_sense(sense)
-            if kind:
-                self.first[word] = kind
-                return
+            if not kind:
+                continue
+            if word not in self.first:
+                self.first[word] = kind  # the first meaning of the first entry
+            if is_slur(sense):
+                self.slur.add(word)
+            if kind[0] == "ref":
+                self.refs.setdefault(word, set()).update(kind[1])
+
+    def explicit_reasons(self):
+        """Explicit words, each with why: "main meaning", "a slur meaning", or
+        "form of <word>"."""
+        reasons = {w: "main meaning" for w, (kind, _) in self.first.items() if kind == "explicit"}
+        for w in self.slur:
+            reasons.setdefault(w, "a slur meaning")
+        slurs = set(self.slur)
+        # Spellings and inflections of slurs, wherever listed, are slurs too.
+        grown = True
+        while grown:
+            grown = False
+            for w, bases in self.refs.items():
+                if w in slurs:
+                    continue
+                hit = next((b for b in bases if b in slurs), None)
+                if hit is not None:
+                    slurs.add(w)
+                    reasons.setdefault(w, f"form of {hit}")
+                    grown = True
+        # A main meaning that is a form of a hidden word hides the word.
+        pending = {w: bases for w, (kind, bases) in self.first.items() if kind == "ref" and w not in reasons}
+        while True:
+            done = [w for w, bases in pending.items() if bases <= reasons.keys()]
+            if not done:
+                return reasons
+            for w in done:
+                reasons[w] = f"form of {min(pending.pop(w))}"
 
     def explicit_words(self):
-        explicit = {w for w, (kind, _) in self.first.items() if kind == "explicit"}
-        pending = {w: bases for w, (kind, bases) in self.first.items() if kind == "ref"}
-        while True:  # inflections of inflections: repeat until nothing changes
-            grown = [w for w, bases in pending.items() if bases <= explicit]
-            if not grown:
-                return explicit
-            explicit.update(grown)
-            for w in grown:
-                del pending[w]
+        return set(self.explicit_reasons())
+
+
+def is_slur(sense):
+    """A slur, or a plainly (not "sometimes") offensive meaning."""
+    if not isinstance(sense, dict):
+        return False
+    tags = set(sense.get("tags") or ())
+    if SLUR_TAGS & tags or SLUR_CATEGORIES.intersection(category_names(sense.get("categories"))):
+        return True
+    return "offensive" in tags and not tags & HEDGES
 
 
 def classify_sense(sense):
@@ -212,6 +259,19 @@ def explicit_key_ids(keys, forms_by_key, explicit_words):
         if (forms[0] if forms else key) in explicit_words:
             out.append(i)
     return out
+
+
+def safe_review_rows(keys, forms_by_key, freq, explicit_ids, reasons):
+    """(Zipf, word, reason) for every key safe search hides, most common
+    first, then alphabetical: the list to read through for mistakes."""
+    rows = []
+    for i in explicit_ids:
+        forms = display_forms(keys[i], forms_by_key[keys[i]])
+        word = forms[0] if forms else keys[i]
+        zipf = int(freq[i]) if freq is not None else 0
+        rows.append((-zipf, re.sub(r"\s", " ", word), reasons.get(word, "")))
+    rows.sort()
+    return [(f"{-z / 100:.2f}" if freq is not None else "", w, r) for z, w, r in rows]
 
 
 def read_kaikki(path, lang, labels=None):
@@ -778,10 +838,11 @@ def main():
     shape = np.array([word_shape(key) for key in keys], dtype=np.uint8)
     sections.append(("SHAPE", shape))
 
-    # Safe search: a key is explicit when every headword written that way is.
+    # Safe search: a key is explicit when its most common written form is.
     explicit_ids = None
     if labels.seen:
-        explicit_ids = explicit_key_ids(keys, forms_by_key, labels.explicit_words())
+        reasons = labels.explicit_reasons()
+        explicit_ids = explicit_key_ids(keys, forms_by_key, reasons.keys())
         sections.append(("EXPLICIT", np.array(explicit_ids, dtype="<u4")))
 
     # Hot list: keys of the top-ranked words, in rank order, each ending in SEP.
@@ -821,6 +882,13 @@ def main():
                   random.Random(args.seed + 1), sha, py_order)
     with open(golden_path, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=1)
+    review_path = None
+    if explicit_ids is not None:
+        review_path = args.out + ".safe-review.tsv"
+        with open(review_path, "w", encoding="utf-8") as f:
+            f.write("zipf\tword\treason\n")
+            for row in safe_review_rows(keys, forms_by_key, freq, explicit_ids, reasons):
+                f.write("\t".join(row) + "\n")
 
     gz = len(zlib.compress(buf, 6))
     log("")
@@ -837,6 +905,8 @@ def main():
     log(f"{'sha256':<26}{sha}")
     log(f"wrote {bin_path}")
     log(f"wrote {golden_path}")
+    if review_path:
+        log(f"wrote {review_path} (hidden by safe search, most common first)")
     log(f"done in {time.time() - started:.0f}s")
 
 

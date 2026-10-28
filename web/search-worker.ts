@@ -7,6 +7,7 @@
 import { HeadwordIndex } from "../src/headword-index";
 import { Completer, type Matches } from "../src/complete";
 import { normalize } from "../src/normalize";
+import { SAFE_SEARCH_OVERRIDES } from "../src/safe-search-overrides";
 import { PAGE_SIZE, type Counts, type FromWorker, type ToWorker } from "./protocol";
 
 /** Background counting runs in slices this long, so requests aren't held up. */
@@ -57,7 +58,7 @@ async function load(url: string) {
     const response = await fetch(url);
     if (!response.ok) throw new Error(`HTTP ${response.status} loading ${url}`);
     const index = HeadwordIndex.fromBytes(new Uint8Array(await response.arrayBuffer()));
-    completer = new Completer(index);
+    completer = new Completer(index, SAFE_SEARCH_OVERRIDES);
     scope.postMessage({ type: "ready", words: index.size, ms: performance.now() - started });
     if (waiting) search(waiting);
     waiting = null;
