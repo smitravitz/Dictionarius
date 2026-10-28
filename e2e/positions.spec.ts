@@ -228,7 +228,7 @@ test("in a browser, the slider pulses when it opens and ticks once per step", as
   await finger.lift();
 });
 
-test("held from the right, the scrubber mirrors for a right thumb: 0 at the right edge, more letters leftward", async ({ page, isMobile }) => {
+test("held from the right, the thumb's direction flips: 0 at the right edge, more letters leftward; the bars still read left to right", async ({ page, isMobile }) => {
   await open(page);
   await page.locator("#q").fill("a");
   await counted(page);
@@ -240,12 +240,17 @@ test("held from the right, the scrubber mirrors for a right thumb: 0 at the righ
   const fromRight = (share: number) => box.x + box.width * (0.9 - 0.8 * share);
   await finger.slideTo(fromRight(0.75));
   await expect(page.locator(".slider-note")).toHaveText(/^6 letters before/);
-  // The bars are drawn mirrored too, so the lit bar stays under the thumb.
+  // The histogram is unchanged: bar 0 on the left, as for a left thumb. The
+  // cursor marks the chosen bar, across the screen from the thumb.
   const bars = page.locator(".slider-track > i");
-  expect((await bars.nth(0).boundingBox())!.x).toBeGreaterThan((await bars.nth(1).boundingBox())!.x);
-  const lit = (await page.locator(".slider-track > i.on").boundingBox())!;
-  expect(finger.x).toBeGreaterThanOrEqual(lit.x - 2);
-  expect(finger.x).toBeLessThanOrEqual(lit.x + lit.width + 4);
+  expect((await bars.nth(0).boundingBox())!.x).toBeLessThan((await bars.nth(1).boundingBox())!.x);
+  await expect(bars.nth(6)).toHaveClass("on");
+  const lit = (await bars.nth(6).boundingBox())!;
+  const cursor = (await page.locator(".slider-thumb").boundingBox())!;
+  expect(cursor.x).toBeGreaterThanOrEqual(lit.x - 2);
+  expect(cursor.x).toBeLessThanOrEqual(lit.x + lit.width + 4);
+  expect(finger.x).toBeLessThan(box.x + box.width / 2); // the thumb has swept left...
+  expect(cursor.x).toBeGreaterThan(box.x + box.width / 2); // ...and the cursor right, to 6
   await finger.slideTo(2); // all the way left: the last position
   const last = (await bars.count()) - 1;
   await expect(page.locator(".slider-note")).toHaveText(new RegExp(`^${last} letters before`));
