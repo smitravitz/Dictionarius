@@ -195,7 +195,46 @@ export class Matches {
   /** Results from `fromOffset` characters before the match onwards (the exact
    *  match comes first only from 0). Several cursors can share one search. */
   cursor(fromOffset = 0): ResultCursor {
-    return new ResultCursor(this, fromOffset, fromOffset === 0 ? this.exactId : null);
+    return new ResultCursor(this, fromOffset);
+  }
+
+  /** Rows worked out so far: the list is at least this long. Equals `total`
+   *  once complete. */
+  get known(): number {
+    let sum = 0;
+    for (const c of this.chunks) sum += c.length;
+    return sum;
+  }
+
+  /**
+   * Rows [from, to) of the whole list (the exact match, then words by
+   * position): any stretch, read directly. Positions up to `to` are worked out
+   * if needed. Fewer rows (or none) come back past the end of the list.
+   */
+  rows(from: number, to: number): Suggestion[] {
+    const out: Suggestion[] = [];
+    let base = 0; // row where position `offset` starts
+    for (let offset = 0; base < to; offset++) {
+      const ids = this.chunk(offset);
+      if (!ids) break;
+      for (let row = Math.max(from, base); row < Math.min(to, base + ids.length); row++) {
+        out.push(this.suggestion(ids[row - base], offset));
+      }
+      base += ids.length;
+    }
+    return out;
+  }
+
+  /** The row where words with `offset` characters before the match begin (the
+   *  length of the list, if no word has that many). */
+  startOf(offset: number): number {
+    let row = 0;
+    for (let k = 0; k < offset; k++) {
+      const ids = this.chunk(k);
+      if (!ids) break;
+      row += ids.length;
+    }
+    return row;
   }
 
   /** Ranked word ids of position `offset`, working it out if needed; null when
@@ -245,7 +284,18 @@ export class Matches {
     for (let i = 0; i < ranges.length; i += 2) for (let id = ranges[i]; id < ranges[i + 1]; id++) take(id);
     for (const id of singles) take(id);
 
-    const out = Uint32Array.from(ids).sort(); // ascending ids: ties stay alphabetical
+    const sorted = this.rank(Uint32Array.from(ids).sort()); // ascending ids: ties stay alphabetical
+    // The exact match leads the list.
+    const exact = offset === 0 && this.exactId !== null ? sorted.indexOf(this.exactId) : -1;
+    if (exact > 0) {
+      sorted.copyWithin(1, 0, exact);
+      sorted[0] = this.exactId!;
+    }
+    return sorted;
+  }
+
+  /** Ids (ascending) in rank order: rank desc, then id asc. */
+  private rank(out: Uint32Array): Uint32Array {
     const { ranks, maxRank } = this;
     if (out.length < SMALL_CHUNK) {
       return out.sort((a, b) => ranks[b] - ranks[a] || a - b);
@@ -261,21 +311,16 @@ export class Matches {
   }
 }
 
+/** Reads the list in order from a starting position, a page at a time. */
 export class ResultCursor {
-  private offset: number;
-  private pos = 0;
-  private exactPending: boolean;
+  private pos: number | null = null; // row of the next result; found on first use
   private finished = false;
 
   constructor(
     private readonly matches: Matches,
     /** where this cursor started: characters before the match */
     readonly fromOffset: number,
-    private readonly exactId: number | null,
-  ) {
-    this.offset = fromOffset;
-    this.exactPending = exactId !== null;
-  }
+  ) {}
 
   get query(): string {
     return this.matches.query;
@@ -283,31 +328,16 @@ export class ResultCursor {
 
   /** True once every match from `fromOffset` on has been returned. */
   get done(): boolean {
-    return this.finished && !this.exactPending;
+    return this.finished;
   }
 
   /** Up to `n` more results. */
   next(n: number): Suggestion[] {
-    const out: Suggestion[] = [];
-    if (this.exactPending && n > 0) {
-      this.exactPending = false;
-      out.push(this.matches.suggestion(this.exactId!, 0));
-    }
-    while (out.length < n && !this.finished) {
-      const ids = this.matches.chunk(this.offset);
-      if (!ids) {
-        this.finished = true;
-        break;
-      }
-      while (this.pos < ids.length && out.length < n) {
-        const id = ids[this.pos++];
-        if (id !== this.exactId) out.push(this.matches.suggestion(id, this.offset));
-      }
-      if (this.pos >= ids.length) {
-        this.offset++;
-        this.pos = 0;
-      }
-    }
+    if (this.finished) return [];
+    this.pos ??= this.matches.startOf(this.fromOffset);
+    const out = this.matches.rows(this.pos, this.pos + n);
+    this.pos += out.length;
+    if (out.length < n) this.finished = true;
     return out;
   }
 }

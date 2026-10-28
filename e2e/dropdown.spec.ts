@@ -9,9 +9,26 @@ async function open(page: Page) {
   await expect(page.locator("#status")).toHaveText(/^[\d,]+ words$/);
 }
 
-/** How many results the list holds (rendered or not): its height in rows, minus the footer. */
-const loadedRows = (page: Page) =>
+/** How long the list is (rows loaded or not): its height in rows, minus the footer. */
+const listRows = (page: Page) =>
   page.locator("#results").evaluate((el) => Math.round(el.getBoundingClientRect().height / 52) - 1);
+
+/** Wait until every match is counted: the summary's total is exact. */
+async function counted(page: Page) {
+  await expect(page.locator("#summary")).toHaveText(/ in all$/);
+  await expect(page.locator("#summary")).not.toHaveText(/about/);
+  return Number((await page.locator("#summary").textContent())!.match(/([\d,]+) in all$/)![1].replace(/,/g, ""));
+}
+
+/** Rows drawn in the visible part of the list that are still waiting for their words. */
+const pendingInView = (page: Page) =>
+  page.locator("#scroller").evaluate((scroller) => {
+    const box = scroller.getBoundingClientRect();
+    return [...scroller.querySelectorAll("li.word.pending")].filter((row) => {
+      const r = row.getBoundingClientRect();
+      return r.bottom > box.top && r.top < box.bottom;
+    }).length;
+  });
 
 const scroller = (page: Page) => page.locator("#scroller");
 
@@ -20,32 +37,35 @@ test("shows how many words are loaded", async ({ page }) => {
   await expect(page.locator("#status")).toHaveText("17,074 words");
 });
 
-test("typing shows the first 50 results, exact match first", async ({ page }) => {
+test("typing shows results straight away, exact match first", async ({ page }) => {
   await open(page);
   await page.locator("#q").fill("e");
   await expect(page.locator("#q")).toHaveAttribute("aria-expanded", "true");
-  await expect.poll(() => loadedRows(page)).toBe(PAGE);
   await expect(page.locator("#opt-0")).toHaveText("e");
   await expect(page.locator("li.word[role=option]").first()).toHaveAttribute("aria-posinset", "1");
 });
 
-test("scrolling near the end loads the next 50, again and again", async ({ page }) => {
+test("the list is as long as every match, and fills in wherever you scroll", async ({ page }) => {
   await open(page);
   await page.locator("#q").fill("e");
-  await expect.poll(() => loadedRows(page)).toBe(PAGE);
-  for (const expected of [2 * PAGE, 3 * PAGE]) {
-    await scroller(page).evaluate((el) => (el.scrollTop = el.scrollHeight));
-    await expect.poll(() => loadedRows(page)).toBe(expected);
+  const total = await counted(page);
+  expect(total).toBeGreaterThan(10 * PAGE);
+  await expect.poll(() => listRows(page)).toBe(total);
+  for (const share of [0.5, 0.9, 0.2]) {
+    await scroller(page).evaluate((el, share) => (el.scrollTop = el.scrollHeight * share), share);
+    await expect.poll(() => pendingInView(page)).toBe(0); // the page under the viewport arrived
   }
-  // Only rows near the viewport exist in the page, however many are loaded.
+  // Only rows near the viewport exist in the page, however long the list.
   expect(await page.locator("li.word").count()).toBeLessThan(40);
+  await scroller(page).evaluate((el) => (el.scrollTop = el.scrollHeight));
+  await expect(page.locator("li.foot")).toHaveText(`That’s all ${total.toLocaleString("en-US")}.`);
 });
 
 test("a touch drag scrolls the list and lazily loads more", async ({ page, isMobile }) => {
   test.skip(!isMobile, "touch gesture on the phone project");
   await open(page);
   await page.locator("#q").fill("e");
-  await expect.poll(() => loadedRows(page)).toBe(PAGE);
+  await expect(page.locator("#opt-0")).toHaveText("e");
   const box = (await scroller(page).boundingBox())!;
   const cdp = await page.context().newCDPSession(page);
   // Real touch events, as a phone sends them: finger down, drag up, lift.
@@ -61,7 +81,7 @@ test("a touch drag scrolls the list and lazily loads more", async ({ page, isMob
     await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
   }
   await expect.poll(() => scroller(page).evaluate((el) => el.scrollTop)).toBeGreaterThan(5 * ROW);
-  await expect.poll(() => loadedRows(page)).toBeGreaterThan(PAGE);
+  await expect.poll(() => pendingInView(page)).toBe(0);
   await expect(page.locator("#entry")).toBeHidden(); // dragging didn't open a word
 });
 
@@ -69,7 +89,7 @@ test("a mouse drag scrolls the list without opening a word", async ({ page, isMo
   test.skip(isMobile, "mouse drag on the desktop project");
   await open(page);
   await page.locator("#q").fill("e");
-  await expect.poll(() => loadedRows(page)).toBe(PAGE);
+  await expect(page.locator("#opt-0")).toHaveText("e");
   const box = (await scroller(page).boundingBox())!;
   const x = box.x + box.width / 2;
   await page.mouse.move(x, box.y + box.height - 40);
@@ -105,7 +125,7 @@ test("tapping a word opens it, with its Wiktionary link", async ({ page }) => {
 test("Back closes the word and returns to the same results", async ({ page }) => {
   await open(page);
   await page.locator("#q").fill("e");
-  await expect.poll(() => loadedRows(page)).toBe(PAGE);
+  await expect(page.locator("#opt-0")).toHaveText("e");
   await scroller(page).evaluate((el) => (el.scrollTop = 10 * 52));
   // Wait for the rows near row 10 to render, then open one of them.
   const row = page.locator('li.word[aria-posinset="12"]');
@@ -124,7 +144,7 @@ test("arrow keys move through the results and Enter opens one", async ({ page })
   await open(page);
   const input = page.locator("#q");
   await input.fill("e");
-  await expect.poll(() => loadedRows(page)).toBe(PAGE);
+  await expect(page.locator("#opt-0")).toHaveText("e");
   for (let i = 0; i < 3; i++) await input.press("ArrowDown");
   await expect(input).toHaveAttribute("aria-activedescendant", "opt-2");
   await expect(page.locator("#opt-2")).toHaveAttribute("aria-selected", "true");

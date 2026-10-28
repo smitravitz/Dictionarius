@@ -1,21 +1,24 @@
 /**
  * The position slider. Press and hold a blank spot in the results (not a
  * word: holding a word is kept for something else), feel a pulse, then slide
- * sideways to choose how many letters come before the match. Under the finger
- * runs a histogram: one bar per position, as tall as the words found there.
- * Each step ticks; the list jumps to the words at that position as you go.
+ * sideways to choose how many letters come before the match. A histogram
+ * sits centred across 80% of the screen: one bar per position, as tall as the
+ * words found there. The cursor stays under the finger; the margins either
+ * side count as the first and last position, so the ends are easy to reach.
+ * Each step ticks; the list scrolls to the words at that position as you go,
+ * and stays whole: scroll up or down from there.
  */
 import { pulse, release, tick } from "./haptics";
 
 const HOLD_MS = 420; // just under Android's long-press, so ours wins
 const MOVE_SLOP = 8; // moving further than this before the hold means scrolling
 const MAX_DOTS = 10;
+const MAX_STEP = 28; // widest a bar gets; fewer positions sit centred
+const TRACK_SHARE = 0.8; // of the width; the margins either side reach the ends
 
 export interface SliderState {
   /** the normalized query */
   query: string;
-  /** current position: letters before the match */
-  value: number;
   /** words per position, as far as counted */
   byOffset: readonly number[];
   /** every position has been counted */
@@ -57,8 +60,8 @@ export class OffsetSlider {
   private lastX = 0;
   private value = 0;
   private max = 0;
-  private step = 20;
-  private trackX = 0;
+  private step = 20; // pixels per position
+  private trackX = 0; // where position 0 starts inside the window
   private suppressClick = false;
 
   constructor(
@@ -156,43 +159,46 @@ export class OffsetSlider {
     }
     pulse();
     this.events.used();
-    this.value = state.value;
-    this.layout(state);
-    // Put the current position's bar right under the finger.
-    const left = this.window.getBoundingClientRect().left;
-    this.trackX = this.lastX - left - (this.value + 0.5) * this.step;
-    this.track.style.transform = `translateX(${this.trackX}px)`;
-    this.thumb.style.transform = `translateX(${this.lastX - left}px)`;
     this.el.classList.add("on");
+    this.value = -1; // so the position under the finger is applied now
+    this.layout(state);
+    this.slideTo(this.lastX);
   }
 
+  /** The finger is at screen x: put the cursor there and pick the position
+   *  under it. Left of the bars is the first position, right of them the last. */
   private slideTo(x: number) {
-    const left = this.window.getBoundingClientRect().left;
-    this.thumb.style.transform = `translateX(${x - left}px)`;
-    const value = Math.min(this.max, Math.max(0, Math.floor((x - left - this.trackX) / this.step)));
+    const box = this.window.getBoundingClientRect();
+    const inside = Math.min(box.width, Math.max(0, x - box.left));
+    this.thumb.style.transform = `translateX(${inside}px)`;
+    const value = Math.min(this.max, Math.max(0, Math.floor((inside - this.trackX) / this.step)));
     if (value === this.value) return;
+    const first = this.value < 0;
     this.value = value;
-    tick();
+    if (!first) tick();
     this.events.change(value);
     const state = this.events.state();
-    if (state) this.layout({ ...state, value });
+    if (state) this.layout(state);
   }
 
-  /** Draw the bars and the label for `state`. */
+  /** Draw the bars, centred and fitted to the screen, and the label. */
   private layout(state: SliderState) {
-    const { byOffset, complete, value, query } = state;
+    const { byOffset, complete, query } = state;
+    const value = Math.max(0, this.value);
     // One position past what's counted, so you can keep going until it is.
-    this.max = Math.max(value, complete ? byOffset.length - 1 : byOffset.length);
+    this.max = Math.max(0, complete ? byOffset.length - 1 : byOffset.length);
     const width = this.window.clientWidth || 300;
-    this.step = Math.min(28, Math.max(14, (width * 0.92) / (this.max + 1)));
+    this.step = Math.min(MAX_STEP, (width * TRACK_SHARE) / (this.max + 1));
+    this.trackX = (width - this.step * (this.max + 1)) / 2;
+    const gap = this.step > 8 ? 3 : this.step > 4 ? 1.5 : 0.5;
     const most = Math.max(1, ...byOffset);
     const bars: HTMLElement[] = [];
     for (let i = 0; i <= this.max; i++) {
       const bar = document.createElement("i");
       const count = byOffset[i];
       const height = count === undefined ? 3 : count === 0 ? 2 : 4 + 36 * Math.sqrt(count / most);
-      bar.style.left = `${i * this.step}px`;
-      bar.style.width = `${this.step - 3}px`;
+      bar.style.left = `${this.trackX + i * this.step}px`;
+      bar.style.width = `${Math.max(1, this.step - gap)}px`;
       bar.style.height = `${height}px`;
       if (count === undefined) bar.className = "unknown";
       if (i === value) bar.className = "on";

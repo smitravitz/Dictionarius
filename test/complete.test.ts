@@ -103,6 +103,36 @@ describe("Completer", () => {
     }
   });
 
+  it("reads any stretch of the list directly, without paging from the top", () => {
+    for (const q of ["e", "an", "ing"]) {
+      const all = oracle(q).map((r) => r.id);
+      const m = completer.search(q);
+      for (const [from, to] of [[2000, 2050], [0, 10], [all.length - 5, all.length + 20], [all.length + 5, all.length + 10]]) {
+        expect(m.rows(from, to).map((s) => s.id), `${q} ${from}-${to}`).toEqual(all.slice(Math.max(0, from), Math.max(0, to)));
+      }
+    }
+  });
+
+  it("knows the row where each position starts", () => {
+    for (const q of ["e", "ate", "ing"]) {
+      const all = oracle(q);
+      const m = completer.search(q);
+      for (const offset of [0, 1, 2, 5, 9, 99]) {
+        const first = all.findIndex((r) => r.offset >= offset);
+        expect(m.startOf(offset), `${q} @${offset}`).toBe(first < 0 ? all.length : first);
+      }
+    }
+  });
+
+  it("knows how many rows exist so far, up to the total", () => {
+    const m = completer.search("e");
+    expect(m.known).toBe(0);
+    m.rows(0, 1);
+    expect(m.known).toBeGreaterThan(0);
+    while (!m.count(1_000));
+    expect(m.known).toBe(m.total);
+  });
+
   it("serves several cursors from one search without redoing work", () => {
     const matches = completer.search("re");
     const a = matches.cursor(0).next(30).map((s) => s.id);

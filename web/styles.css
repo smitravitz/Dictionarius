@@ -435,6 +435,17 @@ a:focus-visible {
   }
 }
 
+/* A row whose page hasn't arrived yet: a faint bar where the word will sit. */
+.word.pending::after {
+  content: "";
+  position: absolute;
+  left: calc(var(--pad) + var(--seam-x));
+  width: 4.5rem;
+  height: 0.5rem;
+  border-radius: 0.25rem;
+  background: var(--hairline);
+}
+
 .word[aria-selected="true"] {
   background: var(--proof-wash);
   box-shadow: inset 3px 0 0 var(--proof);

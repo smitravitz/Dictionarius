@@ -30,11 +30,11 @@ const send = (message: ToWorker) => worker.postMessage(message);
 let seq = 0; // id of the latest search; older answers are ignored
 let ready = false;
 let query = ""; // the normalized query on screen
-let fromOffset = 0; // letters before the match the list starts at (the slider's position)
 let counts: Counts | null = null; // for `query`
+let seeking = -1; // the position a seek is on its way to
 
 const list = new ResultsList(scroller, $("results"), {
-  needMore: () => send({ type: "more", seq }),
+  needRows: (from, to) => send({ type: "rows", seq, from, to }),
   choose: (s) => showEntry(s),
   busy: () => slider.active,
 });
@@ -42,7 +42,7 @@ const list = new ResultsList(scroller, $("results"), {
 const slider = new OffsetSlider(frame, scroller, {
   state: () =>
     query && counts && counts.occurrences > 0
-      ? { query, value: fromOffset, byOffset: counts.byOffset, complete: counts.total !== null }
+      ? { query, byOffset: counts.byOffset, complete: counts.total !== null }
       : null,
   change: (value) => seek(value),
   used: () => {
@@ -71,19 +71,26 @@ worker.onmessage = ({ data }: MessageEvent<FromWorker>) => {
       status.textContent = "Word list unavailable";
       summary.textContent = `Couldn’t load the word list (${data.message}). Check your connection and reload the page.`;
       break;
-    case "page":
+    case "rows":
       if (data.seq !== seq) return; // an answer to an older search
       counts = mergeCounts(counts, data.counts);
-      list.append(data.items, data.done);
+      list.receive(data.from, data.items, data.known, data.complete);
+      if (data.seek && data.seek.offset === seeking) {
+        list.scrollToRow(data.seek.row);
+        seeking = -1;
+      }
       describe();
       break;
     case "counts":
       if (data.query !== query || data.counts.safe !== safeSwitch.checked) return;
       counts = data.counts;
+      list.grow(sum(counts.byOffset), counts.total !== null);
       describe();
       break;
   }
 };
+
+const sum = (values: number[]) => values.reduce((a, b) => a + b, 0);
 
 /** Keep whichever counts know more: background counting can finish before a page. */
 function mergeCounts(old: Counts | null, next: Counts): Counts {
@@ -98,7 +105,7 @@ function search(text: string) {
   const next = normalize(text);
   if (next !== query) counts = null;
   query = next;
-  fromOffset = 0;
+  seeking = -1;
   seq++;
   if (!query) {
     frame.hidden = true;
@@ -115,18 +122,21 @@ function search(text: string) {
   input.removeAttribute("aria-activedescendant");
   if (!ready) summary.textContent = "Loading the word list…";
   list.reset(query);
-  send({ type: "search", seq, query: text, fromOffset });
+  send({ type: "search", seq, query: text });
 }
 
-/** Show the same search starting at words with `offset` letters before the match. */
+/** Scroll to where words with `offset` letters before the match begin. The
+ *  whole list stays: scroll up for fewer letters, down for more. */
 function seek(offset: number) {
-  if (!query || offset === fromOffset || offset < 0) return;
-  fromOffset = offset;
-  seq++;
-  input.removeAttribute("aria-activedescendant");
-  list.reset(query);
-  describe();
-  send({ type: "search", seq, query, fromOffset });
+  if (!query || offset < 0) return;
+  if (counts && offset <= counts.byOffset.length) {
+    // Every position before it is counted: the row is known here.
+    seeking = -1;
+    list.scrollToRow(sum(counts.byOffset.slice(0, offset)));
+  } else {
+    seeking = offset;
+    send({ type: "seek", seq, offset });
+  }
 }
 
 const fmt = (n: number) => n.toLocaleString();
@@ -150,26 +160,22 @@ function describe() {
     return;
   }
   const total = counts.total !== null ? fmt(counts.total) : `about ${roughly(counts.occurrences)}`;
-  if (fromOffset === 0) {
-    const { starts, ends } = counts;
-    summary.textContent =
-      `${fmt(starts)} ${starts === 1 ? "starts" : "start"} with ${q} · ` +
-      `${fmt(ends)} ${ends === 1 ? "ends" : "end"} with it · ${total} in all`;
-  } else {
-    const here = counts.byOffset[fromOffset];
-    const letters = `${fromOffset} ${fromOffset === 1 ? "letter" : "letters"} before ${q}`;
-    summary.textContent = `${here === undefined ? "Words" : fmt(here)} with ${letters} · ${total} in all`;
-  }
+  const { starts, ends } = counts;
+  summary.textContent =
+    `${fmt(starts)} ${starts === 1 ? "starts" : "start"} with ${q} · ` +
+    `${fmt(ends)} ${ends === 1 ? "ends" : "end"} with it · ${total} in all`;
   hint.hidden = seen(HINT_SEEN);
 }
 
 input.addEventListener("keydown", (event) => {
   if (frame.hidden) return;
   if (event.altKey && (event.key === "ArrowLeft" || event.key === "ArrowRight")) {
-    // The keyboard's way to move the position slider.
+    // The keyboard's way to move the position slider: from the position at
+    // the top of the list to the next or previous one.
     event.preventDefault();
-    const last = counts ? counts.byOffset.length - (counts.total !== null ? 1 : 0) : fromOffset + 1;
-    seek(Math.min(last, Math.max(0, fromOffset + (event.key === "ArrowRight" ? 1 : -1))));
+    const here = list.topOffset() ?? 0;
+    const last = counts ? counts.byOffset.length - (counts.total !== null ? 1 : 0) : here + 1;
+    seek(Math.min(last, Math.max(0, here + (event.key === "ArrowRight" ? 1 : -1))));
   } else if (event.key === "ArrowDown" || event.key === "ArrowUp") {
     event.preventDefault();
     const id = list.move(event.key === "ArrowDown" ? 1 : -1);
