@@ -5,12 +5,10 @@
  * the position slider get exact numbers without slowing the first page.
  */
 import { HeadwordIndex } from "../src/headword-index";
-import { Completer, type Matches, type ResultCursor } from "../src/complete";
+import { Completer, type Matches } from "../src/complete";
 import { normalize } from "../src/normalize";
 import { PAGE_SIZE, type Counts, type FromWorker, type ToWorker } from "./protocol";
 
-/** Longest one reply may take. A page can come back short; the page asks again. */
-const SLICE_MS = 40;
 /** Background counting runs in slices this long, so requests aren't held up. */
 const COUNT_SLICE_MS = 12;
 
@@ -23,8 +21,7 @@ const scope = self as unknown as WorkerScope;
 let completer: Completer | null = null;
 let waiting: Extract<ToWorker, { type: "search" }> | null = null; // typed before the index loaded
 let matches: Matches | null = null;
-let cursor: ResultCursor | null = null;
-let cursorSeq = -1;
+let matchesSeq = -1;
 let countTimer: ReturnType<typeof setTimeout> | undefined;
 let safe = true; // safe search; the page sends the saved setting before loading
 let matchesSafe = safe;
@@ -42,8 +39,14 @@ scope.onmessage = ({ data }) => {
       if (completer) search(data);
       else waiting = data;
       break;
-    case "more":
-      if (cursor && data.seq === cursorSeq) sendPage(cursor);
+    case "rows":
+      if (matches && data.seq === matchesSeq) sendRows(data.from, data.to);
+      break;
+    case "seek":
+      if (matches && data.seq === matchesSeq) {
+        const row = matches.startOf(data.offset);
+        sendRows(row, row + PAGE_SIZE, { offset: data.offset, row });
+      }
       break;
   }
 };
@@ -65,32 +68,30 @@ async function load(url: string) {
   }
 }
 
-function search({ seq, query, fromOffset }: { seq: number; query: string; fromOffset: number }) {
-  // Moving the position slider re-asks for the same query: keep its counts.
+function search({ seq, query }: { seq: number; query: string }) {
+  // Re-asking for the same query (a setting unchanged) keeps the work done.
   if (!matches || matches.query !== normalize(query) || matchesSafe !== safe) {
     matches = completer!.search(query, { safe });
     matchesSafe = safe;
   }
-  cursor = matches.cursor(fromOffset);
-  cursorSeq = seq;
-  sendPage(cursor);
+  matchesSeq = seq;
+  sendRows(0, PAGE_SIZE);
   countInBackground(matches);
 }
 
-function sendPage(c: ResultCursor) {
-  const items = [];
-  const started = performance.now();
-  do {
-    items.push(...c.next(PAGE_SIZE - items.length));
-  } while (items.length < PAGE_SIZE && !c.done && performance.now() - started < SLICE_MS);
+function sendRows(from: number, to: number, seek?: { offset: number; row: number }) {
+  const m = matches!;
+  const items = m.rows(from, to);
   scope.postMessage({
-    type: "page",
-    seq: cursorSeq,
-    query: c.query,
-    fromOffset: c.fromOffset,
+    type: "rows",
+    seq: matchesSeq,
+    query: m.query,
+    from,
     items,
-    done: c.done,
-    counts: countsOf(matches!),
+    known: m.known,
+    complete: m.complete,
+    counts: countsOf(m),
+    seek,
   });
 }
 
