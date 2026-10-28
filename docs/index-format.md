@@ -154,13 +154,17 @@ combined key, such as `(2 − shape) × 2000 + FREQ`.
 `EXPLICIT` lists the words safe search hides. Wiktionary labels each meaning of
 a word; a meaning is explicit when its tags include `vulgar`, `offensive` or
 `slur`, or its categories include *English vulgarities*, *English offensive
-terms*, *English ethnic slurs* or *English swear words*. A meaning that is an
-inflection or spelling of another word (`form_of`, `alt_of`) is explicit when
-that word is. A headword is explicit when every meaning across all its
-entries is; a search key, when every headword written that way is. So one
-ordinary meaning keeps a word visible: "cock" (a rooster) stays, while words
-that are only profanity or slurs, and their inflections, are listed.
-`derogatory`, `pejorative` and `slang` alone don't count.
+terms*, *English ethnic slurs* or *English swear words*. A headword is explicit
+when its **main meaning** is: the first meaning of its first entry, as the page
+lists it. When that meaning is an inflection or spelling of another word
+(`form_of`, `alt_of`), the headword follows that word. A search key is explicit
+when its most common written form is (by wordfreq, as in *Display forms*).
+
+Dictionaries list the main meaning first, so a word with a double meaning
+follows its everyday sense: "cock" (a rooster) and "ass" (a donkey) stay
+visible, while "shit" stays hidden although a later meaning is labelled only
+`slang`. `derogatory`, `pejorative` and `slang` alone don't count. A slur whose
+main meaning is innocent (one that is also an everyday word) stays visible.
 
 ## Hot list
 

@@ -142,16 +142,17 @@ def category_names(categories):
 
 
 class Labels:
-    """What Wiktionary says about each headword's meanings, tallied while
-    reading. A word is explicit when every meaning it has is labelled vulgar,
-    offensive or a slur, or is an inflection or spelling of an explicit word
-    ("fucked" of "fuck"). One ordinary meaning keeps a word visible ("cock",
-    a rooster), so safe search hides profanity and slurs, not double meanings."""
+    """What Wiktionary says each headword means first, gathered while reading.
+
+    A word is explicit when its main meaning (the first meaning of its first
+    entry, as the page lists it) is labelled vulgar, offensive or a slur, or
+    is an inflection or spelling of an explicit word ("fucked" of "fuck").
+    Dictionaries list the main meaning first, so double meanings follow their
+    everyday sense: "cock" (a rooster) and "ass" (a donkey) stay visible,
+    while "shit" stays hidden despite a later meaning labelled only "slang"."""
 
     def __init__(self):
-        self.plain = set()  # words with at least one ordinary meaning
-        self.marked = set()  # words with at least one explicit meaning
-        self.refs = {}  # word -> base words of its form-of / alt-of meanings
+        self.first = {}  # word -> ("explicit" | "plain" | "ref", base words)
         self.seen = False  # any entry carried meanings at all
 
     def add(self, obj):
@@ -161,34 +162,56 @@ class Labels:
             return
         word = word.strip(JS_WHITESPACE)  # the same trim as headwords
         self.seen = True
+        if word in self.first:
+            return  # a later entry (another part of speech): the first decided
         for sense in senses:
-            if not isinstance(sense, dict):
-                continue
-            tags = sense.get("tags") or ()
-            if EXPLICIT_TAGS.intersection(tags) or EXPLICIT_CATEGORIES.intersection(category_names(sense.get("categories"))):
-                self.marked.add(word)
-                continue
-            bases = [
-                t["word"].strip(JS_WHITESPACE)
-                for key in ("form_of", "alt_of")
-                for t in sense.get(key) or ()
-                if isinstance(t, dict) and isinstance(t.get("word"), str)
-            ]
-            if bases:
-                self.refs.setdefault(word, set()).update(bases)
-            elif sense.get("glosses") or sense.get("raw_glosses"):
-                self.plain.add(word)
+            kind = classify_sense(sense)
+            if kind:
+                self.first[word] = kind
+                return
 
     def explicit_words(self):
-        candidates = (self.marked | self.refs.keys()) - self.plain
-        explicit = {w for w in candidates if w not in self.refs}
-        pending = [w for w in candidates if w in self.refs]
+        explicit = {w for w, (kind, _) in self.first.items() if kind == "explicit"}
+        pending = {w: bases for w, (kind, bases) in self.first.items() if kind == "ref"}
         while True:  # inflections of inflections: repeat until nothing changes
-            grown = [w for w in pending if self.refs[w] <= explicit]
+            grown = [w for w, bases in pending.items() if bases <= explicit]
             if not grown:
                 return explicit
             explicit.update(grown)
-            pending = [w for w in pending if w not in explicit]
+            for w in grown:
+                del pending[w]
+
+
+def classify_sense(sense):
+    """("explicit", ()), ("ref", base words) for an inflection or spelling,
+    ("plain", ()), or None for a meaning without a gloss."""
+    if not isinstance(sense, dict):
+        return None
+    tags = sense.get("tags") or ()
+    if EXPLICIT_TAGS.intersection(tags) or EXPLICIT_CATEGORIES.intersection(category_names(sense.get("categories"))):
+        return ("explicit", frozenset())
+    bases = frozenset(
+        t["word"].strip(JS_WHITESPACE)
+        for key in ("form_of", "alt_of")
+        for t in sense.get(key) or ()
+        if isinstance(t, dict) and isinstance(t.get("word"), str)
+    )
+    if bases:
+        return ("ref", bases)
+    if sense.get("glosses") or sense.get("raw_glosses"):
+        return ("plain", frozenset())
+    return None
+
+
+def explicit_key_ids(keys, forms_by_key, explicit_words):
+    """Ids of search keys whose most common written form is explicit ("dick"
+    decides for "Dick" too). Call after word_frequencies(), which ranks forms."""
+    out = []
+    for i, key in enumerate(keys):
+        forms = display_forms(key, forms_by_key[key])
+        if (forms[0] if forms else key) in explicit_words:
+            out.append(i)
+    return out
 
 
 def read_kaikki(path, lang, labels=None):
@@ -758,8 +781,7 @@ def main():
     # Safe search: a key is explicit when every headword written that way is.
     explicit_ids = None
     if labels.seen:
-        explicit = labels.explicit_words()
-        explicit_ids = [i for i, key in enumerate(keys) if forms_by_key[key] <= explicit]
+        explicit_ids = explicit_key_ids(keys, forms_by_key, labels.explicit_words())
         sections.append(("EXPLICIT", np.array(explicit_ids, dtype="<u4")))
 
     # Hot list: keys of the top-ranked words, in rank order, each ending in SEP.
