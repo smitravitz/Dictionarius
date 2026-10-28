@@ -7,7 +7,8 @@ word list; normalizes them exactly like the app's search box; and writes:
   <out>.bin               the index the app loads straight into typed arrays
   <out>.golden.json       expected answers computed by brute force, used by
                           the TypeScript loader's tests
-  <out>.safe-review.tsv   the words safe search hides, most common first, with why
+  <out>.safe-review.tsv   the words safe search hides, and visible ones worth a
+                          look, most common first, with why
   <out>.labels.jsonl.gz   the meanings' labels safe search needs, to rebuild
                           from a word list without the dump (--labels)
 
@@ -39,6 +40,9 @@ import unicodedata
 import zlib
 
 import numpy as np
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import safe_search_list  # noqa: E402
 
 try:
     import regex  # supports \p{Diacritic}, the same rule as the app's normalize()
@@ -134,9 +138,9 @@ EXPLICIT_TAGS = frozenset({"vulgar", "offensive", "slur"})
 EXPLICIT_CATEGORIES = frozenset({
     "English vulgarities", "English offensive terms", "English ethnic slurs", "English swear words",
 })
-# A slur, or a plainly offensive meaning, hides a word wherever it is listed.
-# Hedged labels ("sometimes offensive", "dated, offensive") only count for
-# the main meaning; further down they would hide everyday words ("colored").
+# Further down a word's meanings, labels only flag it for review (see
+# Labels.candidates): a slur, or a plainly offensive meaning. Hedged labels
+# ("sometimes offensive", "dated, offensive") don't.
 SLUR_TAGS = frozenset({"slur"})
 SLUR_CATEGORIES = frozenset({"English ethnic slurs"})
 HEDGES = frozenset({"sometimes", "possibly", "potentially", "occasionally", "dated", "archaic",
@@ -147,9 +151,8 @@ KEPT_TAGS = EXPLICIT_TAGS | SLUR_TAGS | HEDGES | {"derogatory", "pejorative", "e
 KEPT_CATEGORIES = EXPLICIT_CATEGORIES | SLUR_CATEGORIES
 EXPLICIT_LABELS = EXPLICIT_TAGS | {"cat:" + c for c in EXPLICIT_CATEGORIES}
 SLUR_LABELS = SLUR_TAGS | {"cat:" + c for c in SLUR_CATEGORIES}
-# Hand corrections (allow / block), shared with the app.
-SAFE_SEARCH_LIST = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data", "safe-search.txt")
 BLOCKED = "blocked by hand"
+CANDIDATE = "a slur meaning further down"
 
 
 def category_names(categories):
@@ -188,20 +191,16 @@ def is_slur(labels):
 class Labels:
     """What Wiktionary says each headword means, gathered while reading.
 
-    A word is explicit when
-      - its main meaning (the first meaning of its first entry, as the page
-        lists it) is labelled vulgar, offensive or a slur; or
-      - any of its meanings, wherever listed, is a slur or plainly offensive
-        ("faggot", although "a bundle of sticks" comes first); or
-      - its main meaning is an inflection or spelling of explicit words
-        ("fucked" of "fuck", "faggots" of "faggot").
-    A spelling listed further down doesn't count: "be" is also an old spelling
-    of "by", and that mustn't tie "is" to every word "by" is tied to.
-    Words whose other meanings are only vulgar ("cock": a rooster first) or
-    hedged ("colored") stay visible.
+    A word is explicit when its main meaning (the first meaning of its first
+    entry, as the page lists it) is labelled vulgar, offensive or a slur, or
+    when its main meaning is just a plural, tense or spelling of such a word.
+    That is one step: nothing is hidden for being linked to a linked word.
+    Labels further down a word's meanings hide nothing; a word with an
+    innocent first meaning that is mostly known as a bad word goes on the
+    hand-picked block list (data/safe-search.list) instead.
 
-    Hand corrections (data/safe-search.txt) are search keys: `allow` keeps
-    words visible, `block` hides them; inflections follow both."""
+    `allow` (search keys, normalized) keeps words visible, and with them their
+    plurals and tenses."""
 
     def __init__(self):
         self.main = {}  # word -> (labels, bases) of its main meaning
@@ -224,35 +223,27 @@ class Labels:
             if meaning[0]:
                 self.marked.setdefault(word, []).append(meaning[0])
 
-    def explicit_reasons(self, allow=frozenset(), block=frozenset()):
-        """Explicit words, each with why: "main meaning", "a slur meaning" or
-        "form of <word>". `allow` and `block` are search keys (normalized).
-        Blocked keys themselves are hidden by explicit_keys(); here they pull
-        in their inflections (the cache may not list a blocked word at all)."""
-        reasons = {}
-        for w, (labels, _) in self.main.items():
-            if labels & EXPLICIT_LABELS:
-                reasons[w] = "main meaning"
-        for w, marks in self.marked.items():
-            if w not in reasons and any(is_slur(labels) for labels in marks):
-                reasons[w] = "a slur meaning"
-        if allow:
-            for w in [w for w in reasons if normalize(w) in allow]:
-                del reasons[w]
+    def explicit_reasons(self, allow=frozenset()):
+        """Explicit words, each with why: "main meaning" or "form of <word>"."""
+        def allowed(w):
+            return bool(allow) and normalize(w) in allow
 
-        # A main meaning that is a form of hidden words hides the word.
-        pending = {w: bases for w, (labels, bases) in self.main.items()
-                   if bases and w not in reasons and not (allow and normalize(w) in allow)}
-        blocked = {b for bases in pending.values() for b in bases if normalize(b) in block} if block else set()
-        while True:
-            done = [w for w, bases in pending.items() if all(b in reasons or b in blocked for b in bases)]
-            if not done:
-                return reasons
-            for w in done:
-                reasons[w] = f"form of {min(pending.pop(w))}"
+        bad = {w for w, (labels, _) in self.main.items() if labels & EXPLICIT_LABELS and not allowed(w)}
+        reasons = dict.fromkeys(bad, "main meaning")
+        for w, (_, bases) in self.main.items():
+            if bases and w not in bad and all(b in bad for b in bases) and not allowed(w):
+                reasons[w] = f"form of {min(bases)}"
+        return reasons
 
-    def explicit_words(self, allow=frozenset(), block=frozenset()):
-        return set(self.explicit_reasons(allow, block))
+    def explicit_words(self, allow=frozenset()):
+        return set(self.explicit_reasons(allow))
+
+    def candidates(self, reasons):
+        """Words left visible that Wiktionary labels a slur, or plainly
+        offensive, further down: for a person to judge (a bad word goes on the
+        block list; "boy" doesn't)."""
+        return {w: CANDIDATE for w, marks in self.marked.items()
+                if w not in reasons and any(is_slur(labels) for labels in marks)}
 
     def save(self, path):
         """Write what the rule needs, so the index can be rebuilt (or the rule
@@ -285,31 +276,21 @@ class Labels:
 
 
 def read_safe_search_list(text):
-    """(allow, block) search keys from a corrections list like
-    data/safe-search.txt: "[allow]" and "[block]" sections, one word per
-    line, "#" starts a comment line."""
-    allow, block = set(), set()
-    section = None
-    for n, line in enumerate(text.splitlines(), 1):
-        line = line.strip(JS_WHITESPACE)
-        if not line or line.startswith("#"):
-            continue
-        if line in ("[allow]", "[block]"):
-            section = allow if line == "[allow]" else block
-        elif section is None:
-            raise ValueError(f"line {n}: {line!r} comes before [allow] or [block]")
-        else:
-            section.add(normalize(line))
+    """(allow, block) search keys from the encoded hand-picked list
+    (data/safe-search.list, see scripts/safe_search_list.py)."""
+    sections = safe_search_list.parse(text)
+    allow = frozenset(normalize(w) for w in sections["allow"])
+    block = frozenset(normalize(w) for w in sections["block"])
     both = allow & block
     if both:
-        raise ValueError(f"both allowed and blocked: {', '.join(sorted(both))}")
-    return frozenset(allow), frozenset(block)
+        raise ValueError(f"{len(both)} word(s) both allowed and blocked")
+    return allow, block
 
 
 def explicit_keys(keys, forms_by_key, reasons, allow=frozenset(), block=frozenset()):
     """(id, reason) of each search key safe search hides: blocked keys, and
-    keys whose most common written form is explicit ("dick" decides for "Dick"
-    too). Call after word_frequencies(), which ranks forms."""
+    keys whose most common written form is explicit (ties: the lowercase form).
+    Call after word_frequencies(), which ranks forms."""
     out = []
     for i, key in enumerate(keys):
         if key in allow:
@@ -324,18 +305,40 @@ def explicit_keys(keys, forms_by_key, reasons, allow=frozenset(), block=frozense
     return out
 
 
-def safe_review_rows(keys, forms_by_key, freq, hidden):
-    """(Zipf, word, reason) for every key safe search hides (`hidden`: (id,
-    reason) pairs), most common first, then alphabetical: the list to read
-    through for mistakes."""
+def candidate_keys(keys, forms_by_key, notes, hidden, allow=frozenset()):
+    """(id, note) of each visible key with a form in `notes` (word -> why),
+    for review: a key written another way ("as Name: main meaning") or
+    labelled further down. Allowed keys have been reviewed already."""
+    shut = {i for i, _ in hidden}
+    wanted = {}
+    for w, why in notes.items():
+        wanted.setdefault(normalize(w), []).append((w, why))
+    out = []
+    for i, key in enumerate(keys):
+        if i in shut or key in allow or key not in wanted:
+            continue
+        forms = display_forms(key, forms_by_key[key]) or [key]
+        notes_here = dict(wanted[key])
+        for f in forms:
+            if f in notes_here:
+                out.append((i, notes_here[f] if f == forms[0] else f"as {f}: {notes_here[f]}"))
+                break
+    return out
+
+
+def safe_review_rows(keys, forms_by_key, freq, hidden, shown=()):
+    """(Zipf, word, status, why) for every key safe search hides, and for each
+    visible key worth a look (`hidden`, `shown`: (id, why) pairs), most common
+    first, then alphabetical: the list to read through for mistakes."""
     rows = []
-    for i, reason in hidden:
-        forms = display_forms(keys[i], forms_by_key[keys[i]])
-        word = forms[0] if forms else keys[i]
-        zipf = int(freq[i]) if freq is not None else 0
-        rows.append((-zipf, re.sub(r"\s", " ", word), reason))
+    for status, pairs in (("hidden", hidden), ("shown", shown)):
+        for i, why in pairs:
+            forms = display_forms(keys[i], forms_by_key[keys[i]])
+            word = forms[0] if forms else keys[i]
+            zipf = int(freq[i]) if freq is not None else 0
+            rows.append((-zipf, re.sub(r"\s", " ", word), status, why))
     rows.sort()
-    return [(f"{-z / 100:.2f}" if freq is not None else "", w, r) for z, w, r in rows]
+    return [(f"{-z / 100:.2f}" if freq is not None else "", w, st, why) for z, w, st, why in rows]
 
 
 def read_kaikki(path, lang, labels=None):
@@ -842,8 +845,8 @@ def main():
     ap.add_argument("--seed", type=int, default=1, help="seed for verification samples")
     ap.add_argument("--labels", help="read meanings' labels from a labels cache (<out>.labels.jsonl.gz "
                                      "of an earlier build) instead of the input")
-    ap.add_argument("--safe-search-list", default=SAFE_SEARCH_LIST,
-                    help="safe search's hand corrections (default: data/safe-search.txt; '' for none)")
+    ap.add_argument("--safe-search-list", default=safe_search_list.PATH,
+                    help="safe search's hand-picked list (default: data/safe-search.list; '' for none)")
     args = ap.parse_args()
 
     started = time.time()
@@ -916,9 +919,10 @@ def main():
         if args.safe_search_list:
             with open(args.safe_search_list, encoding="utf-8") as f:
                 allow, block = read_safe_search_list(f.read())
-            log(f"  safe search corrections: {len(allow):,} allowed, {len(block):,} blocked")
-        reasons = labels.explicit_reasons(allow, block)
+            log(f"  safe search hand-picked list: {len(allow):,} allowed, {len(block):,} blocked")
+        reasons = labels.explicit_reasons(allow)
         hidden = explicit_keys(keys, forms_by_key, reasons, allow, block)
+        shown = candidate_keys(keys, forms_by_key, {**labels.candidates(reasons), **reasons}, hidden, allow)
         explicit_ids = [i for i, _ in hidden]
         sections.append(("EXPLICIT", np.array(explicit_ids, dtype="<u4")))
 
@@ -963,8 +967,8 @@ def main():
     if explicit_ids is not None:
         review_path = args.out + ".safe-review.tsv"
         with open(review_path, "w", encoding="utf-8") as f:
-            f.write("zipf\tword\treason\n")
-            for row in safe_review_rows(keys, forms_by_key, freq, hidden):
+            f.write("zipf\tword\tstatus\twhy\n")
+            for row in safe_review_rows(keys, forms_by_key, freq, hidden, shown):
                 f.write("\t".join(row) + "\n")
     labels_path = None
     if labels.seen and not args.labels:
@@ -987,7 +991,7 @@ def main():
     log(f"wrote {bin_path}")
     log(f"wrote {golden_path}")
     if review_path:
-        log(f"wrote {review_path} (hidden by safe search, most common first)")
+        log(f"wrote {review_path} (what safe search hides, and words to look at; most common first)")
     if labels_path:
         log(f"wrote {labels_path} (labels cache: rebuild with --labels, without the dump)")
     log(f"done in {time.time() - started:.0f}s")

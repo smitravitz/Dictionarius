@@ -30,10 +30,9 @@ interface Row {
   offset: number;
 }
 // The fixture's made-up labelled words (test/fixtures/README.md): these are
-// explicit ("gapword" has an everyday main meaning, but a slur further down);
-// "mixedword" (a vulgar meaning further down) and "hedgeword" (a dated,
-// offensive one) aren't.
-const EXPLICIT = new Set(["rudeword", "rudewords", "rudewurd", "slurword", "gapword", "gapwords"]);
+// explicit; "gapword" (a slur further down), "mixedword" (a vulgar meaning
+// further down) and "hedgeword" (a dated, offensive one) aren't.
+const EXPLICIT = new Set(["rudeword", "rudewords", "rudewurd", "slurword"]);
 
 function oracle(query: string, fromOffset = 0, safe = false, explicit = EXPLICIT): Row[] {
   const q = normalize(query);
@@ -199,8 +198,7 @@ describe("Completer", () => {
         expect(drain(completer.search(q, { safe: true }).cursor()), q).toEqual(oracle(q, 0, true));
       }
       const shown = drain(completer.search("word", { safe: true }).cursor()).map((r) => keys[r.id]);
-      expect(shown).toContain("mixedword");
-      expect(shown).toContain("hedgeword");
+      for (const word of ["mixedword", "hedgeword", "gapword", "gapwords"]) expect(shown).toContain(word);
       for (const word of EXPLICIT) expect(shown).not.toContain(word);
     });
 

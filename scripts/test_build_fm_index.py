@@ -10,7 +10,10 @@ import unittest
 
 sys.path.insert(0, os.path.dirname(__file__))
 import build_fm_index  # noqa: E402
-from build_fm_index import Labels, explicit_keys, read_safe_search_list, safe_review_rows  # noqa: E402
+import safe_search_list  # noqa: E402
+from build_fm_index import (  # noqa: E402
+    Labels, candidate_keys, explicit_keys, read_safe_search_list, safe_review_rows,
+)
 
 
 def entry(word, *senses):
@@ -27,13 +30,14 @@ def sense(*tags, gloss="a meaning", categories=(), form_of=None, alt_of=None):
 
 
 class ExplicitWords(unittest.TestCase):
-    """A word is explicit when its main meaning (the first one listed) is."""
+    """A word is explicit when its main meaning (the first one listed) is, or
+    is just a plural, tense or spelling of such a word."""
 
-    def explicit(self, *entries):
+    def explicit(self, *entries, allow=frozenset()):
         labels = Labels()
         for e in entries:
             labels.add(e)
-        return labels.explicit_words()
+        return labels.explicit_words(allow)
 
     def test_main_meaning_vulgar_offensive_or_a_slur(self):
         found = self.explicit(
@@ -47,13 +51,11 @@ class ExplicitWords(unittest.TestCase):
         found = self.explicit(entry("catword", sense(categories=["English vulgarities"])))
         self.assertEqual(found, {"catword"})
 
-    def test_an_ordinary_main_meaning_keeps_a_word_visible(self):
-        # Like "cock" (a rooster first) or "ass" (a donkey first).
-        found = self.explicit(entry("roosterword", sense(gloss="a farm bird"), sense("vulgar")))
-        self.assertEqual(found, set())
+    def test_a_main_meaning_counts_even_when_hedged(self):
+        found = self.explicit(entry("oldterm", sense("dated", "offensive")))
+        self.assertEqual(found, {"oldterm"})
 
     def test_later_ordinary_meanings_dont_save_a_vulgar_word(self):
-        # Like "shit": vulgar first, with a meaning labelled only "slang" later.
         found = self.explicit(entry("rudeword", sense("vulgar"), sense("slang"), sense(gloss="plain")))
         self.assertEqual(found, {"rudeword"})
 
@@ -70,17 +72,25 @@ class ExplicitWords(unittest.TestCase):
         found = self.explicit(entry("meanword", sense("derogatory")), entry("slangword", sense("slang")))
         self.assertEqual(found, set())
 
-    def test_inflections_and_spellings_follow_their_base_word(self):
+    def test_a_words_own_plurals_tenses_and_spellings_follow_it(self):
         found = self.explicit(
             entry("rudeword", sense("vulgar")),
             entry("rudewords", sense("form-of", "plural", form_of="rudeword")),
             entry("rudewurd", sense("alt-of", alt_of="rudeword")),
-            entry("rudewurds", sense("form-of", "plural", form_of="rudewurd")),  # a chain
             entry("roosterword", sense(gloss="a farm bird"), sense("vulgar")),
             entry("roosterwords", sense("form-of", "plural", form_of="roosterword")),
             entry("orphans", sense("form-of", "plural", form_of="no-such-entry")),
         )
-        self.assertEqual(found, {"rudeword", "rudewords", "rudewurd", "rudewurds"})
+        self.assertEqual(found, {"rudeword", "rudewords", "rudewurd"})
+
+    def test_one_step_only(self):
+        # The plural of a spelling is two steps away: not hidden.
+        found = self.explicit(
+            entry("rudeword", sense("vulgar")),
+            entry("rudewurd", sense("alt-of", alt_of="rudeword")),
+            entry("rudewurds", sense("form-of", "plural", form_of="rudewurd")),
+        )
+        self.assertEqual(found, {"rudeword", "rudewurd"})
 
     def test_an_inflection_with_a_vulgar_label_of_its_own_counts(self):
         found = self.explicit(entry("rudeworded", sense("vulgar", "form-of", form_of="plainword")))
@@ -102,94 +112,21 @@ class ExplicitWords(unittest.TestCase):
         found = self.explicit(entry(" rudeword ", sense("vulgar")))
         self.assertEqual(found, {"rudeword"})
 
-
-class SlursAnywhere(unittest.TestCase):
-    """Any meaning that is a slur, or plainly offensive, hides the word, wherever
-    it is listed. Hedged labels and secondary vulgar meanings don't."""
-
-    def explicit(self, *entries):
-        labels = Labels()
-        for e in entries:
-            labels.add(e)
-        return labels.explicit_words()
-
-    def test_a_slur_in_second_or_third_place_hides_the_word(self):
+    def test_allowing_a_word_keeps_it_and_its_forms_visible(self):
         found = self.explicit(
-            entry("raccoonword", sense(gloss="a raccoon"), sense("derogatory", "ethnic", "offensive", "slang", "slur")),
-            entry("cookieword", sense(gloss="a biscuit"), sense(gloss="a firework"), sense("ethnic", "slur")),
-            entry("bundleword", sense(gloss="a bundle of sticks"), sense("derogatory", "offensive", "slang", "vulgar")),
-        )
-        self.assertEqual(found, {"raccoonword", "cookieword", "bundleword"})
-
-    def test_the_slur_category_counts_without_the_tag(self):
-        found = self.explicit(entry("gapword", sense(gloss="a gap"), sense(categories=["English ethnic slurs"])))
-        self.assertEqual(found, {"gapword"})
-
-    def test_a_later_entry_with_a_slur_counts(self):
-        found = self.explicit(entry("gapword", sense(gloss="a gap")), entry("gapword", sense("ethnic", "slur")))
-        self.assertEqual(found, {"gapword"})
-
-    def test_inflections_of_a_slur_follow_it(self):
-        found = self.explicit(
-            entry("gapword", sense(gloss="a gap"), sense("ethnic", "slur")),
-            entry("gapwords", sense("form-of", "plural", form_of="gapword")),
-        )
-        self.assertEqual(found, {"gapword", "gapwords"})
-
-    def test_a_spelling_listed_further_down_doesnt_tie_words_together(self):
-        # "be" is also an old spelling of "by", "by" of "bye", "bye" of "boy";
-        # one slur meaning of "boy" mustn't hide "be", and with it "is".
-        found = self.explicit(
-            entry("boyword", sense(gloss="a boy"), sense("ethnic", "slur")),
-            entry("byword", sense(gloss="beside"), sense("alt-of", alt_of="boyword")),
-            entry("beword", sense(gloss="to exist"), sense("alt-of", alt_of="byword")),
-            entry("isword", sense("form-of", form_of="beword")),
-            entry("Gapword", sense("ethnic", "slur")),
-            entry("gapword", sense(gloss="a narrow gap"), sense("alt-of", alt_of="Gapword")),
-        )
-        self.assertEqual(found, {"boyword", "Gapword"})
-
-    def test_hedged_offensive_labels_further_down_dont_count(self):
-        # Like "colored": an everyday main meaning, and a dated, offensive one.
-        found = self.explicit(
-            entry("nationword", sense(gloss="a people"), sense("offensive", "sometimes")),
-            entry("oldword", sense(gloss="plain"), sense("dated", "offensive")),
-            entry("maybeword", sense(gloss="plain"), sense("offensive", "possibly")),
-        )
-        self.assertEqual(found, set())
-
-    def test_a_main_meaning_counts_even_when_hedged(self):
-        found = self.explicit(entry("oldterm", sense("dated", "offensive")))
-        self.assertEqual(found, {"oldterm"})
-
-    def test_reasons_are_reported(self):
-        labels = Labels()
-        for e in (
+            entry("Nameword", sense("offensive")),
+            entry("nameword", sense("vulgar")),
+            entry("namewords", sense("form-of", "plural", form_of="nameword")),
             entry("rudeword", sense("vulgar")),
-            entry("gapword", sense(gloss="a gap"), sense("ethnic", "slur")),
-            entry("gapwords", sense("form-of", form_of="gapword")),
-        ):
-            labels.add(e)
-        reasons = labels.explicit_reasons()
-        self.assertEqual(reasons, {"rudeword": "main meaning", "gapword": "a slur meaning", "gapwords": "form of gapword"})
-
-    def test_secondary_vulgar_or_derogatory_meanings_alone_dont_hide_a_word(self):
-        found = self.explicit(
-            entry("roosterword", sense(gloss="a farm bird"), sense("slang", "vulgar")),
-            entry("policeword", sense(gloss="a farm animal"), sense("derogatory", "slang")),
+            allow={"nameword"},
         )
-        self.assertEqual(found, set())
-
-    def test_a_spelling_further_down_doesnt_carry_a_vulgar_word_either(self):
-        found = self.explicit(
-            entry("arseword", sense("vulgar")),
-            entry("donkeyword", sense(gloss="a donkey"), sense("alt-of", alt_of="arseword")),
-        )
-        self.assertEqual(found, {"arseword"})  # the donkey stays
+        self.assertEqual(found, {"rudeword"})
 
 
-class Corrections(unittest.TestCase):
-    """Hand corrections (data/safe-search.txt): search keys to allow or block."""
+class FurtherDown(unittest.TestCase):
+    """Labels further down a word's meanings hide nothing: a word mostly known
+    as a bad word despite an innocent first meaning goes on the hand-picked
+    list. They flag the word for review instead."""
 
     def labels(self, *entries):
         labels = Labels()
@@ -197,42 +134,41 @@ class Corrections(unittest.TestCase):
             labels.add(e)
         return labels
 
-    def test_allowing_a_word_keeps_it_and_its_inflections_visible(self):
+    def test_a_slur_or_vulgar_meaning_further_down_hides_nothing(self):
         labels = self.labels(
-            entry("boyword", sense(gloss="a boy"), sense("ethnic", "slur")),
-            entry("boywords", sense("form-of", "plural", form_of="boyword")),
-            entry("rudeword", sense("vulgar")),
+            entry("boyword", sense(gloss="a young man"), sense("ethnic", "slur")),
+            entry("roosterword", sense(gloss="a farm bird"), sense("slang", "vulgar")),
+            entry("gapword", sense(gloss="a gap")),
+            entry("gapword", sense("ethnic", "slur")),  # a later entry
         )
-        self.assertEqual(labels.explicit_words(allow={"boyword"}), {"rudeword"})
+        self.assertEqual(labels.explicit_words(), set())
 
-    def test_allow_matches_every_spelling_of_the_key(self):
-        labels = self.labels(entry("Nameword", sense("offensive")), entry("nameword", sense("vulgar")))
-        self.assertEqual(labels.explicit_words(allow={"nameword"}), set())
-
-    def test_blocking_a_word_pulls_in_its_inflections(self):
+    def test_nothing_is_hidden_through_a_chain_of_spellings(self):
+        # "be" is also an old spelling of "by", "by" of "bye", "bye" of "boy".
         labels = self.labels(
-            entry("gapword", sense(gloss="a narrow gap")),
-            entry("Gapword", sense(gloss="a name")),
-            entry("gapwords", sense("form-of", "plural", form_of="gapword")),
+            entry("boyword", sense("vulgar")),
+            entry("byword", sense(gloss="beside"), sense("alt-of", alt_of="boyword")),
+            entry("beword", sense(gloss="to exist"), sense("alt-of", alt_of="byword")),
+            entry("isword", sense("form-of", form_of="beword")),
         )
-        reasons = labels.explicit_reasons(block={"gapword"})
-        self.assertEqual(reasons, {"gapwords": "form of gapword"})  # the key itself: see test_keys
+        self.assertEqual(labels.explicit_words(), {"boyword"})
 
-    def test_blocking_reaches_inflections_of_words_without_labels(self):
-        # The labels cache leaves out plain words, so a blocked base may be unknown.
-        labels = self.labels(entry("gapwords", sense("form-of", "plural", form_of="gapword")))
-        self.assertEqual(labels.explicit_words(block={"gapword"}), {"gapwords"})
+    def test_slurs_further_down_are_listed_for_review(self):
+        labels = self.labels(
+            entry("boyword", sense(gloss="a young man"), sense("ethnic", "slur")),
+            entry("cookieword", sense(gloss="a biscuit"), sense(categories=["English ethnic slurs"])),
+            entry("insultword", sense(gloss="plain"), sense("derogatory", "offensive")),
+            entry("hedgeword", sense(gloss="plain"), sense("dated", "offensive")),
+            entry("roosterword", sense(gloss="a farm bird"), sense("slang", "vulgar")),
+            entry("slurword", sense("ethnic", "slur")),  # hidden already
+        )
+        found = labels.candidates(labels.explicit_reasons())
+        self.assertEqual(set(found), {"boyword", "cookieword", "insultword"})
 
-    def test_keys(self):
-        build_fm_index.FORM_ZIPF.update({"rude": 4.0, "Rude": 2.0, "name": 2.0, "Name": 4.0})
-        keys = ["name", "rude", "plain", "gap", "fine"]
-        forms = {"name": {"name", "Name"}, "rude": {"rude", "Rude"}, "plain": {"plain"}, "gap": {"gap"},
-                 "fine": {"fine"}}
-        reasons = {"rude": "main meaning", "name": "main meaning", "fine": "a slur meaning"}
-        # "rude" (common) is explicit, "Name" (the common form of "name") isn't;
-        # "gap" is blocked, "fine" allowed.
-        found = explicit_keys(keys, forms, reasons, allow={"fine"}, block={"gap"})
-        self.assertEqual(found, [(1, "main meaning"), (3, "blocked by hand")])
+
+class Keys(unittest.TestCase):
+    """A search key is hidden when it is blocked, or when its most common
+    written form is explicit; allowed keys never are."""
 
     def setUp(self):
         self.saved = dict(build_fm_index.FORM_ZIPF)
@@ -241,27 +177,52 @@ class Corrections(unittest.TestCase):
         build_fm_index.FORM_ZIPF.clear()
         build_fm_index.FORM_ZIPF.update(self.saved)
 
+    def test_keys(self):
+        build_fm_index.FORM_ZIPF.update({"rude": 4.0, "Rude": 2.0, "name": 2.0, "Name": 4.0})
+        keys = ["name", "rude", "plain", "gap", "fine", "gaps"]
+        forms = {"name": {"name", "Name"}, "rude": {"rude", "Rude"}, "plain": {"plain"}, "gap": {"gap"},
+                 "fine": {"fine"}, "gaps": {"gaps"}}
+        reasons = {"rude": "main meaning", "name": "main meaning", "fine": "main meaning"}
+        # "rude" (common) is explicit, "Name" (the common form of "name") isn't;
+        # "gap" is blocked (not its plural), "fine" allowed.
+        found = explicit_keys(keys, forms, reasons, allow={"fine"}, block={"gap"})
+        self.assertEqual(found, [(1, "main meaning"), (3, "blocked by hand")])
 
-class CorrectionsFile(unittest.TestCase):
-    def test_sections_comments_and_normalizing(self):
-        allow, block = read_safe_search_list(
-            "# a comment\n\n[allow]\nBoy\n  fun run  \nCafé\n[block]\n# why\nGapword\n"
-        )
+    def test_visible_keys_worth_a_look(self):
+        build_fm_index.FORM_ZIPF.update({"name": 2.0, "Name": 4.0})
+        keys = ["boy", "name", "plain", "rude", "fine"]
+        forms = {"boy": {"boy"}, "name": {"name", "Name"}, "plain": {"plain"}, "rude": {"rude"}, "fine": {"fine"}}
+        notes = {"boy": "a slur meaning further down", "name": "main meaning", "rude": "main meaning",
+                 "fine": "a slur meaning further down"}
+        hidden = [(3, "main meaning")]
+        found = candidate_keys(keys, forms, notes, hidden, allow={"fine"})
+        self.assertEqual(found, [(0, "a slur meaning further down"), (1, "as name: main meaning")])
+
+
+class HandPickedList(unittest.TestCase):
+    def test_round_trip_and_normalizing(self):
+        text = safe_search_list.render({"allow": ["Boy", "fun run", "Café"], "block": ["Gapword"]})
+        self.assertNotIn("Gapword", text)  # encoded
+        allow, block = read_safe_search_list(text)
         self.assertEqual(allow, {"boy", "fun run", "cafe"})
         self.assertEqual(block, {"gapword"})
 
     def test_a_word_outside_a_section_is_an_error(self):
         with self.assertRaises(ValueError):
-            read_safe_search_list("boy\n[allow]\n")
+            safe_search_list.parse(safe_search_list.encode("boy") + "\n[allow]\n")
+
+    def test_a_plain_word_is_an_error(self):
+        with self.assertRaises(ValueError):
+            safe_search_list.parse("[block]\nnot encoded!\n")
 
     def test_a_word_in_both_sections_is_an_error(self):
         with self.assertRaises(ValueError):
-            read_safe_search_list("[allow]\nboy\n[block]\nBoy\n")
+            read_safe_search_list(safe_search_list.render({"allow": ["boy"], "block": ["Boy"]}))
 
     def test_the_shipped_list_reads(self):
-        with open(build_fm_index.SAFE_SEARCH_LIST, encoding="utf-8") as f:
+        with open(safe_search_list.PATH, encoding="utf-8") as f:
             allow, block = read_safe_search_list(f.read())
-        self.assertIn("it", allow)
+        self.assertTrue(allow)
         self.assertTrue(block)
 
 
@@ -283,8 +244,9 @@ class LabelsCache(unittest.TestCase):
             labels.save(path)
             loaded = Labels.load(path)
         self.assertNotIn("plainword", loaded.main)  # plain words aren't stored
-        for allow, block in ((set(), set()), ({"gapword"}, {"plainword"})):
-            self.assertEqual(loaded.explicit_reasons(allow, block), labels.explicit_reasons(allow, block))
+        for allow in (set(), {"rudeword"}):
+            self.assertEqual(loaded.explicit_reasons(allow), labels.explicit_reasons(allow))
+        self.assertEqual(loaded.candidates({}), labels.candidates({}))
 
 
 class SafeReview(unittest.TestCase):
@@ -297,17 +259,22 @@ class SafeReview(unittest.TestCase):
         build_fm_index.FORM_ZIPF.clear()
         build_fm_index.FORM_ZIPF.update(self.saved)
 
-    def test_most_common_first_with_reasons(self):
-        keys = ["gapword", "plain", "rudeword"]
-        forms = {"gapword": {"gapword"}, "plain": {"plain"}, "rudeword": {"rudeword", "Rudeword"}}
+    def test_most_common_first_with_why(self):
+        keys = ["gapword", "plain", "rudeword", "boy"]
+        forms = {"gapword": {"gapword"}, "plain": {"plain"}, "rudeword": {"rudeword", "Rudeword"}, "boy": {"boy"}}
         build_fm_index.FORM_ZIPF.update({"rudeword": 4.2, "Rudeword": 1.0})
-        hidden = [(0, "a slur meaning"), (2, "main meaning")]
-        rows = safe_review_rows(keys, forms, [150, 500, 420], hidden)
-        self.assertEqual(rows, [("4.20", "rudeword", "main meaning"), ("1.50", "gapword", "a slur meaning")])
+        hidden = [(0, "blocked by hand"), (2, "main meaning")]
+        shown = [(3, "a slur meaning further down")]
+        rows = safe_review_rows(keys, forms, [150, 500, 420, 520], hidden, shown)
+        self.assertEqual(rows, [
+            ("5.20", "boy", "shown", "a slur meaning further down"),
+            ("4.20", "rudeword", "hidden", "main meaning"),
+            ("1.50", "gapword", "hidden", "blocked by hand"),
+        ])
 
     def test_without_frequencies_alphabetical(self):
         rows = safe_review_rows(["b", "a"], {"a": {"a"}, "b": {"b"}}, None, [(0, "x"), (1, "main meaning")])
-        self.assertEqual(rows, [("", "a", "main meaning"), ("", "b", "x")])
+        self.assertEqual(rows, [("", "a", "hidden", "main meaning"), ("", "b", "hidden", "x")])
 
 
 if __name__ == "__main__":

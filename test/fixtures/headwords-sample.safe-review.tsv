@@ -1,7 +1,6 @@
-zipf	word	reason
-0.00	gapword	a slur meaning
-0.00	gapwords	form of gapword
-0.00	rudeword	main meaning
-0.00	rudewords	form of rudeword
-0.00	rudewurd	form of rudeword
-0.00	slurword	main meaning
+zipf	word	status	why
+0.00	gapword	shown	a slur meaning further down
+0.00	rudeword	hidden	main meaning
+0.00	rudewords	hidden	form of rudeword
+0.00	rudewurd	hidden	form of rudeword
+0.00	slurword	hidden	main meaning
