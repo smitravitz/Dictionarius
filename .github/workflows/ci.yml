@@ -88,6 +88,24 @@ jobs:
       - name: Check the APK against the privacy budget (privacy.toml)
         run: python3 scripts/audit_privacy.py --apk android/app/build/outputs/apk/debug/app-debug.apk
 
+  ios-plugin:
+    name: iOS haptic plugin compiles (Swift)
+    # There's no iOS app project yet; this keeps the Swift half of
+    # plugins/haptic-tick from rotting until there is.
+    runs-on: macos-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - name: List what the Swift package builds
+        working-directory: plugins/haptic-tick
+        run: xcodebuild -list
+      - name: Build it for the iOS simulator
+        working-directory: plugins/haptic-tick
+        run: |
+          xcodebuild build -scheme DictionariusHapticTick \
+            -destination 'generic/platform=iOS Simulator' \
+            -skipPackagePluginValidation | tail -25
+
   bench:
     name: Benchmark (FM-index vs SQLite FTS5)
     runs-on: ubuntu-latest

@@ -56,9 +56,11 @@ const SAFE_SEARCH = "dictionarius.safe-search";
 safeSwitch.checked = read(SAFE_SEARCH) !== "off";
 send({ type: "settings", safe: safeSwitch.checked });
 
-// The word list file: ?index= overrides it (tests use a small one).
-const indexUrl = new URLSearchParams(location.search).get("index") ?? "headwords.bin";
-send({ type: "load", url: new URL(indexUrl, location.href).href });
+// The word list file: ?index= overrides it (tests use a small one), but only
+// with a file of the app's own: a link mustn't make the app fetch from elsewhere.
+const asked = new URL(new URLSearchParams(location.search).get("index") ?? "headwords.bin", location.href);
+const indexUrl = asked.origin === location.origin ? asked : new URL("headwords.bin", location.href);
+send({ type: "load", url: indexUrl.href });
 
 worker.onmessage = ({ data }: MessageEvent<FromWorker>) => {
   switch (data.type) {
@@ -69,7 +71,7 @@ worker.onmessage = ({ data }: MessageEvent<FromWorker>) => {
       break;
     case "failed":
       status.textContent = "Word list unavailable";
-      summary.textContent = `Couldn’t load the word list (${data.message}). Check your connection and reload the page.`;
+      summary.textContent = `Couldn’t load the word list (${data.message}). Reload the app to try again.`;
       break;
     case "rows":
       if (data.seq !== seq) return; // an answer to an older search
@@ -99,6 +101,28 @@ function mergeCounts(old: Counts | null, next: Counts): Counts {
 }
 
 input.addEventListener("input", () => search(input.value));
+
+// While typing on a touch screen, a tap on the list only puts the keyboard
+// away: the keyboard closing moves the list under the finger, so the tap
+// would land on a word nobody aimed at. The next tap opens words as usual.
+// (Noted when the press starts: by the click, focus has already moved.)
+let tapClosesKeyboard = false;
+scroller.addEventListener(
+  "pointerdown",
+  (e) => (tapClosesKeyboard = e.pointerType !== "mouse" && document.activeElement === input),
+  true,
+);
+scroller.addEventListener(
+  "click",
+  (e) => {
+    if (!tapClosesKeyboard) return;
+    tapClosesKeyboard = false;
+    e.preventDefault();
+    e.stopPropagation();
+    input.blur();
+  },
+  true,
+);
 
 function search(text: string) {
   entry.hidden = true;

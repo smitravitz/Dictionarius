@@ -2,19 +2,21 @@
  * The position slider. Press and hold a blank spot in the results (not a
  * word: holding a word is kept for something else), feel a pulse, then slide
  * sideways to choose how many letters come before the match. A histogram
- * sits centred across 80% of the screen: one bar per position, as tall as the
- * words found there. The cursor stays under the finger; the margins either
- * side count as the first and last position, so the ends are easy to reach.
- * Each step ticks; the list scrolls to the words at that position as you go,
- * and stays whole: scroll up or down from there.
+ * sits centred across the middle 80% of the screen (the active range): one
+ * bar per position, as tall as the words found there, and as wide as
+ * position-scale.ts gives it: 4-6 letters wide, 6 at about 75%, the rare far
+ * end squeezed. The cursor stays under the finger; the margins either side
+ * count as the first and last position, so the ends are easy to reach. Each
+ * step ticks; the list scrolls to the words at that position as you go, and
+ * stays whole: scroll up or down from there.
  */
 import { pulse, release, tick } from "./haptics";
+import { positionScale, type PositionScale } from "./position-scale";
 
 const HOLD_MS = 420; // just under Android's long-press, so ours wins
 const MOVE_SLOP = 8; // moving further than this before the hold means scrolling
 const MAX_DOTS = 10;
-const MAX_STEP = 28; // widest a bar gets; fewer positions sit centred
-const TRACK_SHARE = 0.8; // of the width; the margins either side reach the ends
+const TRACK_SHARE = 0.8; // the active range, of the width; the margins either side reach the ends
 
 export interface SliderState {
   /** the normalized query */
@@ -60,8 +62,9 @@ export class OffsetSlider {
   private lastX = 0;
   private value = 0;
   private max = 0;
-  private step = 20; // pixels per position
-  private trackX = 0; // where position 0 starts inside the window
+  private scale: PositionScale = positionScale(1);
+  private rangeX = 0; // where the active range starts inside the window
+  private range = 1; // its width in pixels
   private suppressClick = false;
 
   constructor(
@@ -171,7 +174,7 @@ export class OffsetSlider {
     const box = this.window.getBoundingClientRect();
     const inside = Math.min(box.width, Math.max(0, x - box.left));
     this.thumb.style.transform = `translateX(${inside}px)`;
-    const value = Math.min(this.max, Math.max(0, Math.floor((inside - this.trackX) / this.step)));
+    const value = Math.min(this.max, this.scale.at((inside - this.rangeX) / this.range));
     if (value === this.value) return;
     const first = this.value < 0;
     this.value = value;
@@ -188,17 +191,20 @@ export class OffsetSlider {
     // One position past what's counted, so you can keep going until it is.
     this.max = Math.max(0, complete ? byOffset.length - 1 : byOffset.length);
     const width = this.window.clientWidth || 300;
-    this.step = Math.min(MAX_STEP, (width * TRACK_SHARE) / (this.max + 1));
-    this.trackX = (width - this.step * (this.max + 1)) / 2;
-    const gap = this.step > 8 ? 3 : this.step > 4 ? 1.5 : 0.5;
+    this.range = width * TRACK_SHARE;
+    this.rangeX = (width - this.range) / 2;
+    this.scale = positionScale(this.max + 1);
+    const { edges } = this.scale;
     const most = Math.max(1, ...byOffset);
     const bars: HTMLElement[] = [];
     for (let i = 0; i <= this.max; i++) {
       const bar = document.createElement("i");
       const count = byOffset[i];
       const height = count === undefined ? 3 : count === 0 ? 2 : 4 + 36 * Math.sqrt(count / most);
-      bar.style.left = `${this.trackX + i * this.step}px`;
-      bar.style.width = `${Math.max(1, this.step - gap)}px`;
+      const step = (edges[i + 1] - edges[i]) * this.range;
+      const gap = step > 8 ? 3 : step > 4 ? 1.5 : 0.5;
+      bar.style.left = `${this.rangeX + edges[i] * this.range}px`;
+      bar.style.width = `${Math.max(1, step - gap)}px`;
       bar.style.height = `${height}px`;
       if (count === undefined) bar.className = "unknown";
       if (i === value) bar.className = "on";
