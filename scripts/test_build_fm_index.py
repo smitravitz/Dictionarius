@@ -12,7 +12,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 import build_fm_index  # noqa: E402
 import safe_search_list  # noqa: E402
 from build_fm_index import (  # noqa: E402
-    Labels, candidate_keys, explicit_keys, read_safe_search_list, safe_review_rows,
+    Labels, candidate_keys, display_forms, explicit_keys, read_safe_search_list, safe_review_rows,
 )
 
 
@@ -172,10 +172,13 @@ class Keys(unittest.TestCase):
 
     def setUp(self):
         self.saved = dict(build_fm_index.FORM_ZIPF)
+        self.saved_explicit = set(build_fm_index.EXPLICIT_FORMS)
 
     def tearDown(self):
         build_fm_index.FORM_ZIPF.clear()
         build_fm_index.FORM_ZIPF.update(self.saved)
+        build_fm_index.EXPLICIT_FORMS.clear()
+        build_fm_index.EXPLICIT_FORMS.update(self.saved_explicit)
 
     def test_keys(self):
         build_fm_index.FORM_ZIPF.update({"rude": 4.0, "Rude": 2.0, "name": 2.0, "Name": 4.0})
@@ -187,6 +190,18 @@ class Keys(unittest.TestCase):
         # "gap" is blocked (not its plural), "fine" allowed.
         found = explicit_keys(keys, forms, reasons, allow={"fine"}, block={"gap"})
         self.assertEqual(found, [(1, "main meaning"), (3, "blocked by hand")])
+
+    def test_an_offensive_spelling_loses_a_tie(self):
+        # Word frequencies ignore case, so "Russian" and a slur spelling of it
+        # ("RuSSian") tie. The plain spelling shows, and decides; the key
+        # itself still comes first ("rude" stays hidden, though "Rude" isn't).
+        build_fm_index.FORM_ZIPF.update({"Nameword": 5.0, "NaMEword": 5.0, "rude": 4.0, "Rude": 4.0})
+        reasons = {"NaMEword": "main meaning", "rude": "main meaning"}
+        build_fm_index.EXPLICIT_FORMS.update(reasons)
+        forms = {"nameword": {"Nameword", "NaMEword"}, "rude": {"rude", "Rude"}}
+        self.assertEqual(display_forms("nameword", forms["nameword"]), ["Nameword", "NaMEword"])
+        self.assertEqual(display_forms("rude", forms["rude"]), ["rude", "Rude"])
+        self.assertEqual(explicit_keys(["nameword", "rude"], forms, reasons), [(1, "main meaning")])
 
     def test_visible_keys_worth_a_look(self):
         build_fm_index.FORM_ZIPF.update({"name": 2.0, "Name": 4.0})

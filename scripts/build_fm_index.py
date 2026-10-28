@@ -421,14 +421,19 @@ def build_word_table(raw_words):
 
 # Zipf frequency per display form, filled in by word_frequencies().
 FORM_ZIPF = {}
+# Written forms whose main meaning is explicit, filled in from the labels
+# before display forms are ranked.
+EXPLICIT_FORMS = set()
 
 
 def display_forms(key, forms):
-    """Display forms for a key, most frequent first (ties: the plain key, then
-    code-point order), or None when the key itself is the only form."""
+    """Display forms for a key, most frequent first, or None when the key
+    itself is the only form. Ties: the plain key, then a form that isn't
+    explicit (frequencies ignore case, so "Russian" ties with the slur
+    spelling "RuSSian"), then code-point order."""
     if forms == {key}:
         return None
-    return sorted(forms, key=lambda f: (-FORM_ZIPF.get(f, 0.0), f != key, f))
+    return sorted(forms, key=lambda f: (-FORM_ZIPF.get(f, 0.0), f != key, f in EXPLICIT_FORMS, f))
 
 
 def word_frequencies(keys, forms_by_key):
@@ -880,6 +885,16 @@ def main():
         except ImportError:
             log("  wordfreq not installed, skipping frequencies (pip install wordfreq)")
 
+    # Safe search's rule, worked out now: it also breaks ties between display forms.
+    reasons, allow, block = {}, frozenset(), frozenset()
+    if labels.seen:
+        if args.safe_search_list:
+            with open(args.safe_search_list, encoding="utf-8") as f:
+                allow, block = read_safe_search_list(f.read())
+            log(f"  safe search hand-picked list: {len(allow):,} allowed, {len(block):,} blocked")
+        reasons = labels.explicit_reasons(allow)
+        EXPLICIT_FORMS.update(reasons)
+
     log("building FM-index")
     n, text, bwt, C, dense, sparse, SUPER, BLOCK, SOFF, SPOS = build_fm(encoded)
 
@@ -915,12 +930,6 @@ def main():
     # Safe search: a key is explicit when its most common written form is.
     explicit_ids = None
     if labels.seen:
-        allow, block = frozenset(), frozenset()
-        if args.safe_search_list:
-            with open(args.safe_search_list, encoding="utf-8") as f:
-                allow, block = read_safe_search_list(f.read())
-            log(f"  safe search hand-picked list: {len(allow):,} allowed, {len(block):,} blocked")
-        reasons = labels.explicit_reasons(allow)
         hidden = explicit_keys(keys, forms_by_key, reasons, allow, block)
         shown = candidate_keys(keys, forms_by_key, {**labels.candidates(reasons), **reasons}, hidden, allow)
         explicit_ids = [i for i, _ in hidden]

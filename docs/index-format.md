@@ -167,7 +167,8 @@ apart takes a person, not a rule. `derogatory`, `pejorative` and `slang` alone
 don't count.
 
 A search key is explicit when its most common written form is (by wordfreq, as
-in *Display forms*; ties go to the lowercase form).
+in *Display forms*; ties go to the lowercase form, then to a form that isn't
+explicit, so a slur spelling such as `RuSSian` can't hide `Russian`).
 
 **Hand-picked list.** [`data/safe-search.list`](../data/safe-search.list)
 names search keys to **block** (bad words whose first meaning is innocent, and
@@ -203,7 +204,9 @@ still found through the FM-index.
 A word has a `VIDS` entry only when its display forms differ from its
 normalized key (capitals, diacritics, variants such as `résumé` / `Resume`).
 Forms are listed most frequent first by wordfreq (so `Hawaii` comes before
-`Hawaiʻi` and `Hawai`i`); ties put the plain key first, then code-point order.
+`Hawaiʻi` and `Hawai`i`); ties put the plain key first, then forms that aren't
+explicit (wordfreq ignores case: `Russian` before the slur spelling `RuSSian`),
+then code-point order.
 The first form is the one to show. With no entry, the display form is the
 normalized key.
 
