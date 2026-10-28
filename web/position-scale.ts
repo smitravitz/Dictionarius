@@ -48,3 +48,14 @@ export function positionScale(positions: number): PositionScale {
     },
   };
 }
+
+const MAX_DOTS = 10;
+
+/** The slider's label for a position: a dot per letter before the match, up
+ *  to ten; past ten, the ten dots then "10+1", "10+2", … */
+export function positionDots(value: number): { dots: string; more: string } {
+  return {
+    dots: "•".repeat(Math.min(value, MAX_DOTS)),
+    more: value > MAX_DOTS ? `${MAX_DOTS}+${value - MAX_DOTS}` : "",
+  };
+}

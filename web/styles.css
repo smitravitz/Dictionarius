@@ -343,6 +343,18 @@ a:focus-visible {
   letter-spacing: 0.06em;
 }
 
+/* Past ten letters: "10+1" after the ten dots, kept clear of the fragment. */
+.slider-more {
+  color: var(--pencil);
+  font-size: 0.7em;
+  font-variant-numeric: tabular-nums;
+  margin: 0 0.25em 0 0.15em;
+}
+
+.slider-more:empty {
+  display: none;
+}
+
 .slider-frag {
   color: var(--proof);
   font-weight: 650;
