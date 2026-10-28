@@ -1,10 +1,10 @@
 {
  "file": {
-  "sha256": "ebcb1d93b221d5befd9444fc32cf3c92939edd0a54e1567a3584e2e85b7a2279",
+  "sha256": "d4d24df86cb59e646b9866091afe124624477091b429294c44678cb1898b0de7",
   "version": 1,
   "normId": "nfd-strip-diacritic-lower-trim/v1",
-  "n": 166591,
-  "numWords": 17067,
+  "n": 166605,
+  "numWords": 17069,
   "numHot": 3000
  },
  "normalize": [
@@ -103,83 +103,83 @@
  ],
  "exact": [
   {
-   "q": "primality",
+   "q": "priggery",
    "id": 11858
   },
   {
-   "q": "suberone",
+   "q": "subendymal",
    "id": 14606
   },
   {
-   "q": "eurasian",
+   "q": "euphuize",
    "id": 5281
   },
   {
-   "q": "sallow",
+   "q": "saliva",
    "id": 13102
   },
   {
-   "q": "tenno",
+   "q": "tenesmic",
    "id": 15119
   },
   {
-   "q": "juge",
+   "q": "judicatory",
    "id": 8188
   },
   {
-   "q": "unlawed",
+   "q": "unknowledged",
    "id": 16056
   },
   {
-   "q": "mayweed",
+   "q": "mayflower",
    "id": 9145
   },
   {
-   "q": "velar",
+   "q": "veiled plate",
    "id": 16320
   },
   {
-   "q": "victus",
+   "q": "victorine",
    "id": 16411
   },
   {
-   "q": "wrecche",
+   "q": "wray",
    "id": 16888
   },
   {
-   "q": "pomp",
+   "q": "pomiculture",
    "id": 11597
   },
   {
-   "q": "sympetalous",
+   "q": "symmetrical",
    "id": 14899
   },
   {
-   "q": "temse",
+   "q": "temporomaxillary",
    "id": 15106
   },
   {
-   "q": "pluvious",
+   "q": "plutus",
    "id": 11494
   },
   {
-   "q": "taeniacideqzx",
+   "q": "tacticalqzx",
    "id": null
   },
   {
-   "q": "underfillingqzx",
+   "q": "underdoqzx",
    "id": null
   },
   {
-   "q": "hyssopqzx",
+   "q": "hypsometricqzx",
    "id": null
   },
   {
-   "q": "oxysulphuretqzx",
+   "q": "oxyneurineqzx",
    "id": null
   },
   {
-   "q": "extensiblenessqzx",
+   "q": "extemporizationqzx",
    "id": null
   }
  ],
@@ -191,7 +191,7 @@
   },
   {
    "q": "i",
-   "start": 7271,
+   "start": 7273,
    "count": 817
   },
   {
@@ -201,12 +201,12 @@
   },
   {
    "q": "dr",
-   "start": 4567,
+   "start": 4569,
    "count": 69
   },
   {
    "q": "din",
-   "start": 4208,
+   "start": 4210,
    "count": 6
   },
   {
@@ -215,22 +215,22 @@
    "count": 2
   },
   {
-   "q": "indi",
-   "start": 7600,
-   "count": 27
+   "q": "indo",
+   "start": 7629,
+   "count": 7
   },
   {
-   "q": "fulmi",
-   "start": 6073,
-   "count": 2
+   "q": "distr",
+   "start": 4430,
+   "count": 8
   },
   {
-   "q": "cohune",
+   "q": "cohere",
    "start": 2920,
    "count": 1
   },
   {
-   "q": "crosshat",
+   "q": "crossbow",
    "start": 3547,
    "count": 1
   }
@@ -247,9 +247,9 @@
    "wordCount": 11314
   },
   {
-   "q": "ro",
-   "occurrences": 1309,
-   "wordCount": 1290
+   "q": "ss",
+   "occurrences": 906,
+   "wordCount": 884
   },
   {
    "q": "lea",
@@ -257,65 +257,90 @@
    "wordCount": 68
   },
   {
-   "q": "nis",
-   "occurrences": 135,
-   "wordCount": 135
-  },
-  {
-   "q": "ro",
-   "occurrences": 1309,
-   "wordCount": 1290
-  },
-  {
-   "q": "nc",
-   "occurrences": 648,
-   "wordCount": 633
-  },
-  {
-   "q": "pi",
-   "occurrences": 467,
-   "wordCount": 465
-  },
-  {
-   "q": "hant",
-   "occurrences": 16,
-   "wordCount": 16,
+   "q": "sty",
+   "occurrences": 33,
+   "wordCount": 33,
    "wordIds": [
-    2538,
-    2539,
-    4217,
-    4310,
-    4849,
-    4957,
-    7952,
-    9246,
-    10972,
-    11161,
-    11162,
-    13650,
-    14707,
-    14883,
-    14884,
-    15597
+    15,
+    929,
+    974,
+    1766,
+    4484,
+    4583,
+    5145,
+    6157,
+    6827,
+    7263,
+    8578,
+    8607,
+    9651,
+    9786,
+    11311,
+    11995,
+    12423,
+    12830,
+    13067,
+    14572,
+    14573,
+    14574,
+    14575,
+    14576,
+    14577,
+    14578,
+    14579,
+    14580,
+    15189,
+    15281,
+    16201,
+    16702,
+    16961
    ]
   },
   {
-   "q": "ic",
-   "occurrences": 1513,
-   "wordCount": 1487
+   "q": "rs",
+   "occurrences": 261,
+   "wordCount": 260
   },
   {
-   "q": "lusatru",
-   "occurrences": 1,
-   "wordCount": 1,
+   "q": "le",
+   "occurrences": 1649,
+   "wordCount": 1629
+  },
+  {
+   "q": "bi",
+   "occurrences": 368,
+   "wordCount": 365
+  },
+  {
+   "q": "ral",
+   "occurrences": 127,
+   "wordCount": 127
+  },
+  {
+   "q": "ba",
+   "occurrences": 370,
+   "wordCount": 362
+  },
+  {
+   "q": "scin",
+   "occurrences": 9,
+   "wordCount": 9,
    "wordIds": [
-    10278
+    4273,
+    5434,
+    5554,
+    6107,
+    10438,
+    11367,
+    12158,
+    13276,
+    13277
    ]
   },
   {
-   "q": "ar",
-   "occurrences": 1409,
-   "wordCount": 1381
+   "q": "at",
+   "occurrences": 2037,
+   "wordCount": 1996
   },
   {
    "q": "qzxqzx",
@@ -334,63 +359,75 @@
    "word": "arms"
   },
   {
+   "id": 3275,
+   "word": "convoy"
+  },
+  {
    "id": 3407,
-   "word": "counterplead"
+   "word": "countermand"
   },
   {
    "id": 4509,
-   "word": "dominancy"
-  },
-  {
-   "id": 6368,
-   "word": "glossitis"
+   "word": "domett"
   },
   {
    "id": 6619,
-   "word": "gymnocytode"
-  },
-  {
-   "id": 6957,
-   "word": "hierogrammatic"
+   "word": "gymnastically"
   },
   {
    "id": 7507,
-   "word": "incenter"
+   "word": "incensation"
   },
   {
    "id": 8925,
-   "word": "magneticness"
+   "word": "magnes"
   },
   {
    "id": 9170,
-   "word": "mediatorship"
+   "word": "mediastinal"
   },
   {
    "id": 9321,
-   "word": "methodical"
+   "word": "methal"
   },
   {
    "id": 13784,
-   "word": "silicify"
+   "word": "silica"
+  },
+  {
+   "id": 15492,
+   "word": "townlet"
   },
   {
    "id": 16020,
-   "word": "unhappy"
+   "word": "unguled"
   },
   {
-   "id": 17066,
+   "id": 17068,
    "word": "🫀"
   }
  ],
  "display": [
   {
-   "id": 8144,
+   "id": 4548,
+   "forms": [
+    "Doublure"
+   ]
+  },
+  {
+   "id": 4167,
+   "forms": [
+    "Dieter"
+   ]
+  },
+  {
+   "id": 8146,
    "forms": [
     "JESU"
    ]
   },
   {
-   "id": 12267,
+   "id": 12269,
    "forms": [
     "Quincewort"
    ]
@@ -402,19 +439,19 @@
    ]
   },
   {
-   "id": 13618,
+   "id": 13620,
    "forms": [
     "Sew"
    ]
   },
   {
-   "id": 2903,
+   "id": 2905,
    "forms": [
     "Coessential"
    ]
   },
   {
-   "id": 13179,
+   "id": 13181,
    "forms": [
     "SATCHEL"
    ]
@@ -426,28 +463,20 @@
    ]
   },
   {
-   "id": 15530,
+   "id": 15532,
    "forms": [
     "Trannel"
-   ]
-  },
-  {
-   "id": 5604,
-   "forms": [
-    "Felonous"
-   ]
-  },
-  {
-   "id": 14654,
-   "forms": [
-    "Subsulphide"
    ]
   }
  ],
  "freq": [
   {
+   "id": 8601,
+   "zipf100": 76
+  },
+  {
    "id": 15569,
-   "zipf100": 0
+   "zipf100": 213
   },
   {
    "id": 1566,
@@ -455,7 +484,7 @@
   },
   {
    "id": 7357,
-   "zipf100": 0
+   "zipf100": 232
   },
   {
    "id": 4733,
@@ -471,93 +500,89 @@
   },
   {
    "id": 6418,
-   "zipf100": 122
+   "zipf100": 364
   },
   {
    "id": 3550,
-   "zipf100": 0
+   "zipf100": 142
   },
   {
    "id": 4601,
-   "zipf100": 191
-  },
-  {
-   "id": 6110,
-   "zipf100": 0
+   "zipf100": 131
   }
  ],
  "rank": [
   {
    "rank": 0,
-   "id": 7472
+   "id": 7474
   },
   {
    "rank": 1,
-   "id": 7271
+   "id": 7273
   },
   {
    "rank": 2,
-   "id": 8045
+   "id": 8047
   },
   {
    "rank": 899,
-   "id": 758
+   "id": 12605
   },
   {
    "rank": 1177,
-   "id": 11310
+   "id": 5350
   },
   {
    "rank": 2999,
-   "id": 494
+   "id": 16838
   },
   {
    "rank": 3000,
-   "id": 2151
+   "id": 494
   },
   {
    "rank": 5189,
-   "id": 9830
+   "id": 9160
   },
   {
    "rank": 8789,
-   "id": 3188
+   "id": 3184
   },
   {
    "rank": 11928,
-   "id": 9299
+   "id": 9298
   },
   {
    "rank": 12191,
-   "id": 9800
+   "id": 9799
   },
   {
    "rank": 12895,
-   "id": 11058
+   "id": 11056
   },
   {
    "rank": 14112,
-   "id": 13317
+   "id": 13313
   },
   {
    "rank": 14576,
-   "id": 14402
+   "id": 14401
   },
   {
    "rank": 15233,
-   "id": 15630
+   "id": 15629
   },
   {
    "rank": 16451,
-   "id": 3523
+   "id": 16816
   },
   {
    "rank": 16681,
-   "id": 13974
+   "id": 14265
   },
   {
-   "rank": 17066,
-   "id": 16602
+   "rank": 17068,
+   "id": 16604
   }
  ],
  "shape": [
@@ -582,23 +607,23 @@
    "shape": 0
   },
   {
-   "id": 2832,
+   "id": 2834,
    "shape": 1
   },
   {
-   "id": 2868,
+   "id": 2870,
    "shape": 1
   },
   {
-   "id": 5640,
+   "id": 5642,
    "shape": 1
   },
   {
-   "id": 9711,
+   "id": 9713,
    "shape": 1
   },
   {
-   "id": 11692,
+   "id": 11694,
    "shape": 1
   },
   {
@@ -606,19 +631,19 @@
    "shape": 2
   },
   {
-   "id": 2722,
+   "id": 2724,
    "shape": 2
   },
   {
-   "id": 3611,
+   "id": 3613,
    "shape": 2
   },
   {
-   "id": 12489,
+   "id": 12491,
    "shape": 2
   },
   {
-   "id": 13185,
+   "id": 13187,
    "shape": 2
   }
  ]

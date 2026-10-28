@@ -20,6 +20,32 @@ const FLAG_SHAPE = 4;
 /** How a headword is written: 0 = one word, 1 = hyphenated (no spaces), 2 = with spaces. */
 export type WordShape = 0 | 1 | 2;
 
+/** Nodes at most this big are expanded by reading their BWT bytes; bigger ones
+ *  by asking every symbol's rank (cheaper only for very wide ranges). */
+const SCAN_LIMIT = 20_000;
+/** UTF-8 continuation bytes (10xxxxxx) don't start a character. */
+const startsChar = (byte: number) => (byte & 0xc0) !== 0x80;
+
+/**
+ * Every occurrence of a key, walked backwards towards the start of its word
+ * one byte at a time, to learn how many characters come before it. Word ids
+ * come out grouped by that offset. Lazy and resumable: `step` does a bounded
+ * amount of work, so the first offsets are ready long before the last.
+ */
+export interface OffsetWalk {
+  /** Do up to about `budget` units of work (bytes read, rank lookups); stops
+   *  early when a level of the walk completes. Returns the units used. */
+  step(budget: number): number;
+  /** Offsets below this are final: no more words will be found for them. */
+  readonly settled: number;
+  readonly finished: boolean;
+  /** Highest offset any word was found at so far (-1: none). */
+  readonly maxOffset: number;
+  /** Word ids found with `offset` characters before an occurrence of the key.
+   *  A word whose key holds it twice is found at both offsets. */
+  idsAt(offset: number): { ranges: readonly number[]; singles: readonly number[] };
+}
+
 const utf8 = new TextEncoder();
 const utf8Decode = new TextDecoder("utf-8", { fatal: true });
 
@@ -44,6 +70,9 @@ interface Sections {
 export class HeadwordIndex {
   private hotTextCache: string | null = null;
 
+  /** Every byte value that occurs in the BWT. */
+  private readonly symbols: number[];
+
   private constructor(
     readonly size: number,
     /** Words in the hot list (top-ranked words; 0 if the file has none). */
@@ -52,7 +81,10 @@ export class HeadwordIndex {
     private readonly blockShift: number,
     private readonly superShift: number,
     private readonly s: Sections,
-  ) {}
+  ) {
+    this.symbols = [];
+    for (let c = 0; c < 256; c++) if (s.denseOf[c] >= 0 || s.sparseOf[c] >= 0) this.symbols.push(c);
+  }
 
   /** Open an index from the raw bytes of a `.bin` file. */
   static fromBytes(bytes: Uint8Array): HeadwordIndex {
@@ -195,6 +227,141 @@ export class HeadwordIndex {
     return hi - lo;
   }
 
+  /** How many words end with `key`. */
+  countEndingWith(key: string): number {
+    if (key === "") return 0;
+    const body = utf8.encode(key);
+    const pattern = new Uint8Array(body.length + 1);
+    pattern.set(body);
+    pattern[body.length] = SEP;
+    const [lo, hi] = this.range(pattern);
+    return hi - lo;
+  }
+
+  /**
+   * Walk back from every occurrence of `key` to the start of its word. The
+   * walk is a breadth-first search over the strings that precede the key:
+   * level d holds one node per distinct d-byte string x such that x + key
+   * occurs, as the BWT row range of x + key. A node's SEP child is the id
+   * range of words starting with x + key; its other children form level d + 1.
+   * A node with a single row is followed straight to its word.
+   */
+  offsetWalk(key: string): OffsetWalk {
+    const { C, bwt } = this.s;
+    const symbols = this.symbols;
+    const occ = (c: number, i: number) => this.occ(c, i);
+    const [lo0, hi0] = key === "" ? [0, 0] : this.range(utf8.encode(key));
+
+    let level = { lo: [] as number[], hi: [] as number[], chars: [] as number[] };
+    let next = { lo: [] as number[], hi: [] as number[], chars: [] as number[] };
+    if (hi0 > lo0) {
+      level.lo.push(lo0);
+      level.hi.push(hi0);
+      level.chars.push(0);
+    }
+    let pos = 0;
+    const ranges: number[][] = []; // per offset: [loId, hiId, loId, hiId, …]
+    const singles: number[][] = []; // per offset: word ids
+    const counts = new Uint32Array(256);
+    const touched: number[] = [];
+    const state = { settled: hi0 > lo0 ? 0 : Infinity, finished: !(hi0 > lo0), maxOffset: -1 };
+
+    const foundRange = (offset: number, loId: number, hiId: number) => {
+      (ranges[offset] ??= []).push(loId, hiId);
+      if (offset > state.maxOffset) state.maxOffset = offset;
+    };
+    const foundSingle = (offset: number, id: number) => {
+      (singles[offset] ??= []).push(id);
+      if (offset > state.maxOffset) state.maxOffset = offset;
+    };
+    // One row left: follow it to the separator in front of its word.
+    const walkSingle = (row: number, chars: number): number => {
+      let cost = 0;
+      for (;;) {
+        const c = bwt[row];
+        cost++;
+        if (c === SEP) {
+          foundSingle(chars, occ(SEP, row) - 1);
+          return cost;
+        }
+        if (c === 0) return cost; // TERM: not inside any word
+        if (startsChar(c)) chars++;
+        row = C[c] + occ(c, row);
+      }
+    };
+    const child = (c: number, start: number, count: number, chars: number) => {
+      if (c === SEP) {
+        foundRange(chars, start - 1, start - 1 + count); // rows of SEP + x + key -> word ids
+        return 0;
+      }
+      if (c === 0) return 0;
+      const childChars = chars + (startsChar(c) ? 1 : 0);
+      if (count === 1) return walkSingle(C[c] + start, childChars);
+      next.lo.push(C[c] + start);
+      next.hi.push(C[c] + start + count);
+      next.chars.push(childChars);
+      return 0;
+    };
+    const expand = (lo: number, hi: number, chars: number): number => {
+      if (hi - lo === 1) return walkSingle(lo, chars);
+      let cost = 0;
+      if (hi - lo <= SCAN_LIMIT) {
+        for (let row = lo; row < hi; row++) {
+          const c = bwt[row];
+          if (counts[c]++ === 0) touched.push(c);
+        }
+        cost += hi - lo;
+        for (const c of touched) {
+          cost += 1 + child(c, occ(c, lo), counts[c], chars);
+          counts[c] = 0;
+        }
+        touched.length = 0;
+      } else {
+        for (const c of symbols) {
+          const a = occ(c, lo);
+          const b = occ(c, hi);
+          cost += 2;
+          if (b > a) cost += child(c, a, b - a, chars);
+        }
+      }
+      return cost;
+    };
+
+    return {
+      get settled() {
+        return state.settled;
+      },
+      get finished() {
+        return state.finished;
+      },
+      get maxOffset() {
+        return state.maxOffset;
+      },
+      idsAt: (offset) => ({ ranges: ranges[offset] ?? [], singles: singles[offset] ?? [] }),
+      step(budget) {
+        let used = 0;
+        while (!state.finished && used < budget) {
+          used += expand(level.lo[pos], level.hi[pos], level.chars[pos]);
+          pos++;
+          if (pos < level.lo.length) continue;
+          // Level done: every node left is in `next`, and none of them can
+          // produce an offset below its own character count.
+          [level, next] = [next, level];
+          next.lo.length = next.hi.length = next.chars.length = 0;
+          pos = 0;
+          if (level.lo.length === 0) {
+            state.finished = true;
+            state.settled = Infinity;
+          } else {
+            state.settled = minOf(level.chars);
+          }
+          break;
+        }
+        return used;
+      },
+    };
+  }
+
   /** Ids of every word containing `key`, ascending. Cost grows with the hit count. */
   wordsContaining(key: string): number[] {
     if (key === "") return [];
@@ -277,6 +444,12 @@ function framed(key: string, closed: boolean): Uint8Array {
   out.set(body, 1);
   if (closed) out[out.length - 1] = SEP;
   return out;
+}
+
+function minOf(values: number[]): number {
+  let min = Infinity;
+  for (const v of values) if (v < min) min = v;
+  return min;
 }
 
 function ascii(bytes: Uint8Array, start: number, length: number): string {
