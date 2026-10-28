@@ -17,7 +17,7 @@ const scroller = (page: Page) => page.locator("#scroller");
 
 test("shows how many words are loaded", async ({ page }) => {
   await open(page);
-  await expect(page.locator("#status")).toHaveText("17,069 words");
+  await expect(page.locator("#status")).toHaveText("17,074 words");
 });
 
 test("typing shows the first 50 results, exact match first", async ({ page }) => {

@@ -26,11 +26,17 @@ let matches: Matches | null = null;
 let cursor: ResultCursor | null = null;
 let cursorSeq = -1;
 let countTimer: ReturnType<typeof setTimeout> | undefined;
+let safe = true; // safe search; the page sends the saved setting before loading
+let matchesSafe = safe;
 
 scope.onmessage = ({ data }) => {
   switch (data.type) {
     case "load":
       void load(data.url);
+      break;
+    case "settings":
+      safe = data.safe;
+      if (safe) setTimeout(() => completer?.prepareSafeSearch(), 0);
       break;
     case "search":
       if (completer) search(data);
@@ -52,6 +58,8 @@ async function load(url: string) {
     scope.postMessage({ type: "ready", words: index.size, ms: performance.now() - started });
     if (waiting) search(waiting);
     waiting = null;
+    // Safe search reads its words' keys once; do it now, before it's needed.
+    if (safe) setTimeout(() => completer?.prepareSafeSearch(), 0);
   } catch (error) {
     scope.postMessage({ type: "failed", message: error instanceof Error ? error.message : String(error) });
   }
@@ -59,7 +67,10 @@ async function load(url: string) {
 
 function search({ seq, query, fromOffset }: { seq: number; query: string; fromOffset: number }) {
   // Moving the position slider re-asks for the same query: keep its counts.
-  if (!matches || matches.query !== normalize(query)) matches = completer!.search(query);
+  if (!matches || matches.query !== normalize(query) || matchesSafe !== safe) {
+    matches = completer!.search(query, { safe });
+    matchesSafe = safe;
+  }
   cursor = matches.cursor(fromOffset);
   cursorSeq = seq;
   sendPage(cursor);
@@ -103,5 +114,6 @@ function countsOf(m: Matches): Counts {
     occurrences: m.occurrences,
     byOffset: [...m.byOffset],
     total: m.total,
+    safe: matchesSafe,
   };
 }

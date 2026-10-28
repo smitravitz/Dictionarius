@@ -21,6 +21,8 @@ const frame = $("frame");
 const scroller = $("scroller");
 const entry = $("entry");
 const hint = $("hint");
+const settings = $<HTMLDialogElement>("settings");
+const safeSwitch = $<HTMLInputElement>("safe-search");
 
 const worker = new Worker(new URL("./search-worker.ts", import.meta.url), { type: "module" });
 const send = (message: ToWorker) => worker.postMessage(message);
@@ -49,6 +51,11 @@ const slider = new OffsetSlider(frame, scroller, {
   },
 });
 
+// Settings live in browser storage; safe search is on unless turned off.
+const SAFE_SEARCH = "dictionarius.safe-search";
+safeSwitch.checked = read(SAFE_SEARCH) !== "off";
+send({ type: "settings", safe: safeSwitch.checked });
+
 // The word list file: ?index= overrides it (tests use a small one).
 const indexUrl = new URLSearchParams(location.search).get("index") ?? "headwords.bin";
 send({ type: "load", url: new URL(indexUrl, location.href).href });
@@ -71,7 +78,7 @@ worker.onmessage = ({ data }: MessageEvent<FromWorker>) => {
       describe();
       break;
     case "counts":
-      if (data.query !== query) return;
+      if (data.query !== query || data.counts.safe !== safeSwitch.checked) return;
       counts = data.counts;
       describe();
       break;
@@ -134,6 +141,11 @@ function describe() {
   const q = `“${query}”`;
   if (counts.occurrences === 0) {
     summary.textContent = `No word contains ${q}. Try a shorter piece.`;
+    hint.hidden = true;
+    return;
+  }
+  if (counts.total === 0) {
+    summary.textContent = `Safe search hides every word with ${q}. You can turn it off in Settings.`;
     hint.hidden = true;
     return;
   }
@@ -205,11 +217,30 @@ window.addEventListener("popstate", () => {
   input.setAttribute("aria-expanded", "true");
 });
 
-void setUpNativeShell(() => {
-  if (!input.value) return false;
-  input.value = "";
-  search("");
-  return true;
+void setUpNativeShell({
+  closePanel: () => {
+    if (!settings.open) return false;
+    settings.close();
+    return true;
+  },
+  clearSearch: () => {
+    if (!input.value) return false;
+    input.value = "";
+    search("");
+    return true;
+  },
+});
+
+// Settings: the cog opens them; Done, Escape, or a tap outside closes them.
+$("settings-open").addEventListener("click", () => settings.showModal());
+settings.addEventListener("click", (event) => {
+  if (event.target === settings) settings.close(); // the backdrop, outside the panel
+});
+safeSwitch.addEventListener("change", () => {
+  write(SAFE_SEARCH, safeSwitch.checked ? "on" : "off");
+  send({ type: "settings", safe: safeSwitch.checked });
+  counts = null; // counted under the old setting
+  if (query) search(input.value); // show the list again under the new setting
 });
 
 // Example fragments fill the start screen; tapping one searches for it.
@@ -232,23 +263,25 @@ examples.addEventListener("click", (event) => {
   search(input.value);
 });
 
-// Browser storage for one-time hints. It can be missing or blocked; then the
-// hint just shows again next time.
+// Browser storage for settings and one-time hints. It can be missing or
+// blocked; then settings fall back to their defaults and hints show again.
 const HINT_SEEN = "dictionarius.slider-hint-seen";
-function seen(key: string): boolean {
+function read(key: string): string | null {
   try {
-    return localStorage.getItem(key) === "1";
+    return localStorage.getItem(key);
   } catch {
-    return false;
+    return null;
   }
 }
-function remember(key: string) {
+function write(key: string, value: string) {
   try {
-    localStorage.setItem(key, "1");
+    localStorage.setItem(key, value);
   } catch {
     // not stored; harmless
   }
 }
+const seen = (key: string) => read(key) === "1";
+const remember = (key: string) => write(key, "1");
 
 // The seam sits a fixed share of the row width from the left edge.
 const placeSeam = () => {
