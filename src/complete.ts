@@ -12,6 +12,10 @@ import { normalize } from "./normalize";
  *
  * Positions are worked out on demand (see HeadwordIndex.offsetWalk), so the
  * first page never waits for words deep inside long ones.
+ *
+ * Safe search leaves out explicit words (vulgar, offensive, slurs: see
+ * docs/index-format.md), except the exact match: a word typed out in full
+ * still shows. Counts cover only what is shown.
  */
 
 export interface Suggestion {
@@ -37,10 +41,26 @@ const MAX_SCORE = SHAPE_STEP - 1;
 /** Chunks smaller than this are sorted directly; bigger ones by counting sort. */
 const SMALL_CHUNK = 256;
 
+export interface SearchOptions {
+  /** Leave out explicit words (except an exact match). */
+  safe?: boolean;
+}
+
+/** What safe search hides, for one query's exact match. */
+interface Hidden {
+  /** True for an explicit word that isn't the exact match. */
+  has(id: number): boolean;
+  /** Hidden words with ids in [lo, hi). */
+  countIn(lo: number, hi: number): number;
+  /** Hidden words whose key ends with `query`. */
+  countEndingWith(query: string): number;
+}
+
 export class Completer {
   /** Per id: (2 - shape) x SHAPE_STEP + score; higher ranks first. */
   private readonly ranks: Uint16Array;
   private readonly maxRank: number;
+  private explicitKeys: string[] | null = null;
 
   constructor(private readonly index: HeadwordIndex) {
     const k = index.size;
@@ -57,9 +77,52 @@ export class Completer {
 
   /** All matches for what the user typed. Cheap to create; work happens as
    *  cursors and counts ask for it. */
-  search(typed: string): Matches {
-    return new Matches(this.index, this.ranks, this.maxRank, normalize(typed));
+  search(typed: string, options: SearchOptions = {}): Matches {
+    const query = normalize(typed);
+    // Separator bytes would match word boundaries; a normalized query has none.
+    const exactId = query && !/[\u0000\u0001]/.test(query) ? this.index.exact(query) : null;
+    const hidden = options.safe && this.index.explicitCount > 0 ? this.hidden(exactId) : null;
+    return new Matches(this.index, this.ranks, this.maxRank, query, exactId, hidden);
   }
+
+  /** Read the explicit words' keys out of the index now rather than on the
+   *  first safe search (a few thousand words: tens of milliseconds). */
+  prepareSafeSearch(): void {
+    if (this.explicitKeys) return;
+    this.explicitKeys = Array.from(this.index.explicitIds(), (id) => this.index.key(id));
+  }
+
+  private hidden(exactId: number | null): Hidden {
+    const index = this.index;
+    const ids = index.explicitIds();
+    this.prepareSafeSearch();
+    const keys = this.explicitKeys!;
+    return {
+      has: (id) => id !== exactId && index.isExplicit(id),
+      countIn(lo, hi) {
+        let n = lowerBound(ids, hi) - lowerBound(ids, lo);
+        if (exactId !== null && exactId >= lo && exactId < hi && index.isExplicit(exactId)) n--;
+        return n;
+      },
+      countEndingWith(query) {
+        let n = 0;
+        for (let i = 0; i < keys.length; i++) if (ids[i] !== exactId && keys[i].endsWith(query)) n++;
+        return n;
+      },
+    };
+  }
+}
+
+/** First position in ascending `values` whose value is >= x. */
+function lowerBound(values: Uint32Array, x: number): number {
+  let lo = 0;
+  let hi = values.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >>> 1;
+    if (values[mid] < x) lo = mid + 1;
+    else hi = mid;
+  }
+  return lo;
 }
 
 export class Matches {
@@ -70,7 +133,6 @@ export class Matches {
   /** Times the query occurs inside headwords; an upper bound on `total`. */
   readonly occurrences: number;
 
-  private readonly exactId: number | null;
   private readonly walk: OffsetWalk | null;
   /** Finished positions: word ids in rank order, each word at its first match. */
   private readonly chunks: Uint32Array[] = [];
@@ -83,13 +145,16 @@ export class Matches {
     private readonly maxRank: number,
     /** the normalized query */
     readonly query: string,
+    private readonly exactId: number | null,
+    /** safe search's hidden words, or null when off */
+    private readonly hidden: Hidden | null,
   ) {
     // Separator bytes would match word boundaries; a normalized query has none.
     const usable = query !== "" && !/[\u0000\u0001]/.test(query);
-    this.starts = usable ? index.prefix(query).count : 0;
-    this.ends = usable ? index.countEndingWith(query) : 0;
+    const { start, count } = usable ? index.prefix(query) : { start: 0, count: 0 };
+    this.starts = count - (hidden && count ? hidden.countIn(start, start + count) : 0);
+    this.ends = usable ? index.countEndingWith(query) - (hidden ? hidden.countEndingWith(query) : 0) : 0;
     this.occurrences = usable ? index.countOccurrences(query) : 0;
-    this.exactId = usable ? index.exact(query) : null;
     this.walk = usable && this.occurrences > 0 ? index.offsetWalk(query) : null;
   }
 
@@ -170,11 +235,12 @@ export class Matches {
     const seen = (this.seen ??= new Uint32Array((this.index.size + 31) >>> 5));
     const { ranges, singles } = this.walk!.idsAt(offset);
     const ids: number[] = [];
+    const hidden = this.hidden;
     const take = (id: number) => {
       const bit = 1 << (id & 31);
       if (seen[id >>> 5] & bit) return;
       seen[id >>> 5] |= bit;
-      ids.push(id);
+      if (!hidden?.has(id)) ids.push(id);
     };
     for (let i = 0; i < ranges.length; i += 2) for (let id = ranges[i]; id < ranges[i + 1]; id++) take(id);
     for (const id of singles) take(id);

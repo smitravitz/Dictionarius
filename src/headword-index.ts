@@ -16,6 +16,7 @@ const SEP = 0x01;
 const FLAG_FREQ = 1;
 const FLAG_HOT = 2;
 const FLAG_SHAPE = 4;
+const FLAG_EXPLICIT = 8;
 
 /** How a headword is written: 0 = one word, 1 = hyphenated (no spaces), 2 = with spaces. */
 export type WordShape = 0 | 1 | 2;
@@ -65,6 +66,7 @@ interface Sections {
   variantBlob: Uint8Array; // per id: UTF-8 forms separated by 0x00
   hotKeys: Uint8Array | null; // keys of the top-ranked words, each ending in SEP
   shapes: Uint8Array | null; // per id: WordShape, when the build included shapes
+  explicitIds: Uint32Array; // ascending ids safe search hides (empty when the build had no labels)
 }
 
 export class HeadwordIndex {
@@ -72,6 +74,8 @@ export class HeadwordIndex {
 
   /** Every byte value that occurs in the BWT. */
   private readonly symbols: number[];
+  /** Bitset over word ids: explicit words (safe search hides them). */
+  private readonly explicitBits: Uint32Array;
 
   private constructor(
     readonly size: number,
@@ -84,6 +88,27 @@ export class HeadwordIndex {
   ) {
     this.symbols = [];
     for (let c = 0; c < 256; c++) if (s.denseOf[c] >= 0 || s.sparseOf[c] >= 0) this.symbols.push(c);
+    this.explicitBits = new Uint32Array((size + 31) >>> 5);
+    for (const id of s.explicitIds) {
+      if (id >= size) throw new Error("corrupt index: explicit word id out of range");
+      this.explicitBits[id >>> 5] |= 1 << (id & 31);
+    }
+  }
+
+  /** How many words are marked explicit (0 for builds without Wiktionary labels). */
+  get explicitCount(): number {
+    return this.s.explicitIds.length;
+  }
+
+  /** Ids of explicit words, ascending. */
+  explicitIds(): Uint32Array {
+    return this.s.explicitIds;
+  }
+
+  /** True when every meaning of the word is vulgar, offensive or a slur
+   *  (see docs/index-format.md, "Safe search"). */
+  isExplicit(id: number): boolean {
+    return (this.explicitBits[id >>> 5] & (1 << (id & 31))) !== 0;
   }
 
   /** Open an index from the raw bytes of a `.bin` file. */
@@ -154,6 +179,7 @@ export class HeadwordIndex {
       variantBlob: view("VBLOB", Uint8Array),
       hotKeys: hasHot ? view("HOTK", Uint8Array) : null,
       shapes: flags & FLAG_SHAPE ? view("SHAPE", Uint8Array) : null,
+      explicitIds: flags & FLAG_EXPLICIT ? view("EXPLICIT", Uint32Array) : new Uint32Array(0),
     });
   }
 

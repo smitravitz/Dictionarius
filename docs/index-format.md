@@ -41,7 +41,7 @@ normalized query string. Normalized headwords never contain bytes below 0x20.
 |---|---|---|---|
 | 0 | 8 bytes | `magic` | ASCII `DICTFMv1` |
 | 8 | u32 | `version` | `1` |
-| 12 | u32 | `flags` | bit 0 = `FREQ` present, bit 1 = `HOTK` present, bit 2 = `SHAPE` present |
+| 12 | u32 | `flags` | bit 0 = `FREQ`, bit 1 = `HOTK`, bit 2 = `SHAPE`, bit 3 = `EXPLICIT` present |
 | 16 | u32 | `n` | length of `T` in bytes |
 | 20 | u32 | `numWords` | `k` |
 | 24 | u32 | `blockShift` | `8` (rank block = 256 positions) |
@@ -55,6 +55,8 @@ normalized query string. Normalized headwords never contain bytes below 0x20.
 Files written before the hot list existed have zero at offset 92 and flag bit 1
 clear, so they still load; search just skips the fast path. Files written
 before shapes existed have flag bit 2 clear; every word then counts as shape 0.
+Without flag bit 3 no word is marked explicit (also the case for builds from a
+plain word list, which has no labels to go on).
 
 ## Section table (offset 96)
 
@@ -79,6 +81,7 @@ before shapes existed have flag bit 2 clear; every word then counts as shape 0.
 | `VBLOB` | u8 | total | per word: its display forms, UTF-8, separated by 0x00 |
 | `HOTK` | u8 | total | keys of the first `numHot` words in rank order, each followed by `SEP`; only if flag bit 1 |
 | `SHAPE` | u8 | `k` | per word: 0 = one word, 1 = hyphenated, 2 = has spaces; only if flag bit 2. See *Ranking* |
+| `EXPLICIT` | u32 | total | ascending IDs of explicit words; only if flag bit 3. See *Safe search* |
 
 A byte value that never occurs in the BWT is in neither `DSYM` nor `SSYM`.
 Dense vs sparse is chosen per symbol to minimize size: a symbol is dense when
@@ -145,6 +148,19 @@ compounds and affixes such as `well-being` or `-ing`. Everything else is shape
 **Rank order** = shape ascending, then score descending, then word ID ascending
 (alphabetical). The app can rebuild it in one pass with a counting sort over a
 combined key, such as `(2 − shape) × 2000 + FREQ`.
+
+## Safe search
+
+`EXPLICIT` lists the words safe search hides. Wiktionary labels each meaning of
+a word; a meaning is explicit when its tags include `vulgar`, `offensive` or
+`slur`, or its categories include *English vulgarities*, *English offensive
+terms*, *English ethnic slurs* or *English swear words*. A meaning that is an
+inflection or spelling of another word (`form_of`, `alt_of`) is explicit when
+that word is. A headword is explicit when every meaning across all its
+entries is; a search key, when every headword written that way is. So one
+ordinary meaning keeps a word visible: "cock" (a rooster) stays, while words
+that are only profanity or slurs, and their inflections, are listed.
+`derogatory`, `pejorative` and `slang` alone don't count.
 
 ## Hot list
 

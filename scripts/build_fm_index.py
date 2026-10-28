@@ -60,6 +60,7 @@ NORM_ID = "nfd-strip-diacritic-lower-trim/v1"
 FLAG_FREQ = 1
 FLAG_HOT = 2
 FLAG_SHAPE = 4
+FLAG_EXPLICIT = 8
 TERM, SEP = 0x00, 0x01
 BLOCK_SHIFT, SUPER_SHIFT = 8, 16
 HEADER = struct.Struct("<8s9I48sI")  # 96 bytes; the last u32 is numHot
@@ -122,8 +123,77 @@ def detect_format(path):
     return "wordlist"
 
 
-def read_kaikki(path, lang):
-    """One JSON object per line; keep the top-level "word" of entries in `lang`."""
+# Safe search. Wiktionary labels each meaning; these labels (as wiktextract
+# tags, or the categories they add) mark a meaning as vulgar or offensive.
+# "derogatory", "pejorative" and plain "slang" are not enough on their own.
+EXPLICIT_TAGS = frozenset({"vulgar", "offensive", "slur"})
+EXPLICIT_CATEGORIES = frozenset({
+    "English vulgarities", "English offensive terms", "English ethnic slurs", "English swear words",
+})
+
+
+def category_names(categories):
+    """Category names, whether listed as strings (raw data) or {"name": ...}."""
+    for c in categories or ():
+        if isinstance(c, str):
+            yield c
+        elif isinstance(c, dict) and isinstance(c.get("name"), str):
+            yield c["name"]
+
+
+class Labels:
+    """What Wiktionary says about each headword's meanings, tallied while
+    reading. A word is explicit when every meaning it has is labelled vulgar,
+    offensive or a slur, or is an inflection or spelling of an explicit word
+    ("fucked" of "fuck"). One ordinary meaning keeps a word visible ("cock",
+    a rooster), so safe search hides profanity and slurs, not double meanings."""
+
+    def __init__(self):
+        self.plain = set()  # words with at least one ordinary meaning
+        self.marked = set()  # words with at least one explicit meaning
+        self.refs = {}  # word -> base words of its form-of / alt-of meanings
+        self.seen = False  # any entry carried meanings at all
+
+    def add(self, obj):
+        word = obj.get("word")
+        senses = obj.get("senses")
+        if not isinstance(word, str) or not isinstance(senses, list):
+            return
+        word = word.strip(JS_WHITESPACE)  # the same trim as headwords
+        self.seen = True
+        for sense in senses:
+            if not isinstance(sense, dict):
+                continue
+            tags = sense.get("tags") or ()
+            if EXPLICIT_TAGS.intersection(tags) or EXPLICIT_CATEGORIES.intersection(category_names(sense.get("categories"))):
+                self.marked.add(word)
+                continue
+            bases = [
+                t["word"].strip(JS_WHITESPACE)
+                for key in ("form_of", "alt_of")
+                for t in sense.get(key) or ()
+                if isinstance(t, dict) and isinstance(t.get("word"), str)
+            ]
+            if bases:
+                self.refs.setdefault(word, set()).update(bases)
+            elif sense.get("glosses") or sense.get("raw_glosses"):
+                self.plain.add(word)
+
+    def explicit_words(self):
+        candidates = (self.marked | self.refs.keys()) - self.plain
+        explicit = {w for w in candidates if w not in self.refs}
+        pending = [w for w in candidates if w in self.refs]
+        while True:  # inflections of inflections: repeat until nothing changes
+            grown = [w for w in pending if self.refs[w] <= explicit]
+            if not grown:
+                return explicit
+            explicit.update(grown)
+            pending = [w for w in pending if w not in explicit]
+
+
+def read_kaikki(path, lang, labels=None):
+    """One JSON object per line; keep the top-level "word" of entries in `lang`,
+    and tally their meanings' labels into `labels`."""
     words = []
     lines = 0
     started = time.time()
@@ -146,12 +216,15 @@ def read_kaikki(path, lang):
             word = obj.get("word")
             if isinstance(word, str):
                 words.append(word)
+                if labels is not None:
+                    labels.add(obj)
     log(f"  {lines:,} lines read")
     return words
 
 
-def read_json(path):
-    """A JSON object (headwords are its keys) or a list of strings / {"word": ...}."""
+def read_json(path, labels=None):
+    """A JSON object (headwords are its keys) or a list of strings / {"word": ...}
+    (objects may carry Kaikki-style "senses", tallied into `labels`)."""
     with open_any(path) as f:
         data = json.load(f)
     if isinstance(data, dict):
@@ -162,6 +235,8 @@ def read_json(path):
             words.append(item)
         elif isinstance(item, dict) and isinstance(item.get("word"), str):
             words.append(item["word"])
+            if labels is not None:
+                labels.add(item)
     return words
 
 
@@ -379,6 +454,7 @@ class IndexReader:
         self.vblob = view("VBLOB", np.uint8)
         self.hot = view("HOTK", np.uint8) if self.flags & FLAG_HOT else None
         self.shape = view("SHAPE", np.uint8) if self.flags & FLAG_SHAPE else None
+        self.explicit = view("EXPLICIT", "<u4") if self.flags & FLAG_EXPLICIT else None
 
     def hot_keys(self):
         """Keys of the top-ranked words, in rank order."""
@@ -479,9 +555,11 @@ class Checker:
         self.passed += 1
 
 
-def verify(reader, text, encoded, keys, forms_by_key, freq, shape, rng, py_order):
+def verify(reader, text, encoded, keys, forms_by_key, freq, shape, explicit_ids, rng, py_order):
     check = Checker()
     check.equal("shapes", reader.shape.tolist(), shape.tolist())
+    if explicit_ids is not None:
+        check.equal("explicit ids", reader.explicit.tolist(), explicit_ids)
     # Hot list = keys of the first numHot words in rank order. py_order is an
     # independent sort (Python's sorted, not numpy's lexsort used to build it).
     check.equal("hot keys in rank order", reader.hot_keys(),
@@ -539,7 +617,7 @@ NORMALIZATION_SAMPLES = [
 ]
 
 
-def golden(reader, text, encoded, keys, forms_by_key, freq, shape, rng, bin_sha256, py_order):
+def golden(reader, text, encoded, keys, forms_by_key, freq, shape, explicit_ids, rng, bin_sha256, py_order):
     k = len(encoded)
     out = {
         "file": {"sha256": bin_sha256, "version": FORMAT_VERSION, "normId": NORM_ID,
@@ -548,6 +626,12 @@ def golden(reader, text, encoded, keys, forms_by_key, freq, shape, rng, bin_sha2
         "exact": [], "prefix": [], "substring": [], "extract": [], "display": [], "freq": [],
         "rank": [], "shape": [],
     }
+    if explicit_ids is not None:
+        flagged = set(explicit_ids)
+        clean = [i for i in rng.sample(range(k), min(40, k)) if i not in flagged][:20]
+        out["explicit"] = {"count": len(explicit_ids),
+                           "ids": sorted(rng.sample(explicit_ids, min(20, len(explicit_ids)))),
+                           "clean": sorted(clean)}
     # A few words of each shape.
     for s in (SHAPE_WORD, SHAPE_HYPHENATED, SHAPE_SPACED):
         ids = np.flatnonzero(shape == s).tolist()
@@ -614,10 +698,11 @@ def main():
     started = time.time()
     fmt = detect_format(args.input) if args.format == "auto" else args.format
     log(f"reading {args.input} ({fmt})")
+    labels = Labels()
     if fmt == "kaikki":
-        raw = read_kaikki(args.input, args.lang)
+        raw = read_kaikki(args.input, args.lang, labels)
     elif fmt == "json":
-        raw = read_json(args.input)
+        raw = read_json(args.input, labels)
     else:
         raw = read_wordlist(args.input)
     if args.limit:
@@ -670,6 +755,13 @@ def main():
     shape = np.array([word_shape(key) for key in keys], dtype=np.uint8)
     sections.append(("SHAPE", shape))
 
+    # Safe search: a key is explicit when every headword written that way is.
+    explicit_ids = None
+    if labels.seen:
+        explicit = labels.explicit_words()
+        explicit_ids = [i for i, key in enumerate(keys) if forms_by_key[key] <= explicit]
+        sections.append(("EXPLICIT", np.array(explicit_ids, dtype="<u4")))
+
     # Hot list: keys of the top-ranked words, in rank order, each ending in SEP.
     # The app scans it with a plain string search, so mid-word hits come out
     # already ranked; the ids are recomputed in the app from FREQ.
@@ -680,6 +772,7 @@ def main():
         sections.append(("HOTK", np.frombuffer(hot_blob, dtype=np.uint8)))
 
     flags = (FLAG_FREQ if freq is not None else 0) | (FLAG_HOT if num_hot else 0) | FLAG_SHAPE
+    flags |= FLAG_EXPLICIT if explicit_ids is not None else 0
     out_dir = os.path.dirname(os.path.abspath(args.out))
     os.makedirs(out_dir, exist_ok=True)
     bin_path = args.out + ".bin"
@@ -698,11 +791,11 @@ def main():
     hyphen = re.compile("[" + re.escape(HYPHENS) + "]")
     py_shape = [2 if spaced.search(key) else 1 if hyphen.search(key) else 0 for key in keys]
     py_order = sorted(range(k), key=lambda i: (py_shape[i], score(i), i))
-    passed = verify(reader, text, encoded, keys, forms_by_key, freq, shape, rng, py_order)
+    passed = verify(reader, text, encoded, keys, forms_by_key, freq, shape, explicit_ids, rng, py_order)
     log(f"  OK: {passed:,} checks passed")
 
     golden_path = args.out + ".golden.json"
-    data = golden(reader, text, encoded, keys, forms_by_key, freq, shape,
+    data = golden(reader, text, encoded, keys, forms_by_key, freq, shape, explicit_ids,
                   random.Random(args.seed + 1), sha, py_order)
     with open(golden_path, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=1)
@@ -710,6 +803,8 @@ def main():
     gz = len(zlib.compress(buf, 6))
     log("")
     log(f"{'headwords (search keys)':<26}{k:>14,}")
+    if explicit_ids is not None:
+        log(f"{'explicit (safe search)':<26}{len(explicit_ids):>14,}")
     log(f"{'indexed text n':<26}{n:>14,} bytes")
     log(f"{'alphabet':<26}{len(dense) + len(sparse):>14} byte values "
         f"({len(dense)} dense, {len(sparse)} sparse)")

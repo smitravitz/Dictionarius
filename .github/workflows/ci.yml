@@ -99,6 +99,8 @@ jobs:
             bench/requirements.txt
             scripts/requirements.txt
       - run: pip install -r bench/requirements.txt -r scripts/requirements.txt
+      - name: Builder unit tests
+        run: python -m unittest scripts/test_build_fm_index.py
       - run: bash bench/fetch_data.sh words
       - name: Build headword index (self-verifying)
         run: |
