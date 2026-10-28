@@ -15,7 +15,7 @@ The open dictionary ecosystem (StarDict, Aard2, ZIM) does prefix/exact lookup ov
 ## How it stays small 🥔
 
 - **Core (~16 MB download):** every headword searchable + full definitions for the top ~50k words by frequency (~100% of real lookups), fully offline on first run. The headword index for all 1,357,380 English search keys is measured at **12.4 MB download / 29.8 MB in memory** (including a 1.6 MB hot list that makes mid-word search instant); the core definitions (~5.7 MB) are still a projection.
-- **Tail (on-demand):** rarer definitions fetch when tapped and cache locally, or pre-download the full set for total offline use.
+- **Tail (a data pack you add):** the rarer definitions come as one file. The app opens its download link in your browser, and you import the file; the app itself never connects ([ADR-0002](docs/adr/0002-offline-only-data-packs.md), proposed).
 
 See [`docs/adr/0001-frequency-tiered-gloss-storage.md`](docs/adr/0001-frequency-tiered-gloss-storage.md) for the reasoning and measured numbers.
 
@@ -46,7 +46,7 @@ See [`docs/adr/0001-frequency-tiered-gloss-storage.md`](docs/adr/0001-frequency-
 
 **⏳ Next**
 
-- Definitions store (core + on-demand tail)
+- Definitions: the core inside the app, the rest as an importable data pack
 - Testing on real phones (the phone timings above are emulated)
 - PWA, iOS and F-Droid builds
 
