@@ -2,6 +2,7 @@ name: Release
 
 # Pushing a tag like v1.2.3 builds a signed Android APK and publishes it as a
 # GitHub release (which Obtainium picks up). One-time setup: scripts/setup-release.sh.
+# Release notes come from the tag's message: git tag -a v1.2.3 -m "What's new"
 on:
   push:
     tags: ["v*"]
@@ -105,7 +106,15 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          cat > notes.md <<EOF
+          # What's new: the tag's own message, when it was made with `git tag -a` (checkout
+          # leaves the tag object behind, so fetch it). A plain `git tag` gets no notes.
+          git fetch --quiet --force origin "refs/tags/$GITHUB_REF_NAME:refs/tags/$GITHUB_REF_NAME"
+          : > notes.md
+          if [ "$(git cat-file -t "$GITHUB_REF_NAME")" = tag ]; then
+            git tag -l --format='%(contents:subject)%0a%0a%(contents:body)' "$GITHUB_REF_NAME" > notes.md
+            printf '\n---\n\n' >> notes.md
+          fi
+          cat >> notes.md <<EOF
           Android app, ${{ steps.apk.outputs.size }}. Install it directly, or add this repository to [Obtainium](https://obtainium.imranr.dev) to get updates.
 
           - APK SHA-256: \`${{ steps.apk.outputs.sha256 }}\`
