@@ -15,6 +15,10 @@ const SECTION_SIZE = 16;
 const SEP = 0x01;
 const FLAG_FREQ = 1;
 const FLAG_HOT = 2;
+const FLAG_SHAPE = 4;
+
+/** How a headword is written: 0 = one word, 1 = hyphenated (no spaces), 2 = with spaces. */
+export type WordShape = 0 | 1 | 2;
 
 const utf8 = new TextEncoder();
 const utf8Decode = new TextDecoder("utf-8", { fatal: true });
@@ -34,6 +38,7 @@ interface Sections {
   variantOffsets: Uint32Array;
   variantBlob: Uint8Array; // per id: UTF-8 forms separated by 0x00
   hotKeys: Uint8Array | null; // keys of the top-ranked words, each ending in SEP
+  shapes: Uint8Array | null; // per id: WordShape, when the build included shapes
 }
 
 export class HeadwordIndex {
@@ -116,6 +121,7 @@ export class HeadwordIndex {
       variantOffsets: view("VOFF", Uint32Array),
       variantBlob: view("VBLOB", Uint8Array),
       hotKeys: hasHot ? view("HOTK", Uint8Array) : null,
+      shapes: flags & FLAG_SHAPE ? view("SHAPE", Uint8Array) : null,
     });
   }
 
@@ -152,6 +158,20 @@ export class HeadwordIndex {
       throw new RangeError(`word id out of range: ${id}`);
     }
     return this.s.freq ? this.s.freq[id] / 100 : 0;
+  }
+
+  /** True when the file records word shapes (builds from before shapes: false). */
+  get hasShapes(): boolean {
+    return this.s.shapes !== null;
+  }
+
+  /** 0 = one word, 1 = hyphenated (no spaces), 2 = has spaces; 0 for every word
+   *  in files built before shapes were recorded. */
+  shape(id: number): WordShape {
+    if (!Number.isInteger(id) || id < 0 || id >= this.size) {
+      throw new RangeError(`word id out of range: ${id}`);
+    }
+    return this.s.shapes ? (this.s.shapes[id] as WordShape) : 0;
   }
 
   /** Word id whose search key is exactly `key`, or null. */

@@ -6,10 +6,11 @@ import { normalize } from "../src/normalize";
 
 const index = HeadwordIndex.fromBytes(new Uint8Array(readFileSync("test/fixtures/headwords-sample.bin")));
 
-// Independent oracle: scan every word and sort. The exact match comes first;
-// every other match is ranked by score (Zipf x 100), with a head start of
-// `bonus` for words that start with the query; ties: prefix first, then id
-// (alphabetical). No FM-index, no heap, no streams.
+// Independent oracle: scan every word and sort. The exact match comes first.
+// Every other match is grouped by shape (single words, then hyphenated words,
+// then entries with spaces), and within a group ranked by score (Zipf x 100),
+// with a head start of `bonus` for words that start with the query; ties:
+// prefix first, then id (alphabetical). No FM-index, no heap, no streams.
 let keys: string[] = [];
 beforeAll(() => {
   keys = Array.from({ length: index.size }, (_, id) => index.key(id));
@@ -17,18 +18,27 @@ beforeAll(() => {
 
 type Tier = "exact" | "prefix" | "midword";
 const BONUS = 1.5;
+/** 0 = one word, 1 = hyphenated (no spaces), 2 = has spaces. Spec: docs/index-format.md */
+const shapeOf = (key: string) => (/\s/.test(key) ? 2 : /[-\u2010-\u2014]/.test(key) ? 1 : 0);
 function oracle(query: string, bonus = BONUS): { id: number; tier: Tier }[] {
   const q = normalize(query);
   if (!q) return [];
   const exact: { id: number; tier: Tier }[] = [];
-  const rest: { id: number; tier: Tier; score: number }[] = [];
+  const rest: { id: number; tier: Tier; shape: number; score: number }[] = [];
   keys.forEach((key, id) => {
     const score = Math.round(index.frequency(id) * 100);
+    const shape = shapeOf(key);
     if (key === q) exact.push({ id, tier: "exact" });
-    else if (key.startsWith(q)) rest.push({ id, tier: "prefix", score: score + Math.round(bonus * 100) });
-    else if (key.includes(q)) rest.push({ id, tier: "midword", score });
+    else if (key.startsWith(q)) rest.push({ id, tier: "prefix", shape, score: score + Math.round(bonus * 100) });
+    else if (key.includes(q)) rest.push({ id, tier: "midword", shape, score });
   });
-  rest.sort((a, b) => b.score - a.score || (a.tier === b.tier ? 0 : a.tier === "prefix" ? -1 : 1) || a.id - b.id);
+  rest.sort(
+    (a, b) =>
+      a.shape - b.shape ||
+      b.score - a.score ||
+      (a.tier === b.tier ? 0 : a.tier === "prefix" ? -1 : 1) ||
+      a.id - b.id,
+  );
   return [...exact, ...rest.map(({ id, tier }) => ({ id, tier }))];
 }
 
@@ -43,10 +53,23 @@ function drain(cursor: ResultCursor, pageSize = 50) {
 }
 
 // Short fragments (huge result sets), rare ones, exact words, non-ASCII, misses.
-const QUERIES = ["e", "re", "ing", "ati", "ste", "resume", "sum", "set", "ice cream", "東", "π", "zz", "qzxqzx"];
+const QUERIES = ["e", "re", "ing", "ati", "ste", "resume", "sum", "set", "ice cream", "air", "-", "東", "π", "zz", "qzxqzx"];
 
 describe("Completer", () => {
   const completer = new Completer(index);
+
+  it("lists single words first, then hyphenated words, then entries with spaces", () => {
+    // "air": plenty of each shape in the fixture (aircraft, air-built, air gap).
+    const shapes = drain(completer.complete("air"))
+      .slice(1) // the exact match comes first, whatever its shape
+      .map((r) => shapeOf(index.key(r.id)));
+    expect(new Set(shapes)).toEqual(new Set([0, 1, 2]));
+    expect(shapes).toEqual([...shapes].sort((a, b) => a - b));
+    // The index says the same as the rule applied to the key.
+    for (let id = 0; id < index.size; id++) {
+      if (index.shape(id) !== shapeOf(keys[id])) throw new Error(`shape of ${keys[id]}`);
+    }
+  });
 
   it("ranks the exact match first, then all matches by frequency, giving prefix matches a head start", () => {
     for (const q of QUERIES) {

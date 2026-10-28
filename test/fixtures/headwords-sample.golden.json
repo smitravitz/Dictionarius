@@ -1,6 +1,6 @@
 {
  "file": {
-  "sha256": "77911e3eac02e1cc6a6d679df05fb699e3bb23442d7cae780bbc0f1d5fa08753",
+  "sha256": "ebcb1d93b221d5befd9444fc32cf3c92939edd0a54e1567a3584e2e85b7a2279",
   "version": 1,
   "normId": "nfd-strip-diacritic-lower-trim/v1",
   "n": 166591,
@@ -61,99 +61,47 @@
    "ǆemal"
   ],
   [
-   "Weighlock",
-   "weighlock"
+   "HARA-KIRI",
+   "hara-kiri"
   ],
   [
-   "Telemechanic",
-   "telemechanic"
+   "Internally",
+   "internally"
   ],
   [
-   "Outrage",
-   "outrage"
+   "Macilency",
+   "macilency"
   ],
   [
-   "Ingrately",
-   "ingrately"
+   "PARTICIPATOR",
+   "participator"
   ],
   [
-   "Picturer",
-   "picturer"
+   "CREDULOUSNESS",
+   "credulousness"
   ],
   [
-   "MESSIEURS",
-   "messieurs"
+   "Pragmatist",
+   "pragmatist"
   ],
   [
-   "Ooze leather",
-   "ooze leather"
+   "Defamous",
+   "defamous"
   ],
   [
-   "FINOS",
-   "finos"
+   "Enouncement",
+   "enouncement"
   ],
   [
-   "Apathetically",
-   "apathetically"
+   "Enact",
+   "enact"
   ],
   [
-   "AMPHOTERIC",
-   "amphoteric"
+   "ALTERNATE",
+   "alternate"
   ]
  ],
  "exact": [
-  {
-   "q": "flitch",
-   "id": 5790
-  },
-  {
-   "q": "pactolian",
-   "id": 10654
-  },
-  {
-   "q": "filled cheese",
-   "id": 5688
-  },
-  {
-   "q": "documental",
-   "id": 4479
-  },
-  {
-   "q": "wher",
-   "id": 16717
-  },
-  {
-   "q": "whereof",
-   "id": 16719
-  },
-  {
-   "q": "premerit",
-   "id": 11786
-  },
-  {
-   "q": "wofulness",
-   "id": 16834
-  },
-  {
-   "q": "foundershaft",
-   "id": 5958
-  },
-  {
-   "q": "subduction",
-   "id": 14602
-  },
-  {
-   "q": "serpens",
-   "id": 13587
-  },
-  {
-   "q": "prolification",
-   "id": 11935
-  },
-  {
-   "q": "polyzoon",
-   "id": 11592
-  },
   {
    "q": "primality",
    "id": 11858
@@ -163,153 +111,211 @@
    "id": 14606
   },
   {
-   "q": "eurasianqzx",
+   "q": "eurasian",
+   "id": 5281
+  },
+  {
+   "q": "sallow",
+   "id": 13102
+  },
+  {
+   "q": "tenno",
+   "id": 15119
+  },
+  {
+   "q": "juge",
+   "id": 8188
+  },
+  {
+   "q": "unlawed",
+   "id": 16056
+  },
+  {
+   "q": "mayweed",
+   "id": 9145
+  },
+  {
+   "q": "velar",
+   "id": 16320
+  },
+  {
+   "q": "victus",
+   "id": 16411
+  },
+  {
+   "q": "wrecche",
+   "id": 16888
+  },
+  {
+   "q": "pomp",
+   "id": 11597
+  },
+  {
+   "q": "sympetalous",
+   "id": 14899
+  },
+  {
+   "q": "temse",
+   "id": 15106
+  },
+  {
+   "q": "pluvious",
+   "id": 11494
+  },
+  {
+   "q": "taeniacideqzx",
    "id": null
   },
   {
-   "q": "sallowqzx",
+   "q": "underfillingqzx",
    "id": null
   },
   {
-   "q": "tennoqzx",
+   "q": "hyssopqzx",
    "id": null
   },
   {
-   "q": "jugeqzx",
+   "q": "oxysulphuretqzx",
    "id": null
   },
   {
-   "q": "unlawedqzx",
+   "q": "extensiblenessqzx",
    "id": null
   }
  ],
  "prefix": [
   {
-   "q": "p",
-   "start": 10643,
-   "count": 1555
+   "q": "a",
+   "start": 19,
+   "count": 1255
   },
   {
-   "q": "b",
-   "start": 1274,
-   "count": 855
+   "q": "i",
+   "start": 7271,
+   "count": 817
   },
   {
-   "q": "in",
-   "start": 7472,
-   "count": 526
+   "q": "ac",
+   "start": 100,
+   "count": 111
   },
   {
-   "q": "co",
-   "start": 2852,
-   "count": 598
+   "q": "dr",
+   "start": 4567,
+   "count": 69
   },
   {
-   "q": "woo",
-   "start": 16845,
-   "count": 16
+   "q": "din",
+   "start": 4208,
+   "count": 6
   },
   {
-   "q": "tus",
-   "start": 15793,
-   "count": 4
+   "q": "aby",
+   "start": 98,
+   "count": 2
   },
   {
-   "q": "chaf",
-   "start": 2513,
-   "count": 3
+   "q": "indi",
+   "start": 7600,
+   "count": 27
   },
   {
-   "q": "salaa",
-   "start": 13088,
+   "q": "fulmi",
+   "start": 6073,
+   "count": 2
+  },
+  {
+   "q": "cohune",
+   "start": 2920,
    "count": 1
   },
   {
-   "q": "outlie",
-   "start": 10498,
-   "count": 1
-  },
-  {
-   "q": "eastern ",
-   "start": 4719,
+   "q": "crosshat",
+   "start": 3547,
    "count": 1
   }
  ],
  "substring": [
   {
-   "q": "r",
-   "occurrences": 10988,
-   "wordCount": 9014
+   "q": "p",
+   "occurrences": 4858,
+   "wordCount": 4284
   },
   {
-   "q": "s",
-   "occurrences": 9083,
-   "wordCount": 6995
+   "q": "e",
+   "occurrences": 16441,
+   "wordCount": 11314
   },
   {
-   "q": "s",
-   "occurrences": 9083,
-   "wordCount": 6995
+   "q": "ro",
+   "occurrences": 1309,
+   "wordCount": 1290
   },
   {
-   "q": "d",
-   "occurrences": 4525,
-   "wordCount": 4083
+   "q": "lea",
+   "occurrences": 68,
+   "wordCount": 68
   },
   {
-   "q": "ary",
-   "occurrences": 108,
-   "wordCount": 108
+   "q": "nis",
+   "occurrences": 135,
+   "wordCount": 135
   },
   {
-   "q": "ss",
-   "occurrences": 906,
-   "wordCount": 884
+   "q": "ro",
+   "occurrences": 1309,
+   "wordCount": 1290
   },
   {
-   "q": "s",
-   "occurrences": 9083,
-   "wordCount": 6995
+   "q": "nc",
+   "occurrences": 648,
+   "wordCount": 633
   },
   {
-   "q": "ec",
-   "occurrences": 547,
-   "wordCount": 544
+   "q": "pi",
+   "occurrences": 467,
+   "wordCount": 465
   },
   {
-   "q": "th",
-   "occurrences": 737,
-   "wordCount": 725
+   "q": "hant",
+   "occurrences": 16,
+   "wordCount": 16,
+   "wordIds": [
+    2538,
+    2539,
+    4217,
+    4310,
+    4849,
+    4957,
+    7952,
+    9246,
+    10972,
+    11161,
+    11162,
+    13650,
+    14707,
+    14883,
+    14884,
+    15597
+   ]
   },
   {
-   "q": "oeomer",
+   "q": "ic",
+   "occurrences": 1513,
+   "wordCount": 1487
+  },
+  {
+   "q": "lusatru",
    "occurrences": 1,
    "wordCount": 1,
    "wordIds": [
-    7052
+    10278
    ]
   },
   {
-   "q": "rfect",
-   "occurrences": 6,
-   "wordCount": 6,
-   "wordIds": [
-    7411,
-    11034,
-    11035,
-    11036,
-    11834,
-    11837
-   ]
-  },
-  {
-   "q": "roble",
-   "occurrences": 2,
-   "wordCount": 2,
-   "wordIds": [
-    11888,
-    12905
-   ]
+   "q": "ar",
+   "occurrences": 1409,
+   "wordCount": 1381
   },
   {
    "q": "qzxqzx",
@@ -324,52 +330,52 @@
    "word": "!"
   },
   {
-   "id": 3455,
-   "word": "craft"
+   "id": 1003,
+   "word": "arms"
   },
   {
-   "id": 4709,
-   "word": "earning"
+   "id": 3407,
+   "word": "counterplead"
   },
   {
-   "id": 4960,
-   "word": "enchoric"
+   "id": 4509,
+   "word": "dominancy"
   },
   {
-   "id": 5684,
-   "word": "filially"
+   "id": 6368,
+   "word": "glossitis"
   },
   {
-   "id": 6615,
-   "word": "gwiniad"
+   "id": 6619,
+   "word": "gymnocytode"
   },
   {
-   "id": 6891,
-   "word": "herbose"
+   "id": 6957,
+   "word": "hierogrammatic"
   },
   {
-   "id": 9745,
-   "word": "mummichog"
+   "id": 7507,
+   "word": "incenter"
   },
   {
-   "id": 11162,
-   "word": "phantastic"
+   "id": 8925,
+   "word": "magneticness"
   },
   {
-   "id": 12363,
-   "word": "rapidity"
+   "id": 9170,
+   "word": "mediatorship"
   },
   {
-   "id": 14015,
-   "word": "sodic"
+   "id": 9321,
+   "word": "methodical"
   },
   {
-   "id": 14118,
-   "word": "sowter"
+   "id": 13784,
+   "word": "silicify"
   },
   {
-   "id": 16743,
-   "word": "whistlewing"
+   "id": 16020,
+   "word": "unhappy"
   },
   {
    "id": 17066,
@@ -378,105 +384,105 @@
  ],
  "display": [
   {
-   "id": 2780,
+   "id": 8144,
    "forms": [
-    "CLARENCIEUX"
+    "JESU"
    ]
   },
   {
-   "id": 8321,
+   "id": 12267,
    "forms": [
-    "Knitter"
+    "Quincewort"
    ]
   },
   {
-   "id": 6643,
+   "id": 912,
    "forms": [
-    "Hackly"
+    "Aprication"
    ]
   },
   {
-   "id": 16578,
+   "id": 13618,
    "forms": [
-    "Warrener"
+    "Sew"
    ]
   },
   {
-   "id": 6259,
+   "id": 2903,
    "forms": [
-    "Genty"
+    "Coessential"
    ]
   },
   {
-   "id": 16823,
+   "id": 13179,
    "forms": [
-    "Within"
+    "SATCHEL"
    ]
   },
   {
-   "id": 2160,
+   "id": 519,
    "forms": [
-    "Caesar"
+    "ALTERNATE"
    ]
   },
   {
-   "id": 11767,
+   "id": 15530,
    "forms": [
-    "Prefect"
+    "Trannel"
    ]
   },
   {
-   "id": 2167,
+   "id": 5604,
    "forms": [
-    "CAITIFF"
+    "Felonous"
    ]
   },
   {
-   "id": 9803,
+   "id": 14654,
    "forms": [
-    "Myolemma"
+    "Subsulphide"
    ]
   }
  ],
  "freq": [
   {
-   "id": 8925,
+   "id": 15569,
    "zipf100": 0
   },
   {
-   "id": 9321,
-   "zipf100": 302
-  },
-  {
-   "id": 16020,
-   "zipf100": 406
-  },
-  {
-   "id": 9170,
+   "id": 1566,
    "zipf100": 0
   },
   {
-   "id": 7507,
+   "id": 7357,
    "zipf100": 0
   },
   {
-   "id": 13784,
+   "id": 4733,
    "zipf100": 0
   },
   {
-   "id": 4509,
+   "id": 10241,
    "zipf100": 0
   },
   {
-   "id": 3407,
+   "id": 1250,
+   "zipf100": 185
+  },
+  {
+   "id": 6418,
+   "zipf100": 122
+  },
+  {
+   "id": 3550,
    "zipf100": 0
   },
   {
-   "id": 1003,
-   "zipf100": 482
+   "id": 4601,
+   "zipf100": 191
   },
   {
-   "id": 6619,
+   "id": 6110,
    "zipf100": 0
   }
  ],
@@ -494,64 +500,126 @@
    "id": 8045
   },
   {
-   "rank": 1170,
-   "id": 4634
+   "rank": 899,
+   "id": 758
   },
   {
-   "rank": 1853,
-   "id": 3392
-  },
-  {
-   "rank": 2781,
-   "id": 14016
+   "rank": 1177,
+   "id": 11310
   },
   {
    "rank": 2999,
-   "id": 13672
+   "id": 494
   },
   {
    "rank": 3000,
-   "id": 14134
-  },
-  {
-   "rank": 3001,
-   "id": 14366
+   "id": 2151
   },
   {
    "rank": 5189,
-   "id": 3751
+   "id": 9830
   },
   {
-   "rank": 5540,
-   "id": 9592
+   "rank": 8789,
+   "id": 3188
   },
   {
-   "rank": 6953,
-   "id": 2201
+   "rank": 11928,
+   "id": 9299
   },
   {
-   "rank": 8243,
-   "id": 123
-  },
-  {
-   "rank": 10097,
-   "id": 3871
-  },
-  {
-   "rank": 11831,
-   "id": 7189
+   "rank": 12191,
+   "id": 9800
   },
   {
    "rank": 12895,
-   "id": 9189
+   "id": 11058
   },
   {
    "rank": 14112,
-   "id": 11366
+   "id": 13317
+  },
+  {
+   "rank": 14576,
+   "id": 14402
+  },
+  {
+   "rank": 15233,
+   "id": 15630
+  },
+  {
+   "rank": 16451,
+   "id": 3523
+  },
+  {
+   "rank": 16681,
+   "id": 13974
   },
   {
    "rank": 17066,
-   "id": 17066
+   "id": 16602
+  }
+ ],
+ "shape": [
+  {
+   "id": 991,
+   "shape": 0
+  },
+  {
+   "id": 14795,
+   "shape": 0
+  },
+  {
+   "id": 15038,
+   "shape": 0
+  },
+  {
+   "id": 16514,
+   "shape": 0
+  },
+  {
+   "id": 16701,
+   "shape": 0
+  },
+  {
+   "id": 2832,
+   "shape": 1
+  },
+  {
+   "id": 2868,
+   "shape": 1
+  },
+  {
+   "id": 5640,
+   "shape": 1
+  },
+  {
+   "id": 9711,
+   "shape": 1
+  },
+  {
+   "id": 11692,
+   "shape": 1
+  },
+  {
+   "id": 588,
+   "shape": 2
+  },
+  {
+   "id": 2722,
+   "shape": 2
+  },
+  {
+   "id": 3611,
+   "shape": 2
+  },
+  {
+   "id": 12489,
+   "shape": 2
+  },
+  {
+   "id": 13185,
+   "shape": 2
   }
  ]
 }

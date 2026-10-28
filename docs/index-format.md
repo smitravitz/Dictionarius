@@ -41,7 +41,7 @@ normalized query string. Normalized headwords never contain bytes below 0x20.
 |---|---|---|---|
 | 0 | 8 bytes | `magic` | ASCII `DICTFMv1` |
 | 8 | u32 | `version` | `1` |
-| 12 | u32 | `flags` | bit 0 = `FREQ` present, bit 1 = `HOTK` present |
+| 12 | u32 | `flags` | bit 0 = `FREQ` present, bit 1 = `HOTK` present, bit 2 = `SHAPE` present |
 | 16 | u32 | `n` | length of `T` in bytes |
 | 20 | u32 | `numWords` | `k` |
 | 24 | u32 | `blockShift` | `8` (rank block = 256 positions) |
@@ -53,7 +53,8 @@ normalized query string. Normalized headwords never contain bytes below 0x20.
 | 92 | u32 | `numHot` | words in the hot list (0 when `HOTK` is absent) |
 
 Files written before the hot list existed have zero at offset 92 and flag bit 1
-clear, so they still load; search just skips the fast path.
+clear, so they still load; search just skips the fast path. Files written
+before shapes existed have flag bit 2 clear; every word then counts as shape 0.
 
 ## Section table (offset 96)
 
@@ -77,6 +78,7 @@ clear, so they still load; search just skips the fast path.
 | `VOFF` | u32 | `V + 1` | offsets into `VBLOB` |
 | `VBLOB` | u8 | total | per word: its display forms, UTF-8, separated by 0x00 |
 | `HOTK` | u8 | total | keys of the first `numHot` words in rank order, each followed by `SEP`; only if flag bit 1 |
+| `SHAPE` | u8 | `k` | per word: 0 = one word, 1 = hyphenated, 2 = has spaces; only if flag bit 2. See *Ranking* |
 
 A byte value that never occurs in the BWT is in neither `DSYM` nor `SSYM`.
 Dense vs sparse is chosen per symbol to minimize size: a symbol is dense when
@@ -134,8 +136,15 @@ rarest part's frequency (`of a` = 7.08 like `of`; `going-to` = 5.93 like
 `going`), so without the penalty they crowd out real words. A known word never drops below 0.01, so it still
 outranks words with no frequency data (0).
 
-**Rank order** = score descending, then word ID ascending (alphabetical). The
-app can rebuild it in one pass with a counting sort over `FREQ`.
+**Shape** comes before the score. A key containing whitespace (any character
+JavaScript's `\s` matches) is shape 2: phrases and names such as `ice cream`.
+Otherwise a key containing a hyphen or dash (U+002D, U+2010–U+2014) is shape 1:
+compounds and affixes such as `well-being` or `-ing`. Everything else is shape
+0, a single word. Single words list first, so a phrase never outranks a word.
+
+**Rank order** = shape ascending, then score descending, then word ID ascending
+(alphabetical). The app can rebuild it in one pass with a counting sort over a
+combined key, such as `(2 − shape) × 2000 + FREQ`.
 
 ## Hot list
 

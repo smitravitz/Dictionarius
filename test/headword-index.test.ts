@@ -17,6 +17,7 @@ interface Golden {
   extract: { id: number; word: string }[];
   display: { id: number; forms: string[] }[];
   freq: { id: number; zipf100: number }[];
+  shape?: { id: number; shape: number }[]; // older builds: none
   normalize: [string, string][];
 }
 
@@ -92,6 +93,12 @@ function describeAgainstGolden(name: string, base: string) {
     it("reports word frequency on the Zipf scale", () => {
       for (const { id, zipf100 } of golden.freq) {
         expect(index.frequency(id), String(id)).toBeCloseTo(zipf100 / 100, 6);
+      }
+    });
+
+    it("reports each word's shape: one word, hyphenated, or several words", () => {
+      for (const { id, shape } of golden.shape ?? []) {
+        expect(index.shape(id), index.key(id)).toBe(shape);
       }
     });
 

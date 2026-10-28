@@ -4,11 +4,13 @@ import { normalize } from "./normalize";
 /**
  * Type-ahead results, ranked and produced lazily, a page at a time.
  *
- * Order: the exact match first; then every other match by score (word
- * frequency), where words that start with the query get a head start of
- * `prefixBonus` on the Zipf scale. Ties: prefix before mid-word, then
- * alphabetical (= word id order). So a common word containing the query
- * ("criticism" for "ism") can outrank a rare word starting with it ("Ismay").
+ * Order: the exact match first. Then every other match, grouped by shape:
+ * single words, then hyphenated words, then entries with spaces. Within a
+ * group, by score (word frequency), where words that start with the query get
+ * a head start of `prefixBonus` on the Zipf scale. Ties: prefix before
+ * mid-word, then alphabetical (= word id order). So a common word containing
+ * the query ("criticism" for "ism") can outrank a rare word starting with it
+ * ("Ismay"), but no phrase outranks a single word.
  * Asking for the next page never enumerates the whole result set.
  */
 
@@ -49,10 +51,15 @@ const DEFAULTS: CompleterOptions = {
   prefixBonus: 1.5,
 };
 const BLOCK_SHIFT = 5; // 32 ids per tree leaf
+/** Rank points per shape step. Above any score plus prefix bonus (Zipf tops
+ *  out near 8 = 800 points), so shape always decides before frequency. */
+const SHAPE_STEP = 2000;
+const MAX_SCORE = SHAPE_STEP / 2 - 1;
 
-/** Frequency ranks + a max tree over blocks of ids, shared by all cursors. */
+/** Ranks + a max tree over blocks of ids, shared by all cursors. */
 interface Ranks {
-  freq: Uint16Array; // rank score x 100 per id
+  /** per id: (2 - shape) x SHAPE_STEP + rank score x 100; higher ranks first */
+  freq: Uint16Array;
   tree: Uint16Array; // tree[1] = root; leaves at [leafBase, leafBase + numBlocks)
   leafBase: number;
 }
@@ -78,7 +85,10 @@ export class Completer {
     this.options = { ...DEFAULTS, ...options };
     const k = index.size;
     const freq = new Uint16Array(k);
-    for (let id = 0; id < k; id++) freq[id] = Math.round(index.frequency(id) * 100);
+    for (let id = 0; id < k; id++) {
+      const score = Math.min(MAX_SCORE, Math.round(index.frequency(id) * 100));
+      freq[id] = (2 - index.shape(id)) * SHAPE_STEP + score;
+    }
 
     const numBlocks = (k + (1 << BLOCK_SHIFT) - 1) >>> BLOCK_SHIFT;
     let leafBase = 1;
@@ -331,8 +341,7 @@ export class ResultCursor {
         this.finished = true;
         break;
       }
-      const { freq } = this.ranks;
-      if (m === END || (p !== END && freq[p] + this.bonus >= freq[m])) {
+      if (m === END || (p !== END && this.prefixFirst(p, m))) {
         out.push(this.suggestion(p, "prefix"));
         this.prefixHead = undefined;
       } else {
@@ -341,6 +350,15 @@ export class ResultCursor {
       }
     }
     return out;
+  }
+
+  /** Whether prefix match `p` comes before mid-word match `m`: the better
+   *  shape wins; with the same shape, the score plus the prefix head start. */
+  private prefixFirst(p: number, m: number): boolean {
+    const { freq } = this.ranks;
+    const shapeP = Math.floor(freq[p] / SHAPE_STEP);
+    const shapeM = Math.floor(freq[m] / SHAPE_STEP);
+    return shapeP !== shapeM ? shapeP > shapeM : freq[p] + this.bonus >= freq[m];
   }
 
   private isPrefixMatch(id: number): boolean {
@@ -355,7 +373,7 @@ export class ResultCursor {
       display: forms[0],
       forms,
       tier,
-      frequency: this.ranks.freq[id] / 100,
+      frequency: this.index.frequency(id),
     };
   }
 }
