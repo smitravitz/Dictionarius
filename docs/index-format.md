@@ -82,6 +82,8 @@ plain word list, which has no labels to go on).
 | `HOTK` | u8 | total | keys of the first `numHot` words in rank order, each followed by `SEP`; only if flag bit 1 |
 | `SHAPE` | u8 | `k` | per word: 0 = one word, 1 = hyphenated, 2 = has spaces; only if flag bit 2. See *Ranking* |
 | `EXPLICIT` | u32 | total | ascending IDs of explicit words; only if flag bit 3. See *Safe search* |
+| `LEN` | u8 | `k` | word column: characters per word. See *Word columns* |
+| `NAME` | bits | `⌈k / 32⌉` u32 | word column: proper nouns; only when parts of speech were read. See *Word columns* |
 
 A byte value that never occurs in the BWT is in neither `DSYM` nor `SSYM`.
 Dense vs sparse is chosen per symbol to minimize size: a symbol is dense when
@@ -194,6 +196,28 @@ writes `<out>.labels.jsonl.gz`, the labels this rule reads, so a rule change
 can be rebuilt (`--labels`) without the multi-GB dump.
 
 A hidden word stays hidden even when it is typed out in full.
+
+## Word columns
+
+A word column holds one value per word id, for the app to filter (and later
+sort) by; [ADR-0003](adr/0003-filters-from-word-columns.md). It is a section,
+found by name; a reader that doesn't know a column ignores it, and an index
+without one simply doesn't offer what needs it. Two layouts:
+
+- **u8**: `k` bytes, byte *i* for word *i*.
+- **bits**: `⌈k / 32⌉` little-endian u32 numbers; word *i* is bit `i % 32` of
+  number `i >> 5`.
+
+| Column | Layout | Value | Written |
+|---|---|---|---|
+| `SHAPE` | u8 | 0 = one word, 1 = hyphenated, 2 = has spaces (a phrase) | always (flag bit 2) |
+| `LEN` | u8 | characters (code points) in the key, capped at 255; the app counts letters before a match the same way | always |
+| `NAME` | bits | set for a proper noun: the most common written form's main meaning (first glossed meaning of its first entry) has part of speech `name`, decided like *Safe search* (`turkey` ties with `Turkey` and stays a common word) | when the input said parts of speech (a dump, or a labels cache from one) |
+
+The app's filters (`src/filters.ts`) read these: *phrases* hides `SHAPE` 2,
+*names* hides `NAME`, *word length* keeps `LEN` within a range. Adding a column:
+write it in `scripts/build_fm_index.py` (see `word_lengths`, `bitset`), add a
+row here and a sample to the golden file, then a filter entry.
 
 ## Hot list
 

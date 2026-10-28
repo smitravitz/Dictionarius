@@ -17088,5 +17088,10 @@
 {"word": "mixedword", "senses": [{"glosses": ["an everyday meaning"], "tags": []}, {"glosses": ["a made-up meaning"], "tags": ["vulgar"]}]},
 {"word": "gapword", "senses": [{"glosses": ["an everyday meaning"], "tags": []}, {"glosses": ["a made-up meaning"], "tags": ["ethnic", "slur", "offensive"]}]},
 {"word": "gapwords", "senses": [{"glosses": ["plural of gapword"], "tags": ["form-of", "plural"], "form_of": [{"word": "gapword"}]}]},
-{"word": "hedgeword", "senses": [{"glosses": ["an everyday meaning"], "tags": []}, {"glosses": ["a made-up meaning"], "tags": ["dated", "offensive"]}]}
+{"word": "hedgeword", "senses": [{"glosses": ["an everyday meaning"], "tags": []}, {"glosses": ["a made-up meaning"], "tags": ["dated", "offensive"]}]},
+{"word": "Zorbleton", "pos": "name", "senses": [{"glosses": ["a made-up town"]}]},
+{"word": "Quillmarch", "pos": "name", "senses": [{"glosses": ["a made-up surname"]}]},
+{"word": "Turkeyword", "pos": "name", "senses": [{"glosses": ["a made-up country"]}]},
+{"word": "turkeyword", "pos": "noun", "senses": [{"glosses": ["a made-up bird"]}]},
+{"word": "zorble", "pos": "verb", "senses": [{"glosses": ["to wobble (made up)"]}]}
 ]

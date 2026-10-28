@@ -21,6 +21,11 @@ const FLAG_EXPLICIT = 8;
 /** How a headword is written: 0 = one word, 1 = hyphenated (no spaces), 2 = with spaces. */
 export type WordShape = 0 | 1 | 2;
 
+/** How a word column stores one value per word (docs/index-format.md, "Word
+ *  columns"): "u8" is a byte per word; "bits" is a bit per word, id i being
+ *  bit (i % 32) of little-endian u32 number i >> 5. */
+export type ColumnType = "u8" | "bits";
+
 /** Nodes at most this big are expanded by reading their BWT bytes; bigger ones
  *  by asking every symbol's rank (cheaper only for very wide ranges). */
 const SCAN_LIMIT = 20_000;
@@ -67,6 +72,7 @@ interface Sections {
   hotKeys: Uint8Array | null; // keys of the top-ranked words, each ending in SEP
   shapes: Uint8Array | null; // per id: WordShape, when the build included shapes
   explicitIds: Uint32Array; // ascending ids safe search hides (empty when the build had no labels)
+  raw: Map<string, Uint8Array>; // every section's bytes, by name (word columns are read from here)
 }
 
 export class HeadwordIndex {
@@ -109,6 +115,21 @@ export class HeadwordIndex {
    *  (see docs/index-format.md, "Safe search"). */
   isExplicit(id: number): boolean {
     return (this.explicitBits[id >>> 5] & (1 << (id & 31))) !== 0;
+  }
+
+  /**
+   * A word column by name, such as LEN (characters per word) or NAME (proper
+   * nouns): one value per word id. Null when this index has no such column
+   * (older builds, or a build without the data behind it).
+   */
+  column(name: string, type: "u8"): Uint8Array | null;
+  column(name: string, type: "bits"): Uint32Array | null;
+  column(name: string, type: ColumnType): Uint8Array | Uint32Array | null {
+    const bytes = this.s.raw.get(name);
+    if (!bytes) return null;
+    const size = type === "u8" ? this.size : ((this.size + 31) >>> 5) * 4;
+    if (bytes.byteLength !== size) throw new Error(`corrupt index: column ${name} isn't ${type}, one per word`);
+    return type === "u8" ? bytes : new Uint32Array(bytes.buffer, bytes.byteOffset, size / 4);
   }
 
   /** Open an index from the raw bytes of a `.bin` file. */
@@ -180,6 +201,7 @@ export class HeadwordIndex {
       hotKeys: hasHot ? view("HOTK", Uint8Array) : null,
       shapes: flags & FLAG_SHAPE ? view("SHAPE", Uint8Array) : null,
       explicitIds: flags & FLAG_EXPLICIT ? view("EXPLICIT", Uint32Array) : new Uint32Array(0),
+      raw: new Map([...where].map(([name]) => [name, view(name, Uint8Array)])),
     });
   }
 
