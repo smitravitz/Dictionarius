@@ -98,7 +98,7 @@ test("only common words by default: phrases and names start hidden, and come bac
 
   await page.locator("#q").fill("zorble");
   await expect(page.locator("#summary")).toHaveText(/in all$/);
-  expect(await shown(page)).toEqual(["zorble"]);
+  expect(await shown(page)).toEqual(["zorble", "zorbles"]);
   await page.locator("#q").fill("air");
   await expect(page.locator("#summary")).toHaveText(/in all$/);
   expect((await shown(page)).filter((w) => w!.includes(" "))).toEqual([]);
@@ -109,10 +109,10 @@ test("only common words by default: phrases and names start hidden, and come bac
   await dialog.getByRole("button", { name: "Done" }).click();
   await expect.poll(() => shown(page)).toContain("air gap");
   await page.locator("#q").fill("zorble");
-  await expect.poll(() => shown(page)).toEqual(["zorble", "Zorbleton"]);
+  await expect.poll(() => shown(page)).toEqual(["zorble", "zorbles", "Zorbleton"]);
 
   await page.reload();
   await expect(page.locator("#status")).toHaveText(/^[\d,]+ words$/);
   await page.locator("#q").fill("zorble");
-  await expect.poll(() => shown(page)).toEqual(["zorble", "Zorbleton"]); // still off after a reload
+  await expect.poll(() => shown(page)).toEqual(["zorble", "zorbles", "Zorbleton"]); // still off after a reload
 });

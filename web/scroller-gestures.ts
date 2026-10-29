@@ -5,7 +5,8 @@
  *   puts the keyboard away: the keyboard closing moves the list under the
  *   finger, so the tap would land on a word nobody aimed at.
  * - A hold on a blank spot opens the position slider, which then follows the
- *   finger until it lifts. A hold on a word is reserved: nothing acts on it.
+ *   finger until it lifts. A hold on a word peeks at its definition until
+ *   the finger lifts.
  * - A finger that moves is scrolling, which the browser does itself.
  * - The mouse drags the list up and down (with momentum on release) and a
  *   row sideways, as a finger would.
@@ -36,7 +37,8 @@ export interface PressStart {
 export type GestureAction =
   | { type: "cancel-hold" } // moved before the hold: no slider
   | { type: "hold"; x: number } // open the slider at x
-  | { type: "hold-word" } // held a word: reserved, nothing acts on it yet
+  | { type: "hold-word" } // held a word: peek at it
+  | { type: "release-word" } // let go of it: close the peek
   | { type: "slide"; x: number } // the slider follows the finger
   | { type: "release" } // close the slider
   | { type: "drag"; axis: "list" | "row"; dx: number; dy: number } // mouse drag, from where it started
@@ -142,6 +144,7 @@ export class PressClassifier {
     this.press = null;
     this.state = "idle";
     if (state === "holding") return { type: "release" };
+    if (state === "holding-word") return { type: "release-word" };
     if (state === "dragging") return { type: "drop", axis: this.axis };
     return null;
   }

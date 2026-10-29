@@ -120,7 +120,7 @@ jobs:
             scripts/requirements.txt
       - run: pip install -r bench/requirements.txt -r scripts/requirements.txt
       - name: Builder and privacy-audit unit tests
-        run: python -m unittest scripts/test_build_fm_index.py scripts/test_audit_privacy.py
+        run: python -m unittest scripts/test_build_fm_index.py scripts/test_definitions.py scripts/test_audit_privacy.py
       - run: bash bench/fetch_data.sh words
       - name: Build headword index (self-verifying)
         run: |

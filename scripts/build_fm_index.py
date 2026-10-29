@@ -35,6 +35,7 @@ import random
 import re
 import struct
 import sys
+import tempfile
 import time
 import unicodedata
 import zlib
@@ -395,6 +396,18 @@ def safe_review_rows(keys, forms_by_key, freq, hidden, shown=()):
             rows.append((-zipf, re.sub(r"\s", " ", word), status, why))
     rows.sort()
     return [(f"{-z / 100:.2f}" if freq is not None else "", w, st, why) for z, w, st, why in rows]
+
+
+class Collectors:
+    """Hands each dictionary entry, as it is read, to several collectors
+    (labels for safe search and names, definitions)."""
+
+    def __init__(self, *collectors):
+        self.collectors = collectors
+
+    def add(self, obj):
+        for collector in self.collectors:
+            collector.add(obj)
 
 
 def read_kaikki(path, lang, labels=None):
@@ -930,7 +943,11 @@ def main():
     labels = Labels.load(args.labels) if args.labels else Labels()
     if args.labels:
         log(f"  labels from {args.labels}: {len(labels.main):,} words")
-    collect = None if args.labels else labels
+    # Definitions need the entries themselves: only a dump (or JSON with
+    # "senses") has them, not a word list rebuilt with --labels.
+    from definitions import DefinitionSpool, packing_tables, read_definitions, write_definitions
+    spool = None if args.labels else DefinitionSpool(tempfile.TemporaryFile())
+    collect = None if args.labels else Collectors(labels, spool)
     if fmt == "kaikki":
         raw = read_kaikki(args.input, args.lang, collect)
     elif fmt == "json":
@@ -997,6 +1014,10 @@ def main():
     ]
     shape = np.array([word_shape(key) for key in keys], dtype=np.uint8)
     sections.append(("SHAPE", shape))
+    # Which keys, in which order: the definitions file carries the same hash,
+    # so the app can tell the two files belong together.
+    keys_hash = hashlib.sha256(bytes([SEP]).join(encoded)).digest()
+    sections.append(("KEYHASH", np.frombuffer(keys_hash, dtype=np.uint8)))
 
     # Safe search: a key is explicit when its most common written form is.
     explicit_ids = None
@@ -1047,9 +1068,37 @@ def main():
     passed = verify(reader, text, encoded, keys, forms_by_key, freq, shape, explicit_ids, rng, py_order)
     log(f"  OK: {passed:,} checks passed")
 
+    # Definitions, by word id, for every key with any (docs/definitions-format.md).
+    definitions_path = None
+    if spool is not None and spool.where:
+        definitions_path = args.out + ".definitions.bin"
+        with_definitions = []
+
+        def note(pairs):
+            for i, found in pairs:
+                with_definitions.append(i)
+                yield i, found
+
+        # Two passes over the spool: what all words share (word classes, link templates), then the words.
+        tables = packing_tables(found for _, found in spool.by_key(keys, forms_by_key, display_forms))
+        blocks = write_definitions(definitions_path, keys, note(spool.by_key(keys, forms_by_key, display_forms)),
+                                   keys_hash, tables)
+        log(f"  definitions: {len(with_definitions):,} of {k:,} words, {blocks:,} blocks, "
+            f"{human(os.path.getsize(definitions_path))}")
+
     golden_path = args.out + ".golden.json"
     data = golden(reader, text, encoded, keys, forms_by_key, freq, shape, explicit_ids,
                   random.Random(args.seed + 1), sha, py_order, names)
+    data["keysHash"] = keys_hash.hex()
+    if definitions_path:
+        # Some words with definitions (read back from the file), and some without.
+        pick = random.Random(args.seed + 2)
+        ids = sorted(pick.sample(with_definitions, min(25, len(with_definitions))))
+        found = read_definitions(definitions_path, keys, ids)["entries"]
+        have = set(with_definitions)
+        without = [i for i in pick.sample(range(k), min(40, k)) if i not in have][:5]
+        data["definitions"] = {"ids": [{"id": i, "definitions": found[i]} for i in ids] + [
+            {"id": i, "definitions": None} for i in sorted(without)]}
     with open(golden_path, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=1)
     review_path = None
@@ -1079,6 +1128,8 @@ def main():
     log(f"{'sha256':<26}{sha}")
     log(f"wrote {bin_path}")
     log(f"wrote {golden_path}")
+    if definitions_path:
+        log(f"wrote {definitions_path} (definitions by word id)")
     if review_path:
         log(f"wrote {review_path} (what safe search hides, and words to look at; most common first)")
     if labels_path:

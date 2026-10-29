@@ -1,10 +1,10 @@
 {
  "file": {
-  "sha256": "d3f955ef5bd2e2d945be55a22a96b5dbf63f7069c893ee359730fac4d303306b",
+  "sha256": "a5a7215a302672fff7d519293c17b0c2be31b986d50ff08923ae519fd397ccd2",
   "version": 1,
   "normId": "nfd-strip-diacritic-lower-trim/v1",
-  "n": 166718,
-  "numWords": 17081,
+  "n": 166726,
+  "numWords": 17082,
   "numHot": 3000
  },
  "normalize": [
@@ -440,7 +440,7 @@
    "word": "treeless"
   },
   {
-   "id": 17080,
+   "id": 17081,
    "word": "🫀"
   }
  ],
@@ -618,7 +618,7 @@
    "id": 9455
   },
   {
-   "rank": 17080,
+   "rank": 17081,
    "id": 16614
   }
  ],
@@ -802,7 +802,7 @@
     "value": 8
    },
    {
-    "id": 17080,
+    "id": 17081,
     "value": 1
    }
   ],
@@ -810,7 +810,7 @@
    "count": 2,
    "ids": [
     12272,
-    17057
+    17058
    ],
    "clean": [
     0,
@@ -834,8 +834,308 @@
     16320,
     16411,
     16888,
-    17080
+    17081
    ]
   }
+ },
+ "keysHash": "ba54d479c589e97bff483ec972f863d8906b8f09108abd0e38a5e179a33fe774",
+ "definitions": {
+  "ids": [
+   {
+    "id": 6177,
+    "definitions": [
+     {
+      "form": "gapword",
+      "pos": null,
+      "meanings": [
+       {
+        "gloss": "an everyday meaning"
+       },
+       {
+        "gloss": "a made-up meaning",
+        "labels": [
+         "ethnic",
+         "slur",
+         "offensive"
+        ],
+        "explicit": true
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "id": 6178,
+    "definitions": [
+     {
+      "form": "gapwords",
+      "pos": null,
+      "meanings": [
+       {
+        "gloss": "plural of gapword",
+        "of": [
+         "gapword"
+        ]
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "id": 6821,
+    "definitions": [
+     {
+      "form": "hedgeword",
+      "pos": null,
+      "meanings": [
+       {
+        "gloss": "an everyday meaning"
+       },
+       {
+        "gloss": "a made-up meaning",
+        "labels": [
+         "dated",
+         "offensive"
+        ],
+        "explicit": true
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "id": 7732,
+    "definitions": [
+     {
+      "form": "ingot",
+      "pos": "noun",
+      "meanings": [
+       {
+        "gloss": "A made-up bar of cast metal."
+       },
+       {
+        "gloss": "A made-up sub-meaning.",
+        "labels": [
+         "archaic",
+         "in old ledgers"
+        ]
+       }
+      ],
+      "etymology": "From a made-up Middle English word.",
+      "ipa": [
+       "/ˈɪŋ.ɡət/"
+      ]
+     },
+     {
+      "form": "ingot",
+      "pos": "verb",
+      "meanings": [
+       {
+        "gloss": "To cast into made-up bars.",
+        "labels": [
+         "transitive"
+        ]
+       }
+      ],
+      "etymology": "From a made-up Middle English word."
+     }
+    ]
+   },
+   {
+    "id": 9517,
+    "definitions": [
+     {
+      "form": "mixedword",
+      "pos": null,
+      "meanings": [
+       {
+        "gloss": "an everyday meaning"
+       },
+       {
+        "gloss": "a made-up meaning",
+        "labels": [
+         "vulgar"
+        ],
+        "explicit": true
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "id": 12272,
+    "definitions": [
+     {
+      "form": "Quillmarch",
+      "pos": "name",
+      "meanings": [
+       {
+        "gloss": "a made-up surname"
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "id": 13011,
+    "definitions": [
+     {
+      "form": "rudeword",
+      "pos": null,
+      "meanings": [
+       {
+        "gloss": "a made-up meaning",
+        "labels": [
+         "vulgar"
+        ],
+        "explicit": true
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "id": 13012,
+    "definitions": [
+     {
+      "form": "rudewords",
+      "pos": null,
+      "meanings": [
+       {
+        "gloss": "plural of rudeword",
+        "of": [
+         "rudeword"
+        ]
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "id": 13013,
+    "definitions": [
+     {
+      "form": "rudewurd",
+      "pos": null,
+      "meanings": [
+       {
+        "gloss": "alternative spelling of rudeword",
+        "of": [
+         "rudeword"
+        ]
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "id": 13951,
+    "definitions": [
+     {
+      "form": "slurword",
+      "pos": null,
+      "meanings": [
+       {
+        "gloss": "a made-up meaning",
+        "labels": [
+         "ethnic",
+         "slur",
+         "offensive"
+        ],
+        "explicit": true
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "id": 15791,
+    "definitions": [
+     {
+      "form": "turkeyword",
+      "pos": "noun",
+      "meanings": [
+       {
+        "gloss": "a made-up bird"
+       }
+      ]
+     },
+     {
+      "form": "Turkeyword",
+      "pos": "name",
+      "meanings": [
+       {
+        "gloss": "a made-up country"
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "id": 17056,
+    "definitions": [
+     {
+      "form": "zorble",
+      "pos": "verb",
+      "meanings": [
+       {
+        "gloss": "to wobble (made up)"
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "id": 17057,
+    "definitions": [
+     {
+      "form": "zorbles",
+      "pos": "noun",
+      "meanings": [
+       {
+        "gloss": "plural of zorble",
+        "of": [
+         "zorble"
+        ]
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "id": 17058,
+    "definitions": [
+     {
+      "form": "Zorbleton",
+      "pos": "name",
+      "meanings": [
+       {
+        "gloss": "a made-up town"
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "id": 4935,
+    "definitions": null
+   },
+   {
+    "id": 4968,
+    "definitions": null
+   },
+   {
+    "id": 7599,
+    "definitions": null
+   },
+   {
+    "id": 15409,
+    "definitions": null
+   },
+   {
+    "id": 15609,
+    "definitions": null
+   }
+  ]
  }
 }

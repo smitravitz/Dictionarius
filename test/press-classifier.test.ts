@@ -56,12 +56,16 @@ describe("PressClassifier", () => {
     expect(c.click()).toBe("suppress");
   });
 
-  it("reports a hold on a word, and doesn't let it open the word", () => {
+  it("peeks at a held word until it's let go, and doesn't let it open the word", () => {
     const c = new PressClassifier();
     c.down(press({ onWord: true }));
     expect(c.hold()).toEqual({ type: "hold-word" });
-    expect(c.up(1)).toBeNull();
+    expect(c.move(1, 140, 230)).toBeNull(); // the peek stays put while the finger wanders
+    expect(c.up(1)).toEqual({ type: "release-word" });
     expect(c.click()).toBe("suppress");
+    c.down(press({ onWord: true }));
+    c.hold();
+    expect(c.cancel(1)).toEqual({ type: "release-word" }); // the browser took the press away
   });
 
   it("cancels the hold once the finger moves: that's scrolling", () => {

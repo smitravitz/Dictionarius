@@ -132,6 +132,13 @@ export class HeadwordIndex {
     return type === "u8" ? bytes : new Uint32Array(bytes.buffer, bytes.byteOffset, size / 4);
   }
 
+  /** SHA-256 of the key list, in id order (the KEYHASH section): what a
+   *  definitions file names to say it belongs to this index. Null for older builds. */
+  keysHash(): Uint8Array | null {
+    const bytes = this.s.raw.get("KEYHASH");
+    return bytes && bytes.byteLength === 32 ? bytes : null;
+  }
+
   /** Open an index from the raw bytes of a `.bin` file. */
   static fromBytes(bytes: Uint8Array): HeadwordIndex {
     if (bytes.byteLength < HEADER_SIZE || ascii(bytes, 0, 8) !== MAGIC) {
