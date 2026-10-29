@@ -7,7 +7,10 @@ builder (build_fm_index.py) collects them per search key, in the order it ranks
 written forms, and writes them to the definitions file the app reads by word id.
 """
 
+import collections
+import concurrent.futures
 import json
+import os
 import struct
 import sys
 
@@ -318,25 +321,49 @@ class DefinitionSpool:
         return json.loads(self.file.read(length))
 
 
-def write_definitions(path, keys, by_id, keys_hash, tables, per_block=PER_BLOCK):
+def cpu_cores():
+    """How many cores this process may use (all of them, unless it's been limited)."""
+    if hasattr(os, "process_cpu_count"):  # Python 3.13+
+        return os.process_cpu_count() or 1
+    if hasattr(os, "sched_getaffinity"):  # Linux
+        return len(os.sched_getaffinity(0)) or 1
+    return os.cpu_count() or 1  # macOS
+
+
+def compress_block(raw):
+    return brotli.compress(raw, quality=11, lgwin=22)
+
+
+def write_definitions(path, keys, by_id, keys_hash, tables, per_block=PER_BLOCK, workers=None):
     """Write the definitions file (docs/definitions-format.md). `by_id` gives
     (word id, [definitions]) in ascending id order; words left out have none.
     `keys_hash` is the index's KEYHASH, so a reader can tell the two belong
-    together; `tables` comes from packing_tables(). Returns the number of blocks."""
+    together; `tables` comes from packing_tables(). Returns the number of blocks.
+
+    Brotli at its best setting is most of the build's time, so blocks are
+    compressed on `workers` threads at once (default: every core; brotli lets
+    go of Python's lock while it works) while the next ones are packed. Each
+    block is compressed on its own, so the file is the same however many."""
+    workers = workers or cpu_cores()
     num_words = len(keys)
     num_blocks = (num_words + per_block - 1) // per_block
     by_id = iter(by_id)
     pending = next(by_id, None)
     blocks = []
-    for b in range(num_blocks):
-        lines = []
-        for i in range(b * per_block, min(num_words, (b + 1) * per_block)):
-            if pending is not None and pending[0] == i:
-                lines.append(pack(keys[i], pending[1], tables))
-                pending = next(by_id, None)
-            else:
-                lines.append(b"")
-        blocks.append(brotli.compress(b"\n".join(lines), quality=11, lgwin=22))
+    waiting = collections.deque()  # blocks being compressed, in order
+    with concurrent.futures.ThreadPoolExecutor(workers) as pool:
+        for b in range(num_blocks):
+            lines = []
+            for i in range(b * per_block, min(num_words, (b + 1) * per_block)):
+                if pending is not None and pending[0] == i:
+                    lines.append(pack(keys[i], pending[1], tables))
+                    pending = next(by_id, None)
+                else:
+                    lines.append(b"")
+            waiting.append(pool.submit(compress_block, b"\n".join(lines)))
+            while len(waiting) > 2 * workers:  # packing got ahead: wait, so memory stays flat
+                blocks.append(waiting.popleft().result())
+        blocks.extend(block.result() for block in waiting)
     if pending is not None:
         raise ValueError(f"word id {pending[0]} is out of range or out of order")
     table_bytes = encode(tables)

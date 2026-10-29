@@ -223,6 +223,27 @@ class File(unittest.TestCase):
         self.assertEqual(back["entries"], defs)
         self.assertEqual(only["entries"], {6: defs[6]})
 
+    def test_the_same_file_however_many_cores_compress_it(self):
+        # Blocks are compressed in parallel; the file mustn't depend on how many
+        # at once, or the published checksums would change from one computer to another.
+        import tempfile
+        keys = [f"w{i:03d}" for i in range(40)]
+        defs = [(i, [{"form": keys[i], "pos": "noun", "meanings": [{"gloss": f"Meaning number {i}."}]}])
+                for i in range(0, 40, 3)]
+        tables = packing_tables([d for _, d in defs], min_uses=1)
+        files = []
+        with tempfile.TemporaryDirectory() as tmp:
+            for workers in (1, 3, 8):
+                path = os.path.join(tmp, f"d{workers}.bin")
+                blocks = write_definitions(path, keys, iter(defs), b"k" * 32, tables, per_block=4, workers=workers)
+                with open(path, "rb") as f:
+                    files.append(f.read())
+            back = read_definitions(path, keys)
+        self.assertEqual(blocks, 10)
+        self.assertEqual(files[1], files[0])
+        self.assertEqual(files[2], files[0])
+        self.assertEqual(back["entries"], dict(defs))
+
 
 if __name__ == "__main__":
     unittest.main()

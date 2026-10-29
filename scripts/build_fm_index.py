@@ -945,7 +945,7 @@ def main():
         log(f"  labels from {args.labels}: {len(labels.main):,} words")
     # Definitions need the entries themselves: only a dump (or JSON with
     # "senses") has them, not a word list rebuilt with --labels.
-    from definitions import DefinitionSpool, packing_tables, read_definitions, write_definitions
+    from definitions import DefinitionSpool, cpu_cores, packing_tables, read_definitions, write_definitions
     spool = None if args.labels else DefinitionSpool(tempfile.TemporaryFile())
     collect = None if args.labels else Collectors(labels, spool)
     if fmt == "kaikki":
@@ -1084,7 +1084,7 @@ def main():
         blocks = write_definitions(definitions_path, keys, note(spool.by_key(keys, forms_by_key, display_forms)),
                                    keys_hash, tables)
         log(f"  definitions: {len(with_definitions):,} of {k:,} words, {blocks:,} blocks, "
-            f"{human(os.path.getsize(definitions_path))}")
+            f"{human(os.path.getsize(definitions_path))} (compressed on {cpu_cores()} cores)")
 
     golden_path = args.out + ".golden.json"
     data = golden(reader, text, encoded, keys, forms_by_key, freq, shape, explicit_ids,
