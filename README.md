@@ -12,7 +12,7 @@ Powered by an **FM-index** (a compressed self-index where the search index *is* 
 
 The open dictionary ecosystem (StarDict, Aard2, ZIM) does prefix/exact lookup over block-compressed data with a separate key index. Dictionarius instead makes **substring search *be* the storage** via an FM-index — measured **~2.3× smaller and faster than SQLite FTS5 trigram** on the same data, and projected smaller still with an engineered succinct index.
 
-## How it stays small 🥔
+## How it stays small
 
 - **Core (~16 MB download):** every headword searchable + full definitions for the top ~50k words by frequency (~100% of real lookups), fully offline on first run. The headword index for all 1,357,380 English search keys is measured at **12.4 MB download / 29.8 MB in memory** (including a 1.6 MB hot list that makes mid-word search instant); the core definitions (~5.7 MB) are still a projection.
 - **Tail (a data pack you add):** the rarer definitions come as one file. The app opens its download link in your browser, and you import the file; the app itself never connects ([ADR-0002](docs/adr/0002-offline-only-data-packs.md), proposed).
