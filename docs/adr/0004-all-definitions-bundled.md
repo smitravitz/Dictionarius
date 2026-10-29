@@ -56,7 +56,7 @@ bundled: **40.4 MB**.
 - Bundled: word class, meanings (gloss, usage labels, a safe-search flag), the words a plural or
   spelling links to, **Wiktionary's own links inside each meaning** (a design target: as on
   Wiktionary, words in a definition open their entries), pronunciation (IPA) and etymology.
-  Not bundled: examples.
+  Not bundled: examples (since amended: one short example per meaning, below).
 - The file carries the index's key-list hash (`KEYHASH`); a mismatched pair is refused.
 - Releases carry both files in one `data-<sum>` release; `data/headwords.sha256` lists both.
 
@@ -90,7 +90,21 @@ taken before links were kept, so their cost is measured on the first full build.
   A phone may take several times that; if a peek feels late, 1,024-word blocks unpack about
   4× less per word for ~1.5 MB more.
 
+## Amended 2026-10-29: one short example per meaning; origins shown only when single
+
+- The owner asked for a usage example after each meaning. Not all of them (+51 MB): the
+  builder keeps a meaning's first usage example up to 200 characters, else its first quotation
+  that short, as an extra field at the end of the meaning row, so older readers still read the
+  file and it stays version 2. 17.5% of meanings get one. Measured on the sample: **+13 MB**
+  (40.4 → 53.8 MB, before links), so a full build should come to about 57 MB.
+- Etymology stays in the file, but the entry shows it only as a brief at the top when all the
+  word's classes share one origin (folded after three lines). Words with several origins show
+  none until a planned Etymology section sets each origin over the classes it belongs to, as
+  Wiktionary does. Dropping etymology from the file would save ~9 MB but rule out that section
+  without a data rebuild.
+
 ## Open questions
 
 - How the peek feels on a real phone (block size above).
-- Examples, if wanted later, as their own optional file (+51 MB).
+- Whether the next build's size (estimated ~57 MB definitions) is worth trimming: examples
+  capped shorter, or quotations left out (usage examples only).
