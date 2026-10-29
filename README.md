@@ -15,7 +15,7 @@ The open dictionary ecosystem (StarDict, Aard2, ZIM) does prefix/exact lookup ov
 ## How it stays small
 
 - **Every word, offline, from the first run:** the headword index for all 1,357,380 English search keys is 31 MB on disk (~13 MB zipped in the APK), including a hot list that makes mid-word search instant.
-- **Every definition inside the app (~40 MB, estimated):** meanings, usage labels, links between words, pronunciation and etymology for all ~1.5 million entries, packed small (link glosses as templates, words and word classes as numbers) and compressed with brotli in blocks of 4,096 words, so opening a word unpacks one block. That is within ~11% of compressing it all as one stream, measured on a 5% sample ([ADR-0004](docs/adr/0004-all-definitions-bundled.md)).
+- **Every definition inside the app (43 MB):** meanings, usage labels, links between words, pronunciation and etymology for all ~1.5 million entries, packed small (link glosses as templates, words and word classes as numbers) and compressed with brotli in blocks of 4,096 words, so opening a word unpacks one block. That is within ~11% of compressing it all as one stream, measured on a 5% sample ([ADR-0004](docs/adr/0004-all-definitions-bundled.md)).
 
 Nothing is downloaded later; the app has no network permission at all.
 

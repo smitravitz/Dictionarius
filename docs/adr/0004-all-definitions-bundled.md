@@ -79,7 +79,18 @@ bundled: **40.4 MB**.
 `bench/definitions_packing.py` on the sample (`scripts/sample_definitions.py`). The sample was
 taken before links were kept, so their cost is measured on the first full build.
 
+## Measured on the first full build (data-4c057f0a)
+
+- `headwords.definitions.bin`: **43.3 MB**; the index with its word columns: 32.8 MB. The
+  sample estimate without links was 40.4 MB, so Wiktionary's links cost about 2.9 MB (7%);
+  57% of meanings carry at least one.
+- 99.95% of words have definitions (13,987 of every 97th word's 13,994); no etymology trees
+  left.
+- Unpacking an uncached block in Node: ~16 ms once warm, ~56 ms the first time (desktop CPU).
+  A phone may take several times that; if a peek feels late, 1,024-word blocks unpack about
+  4× less per word for ~1.5 MB more.
+
 ## Open questions
 
-- Links' size, and the real file's size, from the first full build.
+- How the peek feels on a real phone (block size above).
 - Examples, if wanted later, as their own optional file (+51 MB).
