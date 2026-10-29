@@ -177,3 +177,77 @@ test("holding a word peeks at its first meanings until it's let go, without open
   await expect(peek).toBeHidden();
   await expect(entry(page)).toBeHidden();
 });
+
+/** A quick flick across the middle of the screen: "right" steps back, "left" forward. */
+async function swipe(page: Page, direction: "left" | "right") {
+  const { width, height } = page.viewportSize()!;
+  const cdp = await page.context().newCDPSession(page);
+  const y = Math.round(height * 0.6);
+  const [from, to] = direction === "right" ? [0.25, 0.75] : [0.75, 0.25];
+  const steps = 5;
+  await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x: Math.round(width * from), y }] });
+  for (let i = 1; i <= steps; i++) {
+    const x = Math.round(width * (from + ((to - from) * i) / steps));
+    await cdp.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [{ x, y }] });
+  }
+  await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+  await cdp.detach();
+}
+
+/** zorbles → its link "zorble" → its link "wobble": three words followed. */
+async function followThree(page: Page) {
+  await open(page);
+  await openWord(page, "zorbles", "zorbles");
+  await entry(page).getByRole("button", { name: "zorble" }).click();
+  await expect(page.locator("#entry-word")).toHaveText("zorble");
+  await entry(page).getByRole("button", { name: "wobble" }).click();
+  await expect(page.locator("#entry-word")).toHaveText("wobble");
+}
+
+test("swiping steps back and forward along the words followed, back to the results", async ({ page, isMobile }) => {
+  test.skip(!isMobile, "touch swipes on the phone project");
+  await followThree(page);
+  const word = page.locator("#entry-word");
+  await swipe(page, "right");
+  await expect(word).toHaveText("zorble");
+  await swipe(page, "right");
+  await expect(word).toHaveText("zorbles");
+  await swipe(page, "left");
+  await expect(word).toHaveText("zorble");
+  await swipe(page, "left");
+  await expect(word).toHaveText("wobble");
+  await swipe(page, "left"); // nothing further on
+  await expect(word).toHaveText("wobble");
+  for (let i = 0; i < 3; i++) await swipe(page, "right");
+  await expect(entry(page)).toBeHidden();
+  await expect(page.locator("li.word").first()).toBeVisible(); // the results, as they were
+  await expect(page.locator("#q")).toHaveValue("zorbles");
+});
+
+test("Back goes straight to the results; a swipe forward takes up the same words again", async ({ page, isMobile }) => {
+  test.skip(!isMobile, "touch swipes on the phone project");
+  await followThree(page);
+  await page.goBack();
+  await expect(entry(page)).toBeHidden();
+  await expect(page.locator("li.word").first()).toBeVisible();
+  await swipe(page, "left");
+  await expect(page.locator("#entry-word")).toHaveText("zorbles");
+  await swipe(page, "left");
+  await expect(page.locator("#entry-word")).toHaveText("zorble");
+  // Back again goes to the results, and a new search forgets the words.
+  await page.goBack();
+  await expect(entry(page)).toBeHidden();
+  await page.locator("#q").fill("ingot");
+  await expect(page.locator('li.word[aria-label="ingot"]')).toBeVisible();
+  await swipe(page, "left");
+  await expect(entry(page)).toBeHidden();
+});
+
+test("the browser's Back goes to the results in one step, and Forward to the first word followed", async ({ page }) => {
+  await followThree(page);
+  await page.goBack();
+  await expect(entry(page)).toBeHidden();
+  await expect(page.locator("#q")).toHaveValue("zorbles");
+  await page.goForward();
+  await expect(page.locator("#entry-word")).toHaveText("zorbles");
+});

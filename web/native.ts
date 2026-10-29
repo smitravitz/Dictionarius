@@ -19,8 +19,9 @@ export async function setUpNativeShell(back: BackSteps): Promise<void> {
     link.removeAttribute("target");
   }
 
-  // Back closes a panel, then an open word, then clears the search, then
-  // leaves the app.
+  // Back closes a panel, then goes from any word followed straight to the
+  // results (one history step for them all; swipes step one word at a time),
+  // then clears the search, then leaves the app.
   const { App } = await import("@capacitor/app");
   await App.addListener("backButton", ({ canGoBack }) => {
     if (back.closePanel()) return;

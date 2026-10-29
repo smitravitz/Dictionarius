@@ -16,7 +16,7 @@
  * carries out the scrolling.
  */
 
-const HOLD_MS = 420; // just under Android's long-press, so ours wins
+export const HOLD_MS = 420; // just under Android's long-press, so ours wins
 const SLOP = 8; // moving further than this means scrolling or dragging, not a tap or hold
 
 export interface PressStart {

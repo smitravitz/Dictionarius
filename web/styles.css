@@ -605,6 +605,36 @@ a:focus-visible {
   color: var(--pencil);
 }
 
+/* A word's page turns in from the side it came from: forward from the right,
+   back from the left, as a swipe moves it. */
+.entry.turning {
+  animation: turn-in 0.18s ease-out;
+}
+
+.entry.turning[data-from="back"] {
+  animation-name: turn-in-back;
+}
+
+@keyframes turn-in {
+  from {
+    opacity: 0;
+    transform: translateX(1.5rem);
+  }
+}
+
+@keyframes turn-in-back {
+  from {
+    opacity: 0;
+    transform: translateX(-1.5rem);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .entry.turning {
+    animation: none;
+  }
+}
+
 .entry-ipa {
   margin: 0;
   color: var(--pencil);

@@ -21,6 +21,8 @@ import { renderEntry, type EntryContent } from "./entry-page";
 import { fitClamps } from "./clamp";
 import { Peek } from "./peek";
 import { pulse } from "./haptics";
+import { Trail } from "../src/trail";
+import { Swipes, type SwipeDirection } from "./swipe";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const input = $<HTMLInputElement>("q");
@@ -189,7 +191,10 @@ input.addEventListener("input", () => search(input.value));
 function search(text: string) {
   leaveEntry();
   const next = normalize(text);
-  if (next !== query) counts = null;
+  if (next !== query) {
+    counts = null;
+    trail.clear(); // the words followed from the old results
+  }
   query = next;
   seeking = -1;
   seq++;
@@ -282,32 +287,74 @@ input.addEventListener("keydown", (event) => {
 let returnTo: { text: string; summary: string; scrollTop: number } | null = null;
 let entrySeq = 0; // the entry on screen; older answers are dropped
 
-/** Open a word's entry: one history step per word, so Back (browser or
- *  Android) goes back through the words followed, then to the results. */
+// The words followed since leaving the results (src/trail.ts). One history
+// step stands for all of them, so Back (browser or Android) goes straight to
+// the results; a swipe steps along them one word at a time, and a swipe
+// forward from the results takes them up again.
+const trail = new Trail<Suggestion>();
+
+/** A word tapped in the results: a new trail. */
 function showEntry(s: Suggestion) {
-  if (!frame.hidden) returnTo = { text: input.value, summary: summary.textContent ?? "", scrollTop: scroller.scrollTop };
-  history.pushState({ entry: s }, "");
-  drawEntry(s);
+  trail.start(s);
+  leaveResults();
+  drawEntry(s, "forward");
 }
 
 /** A word a definition links to: open it, if the index has it. */
 function openWord(text: string) {
-  void wordNamed(text).then((s) => s && showEntry(s));
+  void wordNamed(text).then((s) => {
+    if (!s) return;
+    trail.follow(s);
+    drawEntry(s, "forward");
+  });
 }
+
+/** From the results onto the trail: remember them, and add the one history step back to them. */
+function leaveResults() {
+  rememberResults();
+  history.pushState({ trail: true }, "");
+}
+
+function rememberResults() {
+  if (!frame.hidden) returnTo = { text: input.value, summary: summary.textContent ?? "", scrollTop: scroller.scrollTop };
+}
+
+/** A swipe (or ←/→ on a word's page): one word back or forward. */
+function step(direction: SwipeDirection) {
+  if (panels.some((panel) => panel.open)) return;
+  if (direction === "back") {
+    if (!trail.canBack) return;
+    if (trail.depth === 1) return history.back(); // to the results, by the history step (popstate shows them)
+    drawEntry(trail.back()!, "back");
+  } else {
+    if (!trail.canForward) return;
+    if (trail.depth === 0) leaveResults();
+    drawEntry(trail.forward()!, "forward");
+  }
+}
+
+new Swipes(document, step);
+document.addEventListener("keydown", (event) => {
+  const keys: Record<string, SwipeDirection> = { ArrowLeft: "back", ArrowRight: "forward" };
+  if (entry.hidden || !keys[event.key] || event.target === input || event.altKey || event.ctrlKey || event.metaKey) return;
+  event.preventDefault();
+  step(keys[event.key]);
+});
 
 /** Past this wait, a word's page shows that its definitions are loading
  *  (the file is still on its way) rather than nothing happening. */
 const SLOW_MS = 300;
 
 /** Show a word's page once its definitions are in, all of it at once, so
- *  nothing appears and then moves (top to bottom, in reading order). */
-function drawEntry(s: Suggestion) {
+ *  nothing appears and then moves (top to bottom, in reading order). It
+ *  turns in from the side it came from: forward from the right, back from the left. */
+function drawEntry(s: Suggestion, from: SwipeDirection) {
   const seq = ++entrySeq;
-  const slow = setTimeout(() => seq === entrySeq && paintEntry(seq, s, "loading"), SLOW_MS);
+  const slow = setTimeout(() => seq === entrySeq && paintEntry(seq, s, "loading", from), SLOW_MS);
   void definitionsOf(s.id).then((definitions) => {
     clearTimeout(slow);
     if (seq !== entrySeq) return;
-    paintEntry(seq, s, definitions ? entryView(definitions, { safe: safe() }) : null);
+    paintEntry(seq, s, definitions ? entryView(definitions, { safe: safe() }) : null, from);
   });
 }
 
@@ -316,7 +363,7 @@ const WIKTIONARY = source.getAttribute("href")!; // as written, not normalized
 
 let painted = 0; // the entry (by entrySeq) the page shows
 
-function paintEntry(seq: number, s: Suggestion, content: EntryContent) {
+function paintEntry(seq: number, s: Suggestion, content: EntryContent, from: SwipeDirection) {
   const parts = { word: $("entry-word"), forms: $("entry-forms"), body: $("entry-body"), note: $("entry-note") };
   renderEntry(parts, s, content, openWord);
   source.href = sourcePageUrl({ headword: s.display, source: "Wiktionary", license: "CC-BY-SA-4.0" }) ?? WIKTIONARY;
@@ -330,6 +377,10 @@ function paintEntry(seq: number, s: Suggestion, content: EntryContent) {
   input.removeAttribute("aria-activedescendant");
   summary.textContent = "";
   entry.hidden = false;
+  entry.dataset.from = from;
+  entry.classList.remove("turning");
+  void entry.offsetWidth; // restart the animation
+  entry.classList.add("turning");
   fitClamps(parts.body); // laid out now, before the screen is painted
   window.scrollTo(0, 0);
 }
@@ -362,8 +413,15 @@ function peekAt(target: Element) {
 }
 
 window.addEventListener("popstate", (event) => {
-  const earlier = (event.state as { entry?: Suggestion } | null)?.entry;
-  if (earlier) return drawEntry(earlier); // back to a word followed from
+  if ((event.state as { trail?: boolean } | null)?.trail) {
+    // The browser's Forward, back onto the trail: its first word.
+    if (trail.depth === 0 && trail.canForward) {
+      rememberResults();
+      drawEntry(trail.forward()!, "forward");
+    }
+    return;
+  }
+  trail.home(); // Back: straight to the results, the words kept for a swipe forward
   if (entry.hidden) return;
   leaveEntry();
   if (!returnTo) return search(input.value);
