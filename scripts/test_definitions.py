@@ -95,6 +95,18 @@ class DefinitionOf(unittest.TestCase):
         self.assertNotIn("etymology", plain)
         self.assertNotIn("ipa", plain)
 
+    def test_an_etymology_tree_drawn_as_text_is_left_out_and_its_prose_kept(self):
+        # Wiktionary's "Etymology tree" diagram comes through as one ancestor per
+        # line, unreadable as text; the prose after it is the etymology.
+        tree = ("Etymology tree\nProto-Indo-European *né\nOld English nān\n▲\nLatin sēnsuslbor.\nEnglish nonsense\n"
+                "From non- (“no, none”) + sense, from c. 1610.")
+        d = definition_of(entry("nonsense", sense("Nonsense."), etymology=tree))
+        self.assertEqual(d["etymology"], "From non- (“no, none”) + sense, from c. 1610.")
+        short = definition_of(entry("serene", sense("Calm."), etymology="Etymology tree\nLatin serēnus\nFrom Latin serēnus."))
+        self.assertEqual(short["etymology"], "From Latin serēnus.")
+        only = definition_of(entry("zorble", sense("To wobble."), etymology="Etymology tree\nProto-Zorble *zorb\nEnglish zorble"))
+        self.assertNotIn("etymology", only)
+
     def test_vulgar_offensive_or_slur_meanings_are_marked_for_safe_search(self):
         # The same labels safe search reads, tags or categories, hedged or not.
         d = definition_of(entry(

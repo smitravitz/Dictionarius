@@ -10,9 +10,10 @@ Consequences · Evidence · Open questions.
 
 | # | Title | Status |
 |---|-------|--------|
-| [0001](0001-frequency-tiered-gloss-storage.md) | Frequency-tiered gloss storage with an always-complete headword index | Accepted; how the Tail arrives superseded in part by 0002 (proposed) |
-| [0002](0002-offline-only-data-packs.md) | The app never connects; more definitions arrive as a file the user brings | Proposed |
+| [0001](0001-frequency-tiered-gloss-storage.md) | Frequency-tiered gloss storage with an always-complete headword index | Accepted; the Core/Tail split superseded by 0004 |
+| [0002](0002-offline-only-data-packs.md) | The app never connects; more definitions arrive as a file the user brings | Superseded by 0004 (never accepted) |
 | [0003](0003-filters-from-word-columns.md) | Filters read per-word columns in the index, through one compiled filter | Accepted |
+| [0004](0004-all-definitions-bundled.md) | Every definition ships inside the app, packed with brotli | Accepted |
 
 ## Decisions anticipated (not yet recorded)
 

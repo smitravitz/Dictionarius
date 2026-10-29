@@ -54,9 +54,17 @@ decision or module makes it load-bearing.
   chosen minimum, and a new minimum puts Max back on Any). Filters read
   **word columns** in the index (`LEN`, `NAME`, `SHAPE`); a choice compiles to
   one **WordFilter** that every list and count goes through (ADR-0003).
-- **DictionarySource** — the seam for definitions (`getByHeadword`,
-  `getCandidates`); mock, SQLite, and FM-index sources are interchangeable
-  behind it. The web app doesn't use it yet: its search runs on the Completer.
+- **Definitions file** — every word's definitions, beside the index, read by
+  word id (`src/definitions.ts`, `docs/definitions-format.md`; ADR-0004): per
+  written form, a **word class** (Wiktionary's part of speech) with numbered
+  **meanings** (gloss, usage **labels**, a safe-search flag), the words a
+  plural or spelling is **of**, **links** inside the gloss (as on Wiktionary),
+  **pronunciation** and **etymology**. Tied to the index by `KEYHASH`.
+- **Entry** — a word's page: its definitions shaped by `src/entry-view.ts`
+  (safe search's meanings left out and counted). Following a link opens that
+  word's entry; Back retraces.
+- **Peek** — hold a word in the results to see its first two meanings beside
+  the row until the finger lifts (`web/peek.ts`).
 
 ## Privacy
 

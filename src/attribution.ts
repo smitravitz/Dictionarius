@@ -1,4 +1,11 @@
-import type { Entry } from "./source";
+/** What a credit needs: the word, where its definition comes from, and the license. */
+export interface Credited {
+  headword: string;
+  /** e.g. "Wiktionary" */
+  source: string;
+  /** SPDX-style id, e.g. "CC-BY-SA-4.0" */
+  license: string;
+}
 
 /** Known FLOSS/open-content licenses -> human label + canonical URL. */
 const KNOWN_LICENSES: Record<string, { label: string; url: string }> = {
@@ -30,8 +37,8 @@ const KNOWN_SOURCES: Record<string, (headword: string) => string> = {
  * page scheme. Derived from the headword at display time, so no URL is stored
  * per entry.
  */
-export function sourcePageUrl(entry: Entry): string | null {
-  const pageFor = KNOWN_SOURCES[entry.attribution.source];
+export function sourcePageUrl(entry: Credited): string | null {
+  const pageFor = KNOWN_SOURCES[entry.source];
   return pageFor ? pageFor(entry.headword) : null;
 }
 
@@ -41,8 +48,8 @@ export function sourcePageUrl(entry: Entry): string | null {
  * Throws if attribution is incomplete — an entry must never be shown or shared
  * without crediting its source and license.
  */
-export function attributionNotice(entry: Entry): string {
-  const { source, license } = entry.attribution;
+export function attributionNotice(entry: Credited): string {
+  const { source, license } = entry;
   if (!source || !license) {
     throw new Error("Entry is missing required attribution (source and license).");
   }

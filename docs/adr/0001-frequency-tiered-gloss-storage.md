@@ -1,6 +1,6 @@
 # ADR-0001: Frequency-tiered gloss storage with an always-complete headword index
 
-- **Status:** Accepted. How the Tail reaches the device (on-demand fetch, in-app pre-download) is superseded in part by [ADR-0002](0002-offline-only-data-packs.md) (proposed): the app never connects; the Tail is a data pack the user imports.
+- **Status:** Accepted; its Core/Tail split is superseded by [ADR-0004](0004-all-definitions-bundled.md): every definition ships inside the app, so there is no Tail. The always-complete headword index stands.
 - **Date:** 2026-09-30
 - **Deciders:** project owner
 - **Related:** `bench/fmbench.py`, `bench/sizemodel_full.py`, `bench/tiers.py` (reproducible measurements)

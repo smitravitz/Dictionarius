@@ -16,15 +16,21 @@ python scripts/audit_privacy.py                      # the code against privacy.
 Build the index from the [Wiktionary download](https://kaikki.org/dictionary/rawdata.html), then start the dev server:
 
 ```bash
+pip install -r scripts/requirements.txt
 python scripts/build_fm_index.py path/to/raw-wiktextract-data.jsonl   # writes dist/headwords.bin
 npm run dev
 ```
 
 The build checks itself against brute force and also writes:
 
+- `headwords.definitions.bin`: every word's definitions, by word id ([format](definitions-format.md)). Only a build from the dump has them; the app reads the file beside the index.
 - `headwords.golden.json`: answers the tests compare against
 - `headwords.safe-review.tsv`: every word safe search hides, and visible words worth a look, most common first, with why. Corrections go in the hand-picked list, `data/safe-search.list` (encoded; `python scripts/safe_search_list.py show`, `add`, `remove`; quote phrases). See the [rule](index-format.md#safe-search). To check an outside bad-word list (such as cuss) against what safe search shows: `npx vite-node scripts/safe-search-candidates.ts list.txt`
-- `headwords.labels.jsonl.gz`: the labels safe search reads, and which words are names (proper nouns). With it and a list of the headwords, a rule change rebuilds without re-reading the dump: `python scripts/build_fm_index.py words.json --labels headwords.labels.jsonl.gz`. A cache from before names were kept has no parts of speech; an index rebuilt from it has no `NAME` column, so the app doesn't offer *Disable names* until the next build from the dump.
+- `headwords.labels.jsonl.gz`: the labels safe search reads, and which words are names (proper nouns). With it and a list of the headwords, a rule change rebuilds without re-reading the dump: `python scripts/build_fm_index.py words.json --labels headwords.labels.jsonl.gz`. A cache from before names were kept has no parts of speech; an index rebuilt from it has no `NAME` column, so the app doesn't offer *Disable names* until the next build from the dump. Definitions aren't in the cache: a rebuild from it writes none.
+
+To measure how the definitions pack, without the whole dump: `python scripts/sample_definitions.py raw-wiktextract-data.jsonl` (every 20th word, a few MB), then `python bench/definitions_packing.py definitions-sample.jsonl.gz` ([ADR-0004](adr/0004-all-definitions-bundled.md)).
+
+**Releasing new data:** put both checksums in `data/headwords.sha256` (`shasum -a 256 headwords.bin headwords.definitions.bin > data/headwords.sha256`), commit, then `bash scripts/setup-release.sh headwords.bin` uploads both as a `data-…` release that app releases are built with.
 
 ## Android
 

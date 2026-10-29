@@ -6,7 +6,7 @@ Fully offline, open-source dictionary with **instant mid-word search** — find 
 
 Powered by an **FM-index** (a compressed self-index where the search index *is* the data), so substring search over 1.3M+ words fits in a tiny footprint and runs with no server. Written in TypeScript; runs as a web app and as an Android app (packaged with [Capacitor](https://capacitorjs.com)), with PWA, iOS and F-Droid builds planned.
 
-> ⚠️ Early development. Search works on the web and Android; definitions are next.
+> ⚠️ Early development. Search works on the web and Android; definitions arrive with the next data build.
 
 ## Why it's different
 
@@ -14,10 +14,10 @@ The open dictionary ecosystem (StarDict, Aard2, ZIM) does prefix/exact lookup ov
 
 ## How it stays small
 
-- **Core (~16 MB download):** every headword searchable + full definitions for the top ~50k words by frequency (~100% of real lookups), fully offline on first run. The headword index for all 1,357,380 English search keys is measured at **12.4 MB download / 29.8 MB in memory** (including a 1.6 MB hot list that makes mid-word search instant); the core definitions (~5.7 MB) are still a projection.
-- **Tail (a data pack you add):** the rarer definitions come as one file. The app opens its download link in your browser, and you import the file; the app itself never connects ([ADR-0002](docs/adr/0002-offline-only-data-packs.md), proposed).
+- **Every word, offline, from the first run:** the headword index for all 1,357,380 English search keys is 31 MB on disk (~13 MB zipped in the APK), including a hot list that makes mid-word search instant.
+- **Every definition inside the app (~40 MB, estimated):** meanings, usage labels, links between words, pronunciation and etymology for all ~1.5 million entries, packed small (link glosses as templates, words and word classes as numbers) and compressed with brotli in blocks of 4,096 words, so opening a word unpacks one block. That is within ~11% of compressing it all as one stream, measured on a 5% sample ([ADR-0004](docs/adr/0004-all-definitions-bundled.md)).
 
-See [`docs/adr/0001-frequency-tiered-gloss-storage.md`](docs/adr/0001-frequency-tiered-gloss-storage.md) for the reasoning and measured numbers.
+Nothing is downloaded later; the app has no network permission at all.
 
 ## Status
 
@@ -31,8 +31,8 @@ See [`docs/adr/0001-frequency-tiered-gloss-storage.md`](docs/adr/0001-frequency-
   3. words with 1 letter before it, then 2, and so on
   - at each position: single words, then hyphenated words, then phrases; common words first
 - ✅ First page in ~1–10 ms; every position counted in ~3–90 ms (0.6 s for a single letter)
-- ✅ Benchmarked against SQLite FTS5 trigram ([`bench/`](bench/)); both work as sources behind one contract
-- ✅ Platform-agnostic core (lookup, search, suggest, favorites, history), test-driven: unit tests, plus browser tests on desktop and phone
+- ✅ Benchmarked against SQLite FTS5 trigram ([`bench/`](bench/))
+- ✅ Platform-agnostic core (search, filters, definitions, favorites, history), test-driven: unit tests, plus browser tests on desktop and phone
 
 **📱 App**
 
@@ -42,19 +42,21 @@ See [`docs/adr/0001-frequency-tiered-gloss-storage.md`](docs/adr/0001-frequency-
 - ✅ Safe search (⚙️ Settings, on by default): hides vulgar words and slurs, even typed out in full ([rule](docs/index-format.md#safe-search))
 - ✅ Common words only by default: phrases and names (proper nouns) are switched off in ⚙️ Settings
 - ✅ Word length filter: two roller wheels (min, max) in the filter panel under ⚙️; drag to turn ([how filters work](docs/adr/0003-filters-from-word-columns.md))
+- ✅ Definitions: tap a word for its meanings, pronunciation and origin; words inside a definition open their own entries, as on Wiktionary, and Back retraces them ([format](docs/definitions-format.md))
+- ✅ Peek: hold a word in the results to see its first meanings; let go and it's gone
 - ✅ Speed in Chromium on the full index: ready in ~0.3–0.7 s; keystroke to results ~33 ms (~35–135 ms with the CPU slowed 4× to mimic a mid-range phone)
 - ✅ Android app with the full word list inside; signed APKs on GitHub releases
 - ✅ No permissions at all: no network, storage or sensors, and nothing leaves your phone. The haptic tick uses the platform's built-in feedback, which needs none. CI checks every APK against [`privacy.toml`](privacy.toml)
 
 **⏳ Next**
 
-- Definitions: the core inside the app, the rest as an importable data pack
+- Definitions in a release: the builder, file format and app are done; the first full data build is next
 - Testing on real phones (the phone timings above are emulated)
 - PWA, iOS and F-Droid builds
 
 ## Install (Android)
 
-Add `https://github.com/smitravitz/Dictionarius` to [Obtainium](https://obtainium.imranr.dev) to install it and get updates, or download the APK from the latest [release](https://github.com/smitravitz/Dictionarius/releases/latest). Definitions aren't in the app yet; it finds words and links each one to Wiktionary.
+Add `https://github.com/smitravitz/Dictionarius` to [Obtainium](https://obtainium.imranr.dev) to install it and get updates, or download the APK from the latest [release](https://github.com/smitravitz/Dictionarius/releases/latest). Until the first build with definitions is released, it finds words and links each one to Wiktionary.
 
 ## Licensing
 

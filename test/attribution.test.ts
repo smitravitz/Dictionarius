@@ -1,12 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { attributionNotice, sourcePageUrl } from "../src/attribution";
-import type { Entry } from "../src/source";
+import { attributionNotice, sourcePageUrl, type Credited } from "../src/attribution";
 
-const entryWith = (source: string, license: string, headword = "run"): Entry => ({
-  headword,
-  senses: [{ partOfSpeech: "verb", gloss: "to move swiftly" }],
-  attribution: { source, license },
-});
+const entryWith = (source: string, license: string, headword = "run"): Credited => ({ headword, source, license });
 
 describe("attributionNotice", () => {
   it("credits the entry's Wiktionary page and the license, both linked", () => {

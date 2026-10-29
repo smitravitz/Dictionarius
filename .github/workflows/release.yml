@@ -46,15 +46,16 @@ jobs:
           echo "name=$major.$minor.$patch" >> "$GITHUB_OUTPUT"
           echo "code=$((major * 10000 + minor * 100 + patch))" >> "$GITHUB_OUTPUT"
 
-      - name: Fetch the word index
+      - name: Fetch the word index and definitions
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          # data/headwords.sha256 names the index; scripts/setup-release.sh uploaded it.
-          sha=$(cut -d' ' -f1 data/headwords.sha256)
+          # data/headwords.sha256 lists the index and its definitions; scripts/setup-release.sh
+          # uploaded them as a release named after that list's own checksum.
+          sum=$(sha256sum data/headwords.sha256 | cut -c1-8)
           mkdir -p release-data
-          gh release download "index-${sha:0:8}" --repo "$GITHUB_REPOSITORY" \
-            --pattern headwords.bin --dir release-data
+          gh release download "data-$sum" --repo "$GITHUB_REPOSITORY" \
+            --pattern headwords.bin --pattern headwords.definitions.bin --dir release-data
           cd release-data
           sha256sum --check ../data/headwords.sha256
 
