@@ -101,6 +101,14 @@ check_file() {
 check_file headwords.bin "$index_file"
 check_file headwords.definitions.bin "$definitions_file"
 
+# App releases find this data through the checksum list in the commit they're
+# tagged on, so the list must be committed (and pushed) as it is now.
+if ! git diff --quiet HEAD -- data/headwords.sha256; then
+  echo "data/headwords.sha256 has changes that aren't committed. Commit and push it first:" >&2
+  echo "  git commit -m 'Pin the index and definitions' data/headwords.sha256 && git push" >&2
+  exit 1
+fi
+
 # One release per set of data files, named after the checksum list's own checksum.
 list_sum=$(openssl dgst -sha256 -r data/headwords.sha256 | cut -d' ' -f1)
 tag="data-${list_sum:0:8}"
@@ -128,5 +136,6 @@ $(cat data/headwords.sha256)
 fi
 
 echo
+echo "Tag app releases on a commit that has this data/headwords.sha256 (push it first)."
 echo "Done. Back up the folder $key_dir (the key and its password) somewhere safe."
 echo "If it's lost, installed copies of the app can't be updated: everyone would have to uninstall first."
