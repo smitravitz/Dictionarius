@@ -9,6 +9,7 @@ import { Completer, type Matches } from "../src/complete";
 import { normalize } from "../src/normalize";
 import { SAFE_SEARCH_OVERRIDES } from "../src/safe-search-overrides";
 import { defaultFilters, filterKey, type FilterState } from "../src/filters";
+import { DefinitionsFile } from "../src/definitions";
 import { PAGE_SIZE, type Counts, type FromWorker, type ToWorker } from "./protocol";
 
 /** Background counting runs in slices this long, so requests aren't held up. */
@@ -27,11 +28,25 @@ let matchesSeq = -1;
 let countTimer: ReturnType<typeof setTimeout> | undefined;
 let filters: FilterState = defaultFilters(); // the page sends the saved settings before loading
 let matchesFilters = filterKey(filters);
+// The definitions file, loaded after the index; null when there is none (or it doesn't fit the index).
+let found: (file: DefinitionsFile | null) => void = () => {};
+const definitions = new Promise<DefinitionsFile | null>((resolve) => (found = resolve));
 
 scope.onmessage = ({ data }) => {
   switch (data.type) {
     case "load":
-      void load(data.url);
+      void load(data.url, data.definitions);
+      break;
+    case "definitions": {
+      const { ask, id } = data;
+      void definitions
+        .then((file) => file?.of(id) ?? null)
+        .catch(() => null)
+        .then((answer) => scope.postMessage({ type: "definitions", ask, definitions: answer }));
+      break;
+    }
+    case "word":
+      scope.postMessage({ type: "word", ask: data.ask, suggestion: completer?.word(data.text) ?? null });
       break;
     case "settings":
       filters = data.filters;
@@ -53,7 +68,7 @@ scope.onmessage = ({ data }) => {
   }
 };
 
-async function load(url: string) {
+async function load(url: string, definitionsUrl: string) {
   const started = performance.now();
   try {
     const response = await fetch(url);
@@ -66,8 +81,20 @@ async function load(url: string) {
     waiting = null;
     // Work out the filters' words now, before the first search needs them.
     setTimeout(() => completer?.prepare(filters), 0);
+    void loadDefinitions(definitionsUrl, index);
   } catch (error) {
     scope.postMessage({ type: "failed", message: error instanceof Error ? error.message : String(error) });
+  }
+}
+
+/** The definitions file for `index`, or null (none there, or built for another word list). */
+async function loadDefinitions(url: string, index: HeadwordIndex) {
+  try {
+    const response = await fetch(url);
+    found(response.ok ? DefinitionsFile.fromBytes(new Uint8Array(await response.arrayBuffer()), index) : null);
+  } catch (error) {
+    console.warn("no definitions:", error instanceof Error ? error.message : error);
+    found(null);
   }
 }
 

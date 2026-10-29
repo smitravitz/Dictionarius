@@ -23,24 +23,35 @@ const PARTS_OF_SPEECH: Record<string, string> = {
   punct: "punctuation",
 };
 
+/** A tappable word inside a gloss: its text there, and the word it opens. */
+export interface Link {
+  text: string;
+  word: string;
+}
+
 export interface MeaningView {
   n: number;
   gloss: string;
   labels: string[];
-  /** words a plural or spelling is of, to link to */
-  of: string[];
+  /** the words to link: a plural's or spelling's own word, then Wiktionary's links */
+  links: Link[];
 }
 
 export interface ClassView {
   form: string;
   pos: string;
   meanings: MeaningView[];
+  /** where the word comes from: set on the first class with an origin, and
+   *  again only where it changes (Wiktionary groups classes under origins) */
+  etymology?: string;
 }
 
 export interface EntryView {
   classes: ClassView[];
   /** meanings safe search left out */
   hidden: number;
+  /** the main written form's pronunciations, each once */
+  ipa: string[];
 }
 
 export interface PeekView extends ClassView {
@@ -52,18 +63,24 @@ export interface PeekView extends ClassView {
 /** A word's entry: with `safe`, vulgar, offensive and slur meanings are left out. */
 export function entryView(definitions: readonly Definition[], { safe }: { safe: boolean }): EntryView {
   let hidden = 0;
+  let origin: string | undefined;
   const classes: ClassView[] = [];
+  const ipa: string[] = [];
   for (const d of definitions) {
+    if (d.form === definitions[0].form) for (const p of d.ipa ?? []) if (!ipa.includes(p)) ipa.push(p);
     const shown = safe ? d.meanings.filter((m) => !m.explicit) : d.meanings;
     hidden += d.meanings.length - shown.length;
     if (shown.length === 0) continue;
-    classes.push({
+    const view: ClassView = {
       form: d.form,
       pos: d.pos ? (PARTS_OF_SPEECH[d.pos] ?? d.pos.replace(/_/g, " ")) : "",
-      meanings: shown.map((m, i) => ({ n: i + 1, gloss: m.gloss, labels: m.labels ?? [], of: m.of ?? [] })),
-    });
+      meanings: shown.map((m, i) => ({ n: i + 1, gloss: m.gloss, labels: m.labels ?? [], links: linksOf(m) })),
+    };
+    if (d.etymology && d.etymology !== origin) view.etymology = d.etymology;
+    origin = d.etymology ?? origin;
+    classes.push(view);
   }
-  return { classes, hidden };
+  return { classes, hidden, ipa };
 }
 
 /** The peek: the first word class's first `count` meanings; null when nothing is left to show. */
@@ -72,5 +89,51 @@ export function peekView(view: EntryView, count = 2): PeekView | null {
   if (!first) return null;
   const meanings = first.meanings.slice(0, count);
   const total = view.classes.reduce((sum, c) => sum + c.meanings.length, 0);
-  return { ...first, meanings, more: total - meanings.length, hidden: view.hidden };
+  const { etymology: _origin, ...shown } = first; // a peek is meanings only
+  return { ...shown, meanings, more: total - meanings.length, hidden: view.hidden };
+}
+
+/** A meaning's links: its plural's or spelling's words, then Wiktionary's, each once. */
+function linksOf(m: Definition["meanings"][number]): Link[] {
+  const links: Link[] = (m.of ?? []).map((w) => ({ text: w, word: w }));
+  for (const [text, word = text] of m.links ?? []) {
+    if (!links.some((l) => l.text === text && l.word === word)) links.push({ text, word });
+  }
+  return links;
+}
+
+/**
+ * A gloss split into plain text and links, in reading order: each link claims
+ * the first place its text appears that no earlier link took. A link whose
+ * text the gloss doesn't spell out (a plural's word, now and then) follows it
+ * after an arrow.
+ */
+export function glossParts(gloss: string, links: readonly Link[]): (string | Link)[] {
+  const placed: { at: number; link: Link }[] = [];
+  const missing: Link[] = [];
+  for (const link of links) {
+    let at = gloss.indexOf(link.text);
+    while (at >= 0 && placed.some((p) => at < p.at + p.link.text.length && p.at < at + link.text.length)) {
+      at = gloss.indexOf(link.text, at + 1);
+    }
+    if (at >= 0) placed.push({ at, link });
+    else missing.push(link);
+  }
+  placed.sort((a, b) => a.at - b.at);
+  const parts: (string | Link)[] = [];
+  let cursor = 0;
+  for (const { at, link } of placed) {
+    if (at > cursor) parts.push(gloss.slice(cursor, at));
+    parts.push(link);
+    cursor = at + link.text.length;
+  }
+  let tail = gloss.slice(cursor);
+  missing.forEach((link, i) => {
+    tail += i === 0 ? " → " : ", ";
+    parts.push(tail);
+    parts.push(link);
+    tail = "";
+  });
+  if (tail) parts.push(tail);
+  return parts;
 }

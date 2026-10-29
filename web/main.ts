@@ -15,6 +15,11 @@ import { EXAMPLES, exampleLabel } from "./examples";
 import { FILTERS, filterKey, type FilterInfo } from "../src/filters";
 import { loadFilters, saveFilter } from "./saved-filters";
 import { FiltersPanel } from "./filters-panel";
+import { entryView, peekView } from "../src/entry-view";
+import type { Definition } from "../src/definitions";
+import { renderEntry } from "./entry-page";
+import { Peek } from "./peek";
+import { pulse } from "./haptics";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const input = $<HTMLInputElement>("q");
@@ -64,6 +69,11 @@ new ScrollerGestures(scroller, {
   holdStart: (x) => slider.open(x),
   holdMove: (x) => slider.slideTo(x),
   holdEnd: () => slider.close(),
+  peek: (target) => peekAt(target),
+  unpeek: () => {
+    peekSeq++; // an answer still on its way is for a peek that's over
+    peek.hide();
+  },
 });
 
 // Which words to leave out (src/filters.ts), as saved on this device. Settings
@@ -113,7 +123,21 @@ function offerFilters(available: FilterInfo[]) {
 // with a file of the app's own: a link mustn't make the app fetch from elsewhere.
 const asked = new URL(new URLSearchParams(location.search).get("index") ?? "headwords.bin", location.href);
 const indexUrl = asked.origin === location.origin ? asked : new URL("headwords.bin", location.href);
-send({ type: "load", url: indexUrl.href });
+send({ type: "load", url: indexUrl.href, definitions: indexUrl.href.replace(/\.bin$/, ".definitions.bin") });
+
+// Questions for the worker that get one answer each, matched up by number.
+let questions = 0;
+const answers = new Map<number, (answer: FromWorker) => void>();
+function ask(question: { type: "definitions"; id: number } | { type: "word"; text: string }): Promise<FromWorker> {
+  const n = ++questions;
+  send({ ...question, ask: n });
+  return new Promise((resolve) => answers.set(n, resolve));
+}
+const definitionsOf = (id: number) =>
+  ask({ type: "definitions", id }).then((a): Definition[] | null => (a.type === "definitions" ? a.definitions : null));
+const wordNamed = (text: string) =>
+  ask({ type: "word", text }).then((a): Suggestion | null => (a.type === "word" ? a.suggestion : null));
+const safe = () => filters["safe-search"] === true;
 
 worker.onmessage = ({ data }: MessageEvent<FromWorker>) => {
   switch (data.type) {
@@ -136,6 +160,11 @@ worker.onmessage = ({ data }: MessageEvent<FromWorker>) => {
         seeking = -1;
       }
       describe();
+      break;
+    case "definitions":
+    case "word":
+      answers.get(data.ask)?.(data);
+      answers.delete(data.ask);
       break;
     case "counts":
       if (data.query !== query || data.counts.filters !== filterKey(filters)) return;
@@ -250,11 +279,22 @@ input.addEventListener("keydown", (event) => {
 
 // Where Back returns to from an open word: the search text, its summary and scroll position.
 let returnTo: { text: string; summary: string; scrollTop: number } | null = null;
+let entrySeq = 0; // the entry on screen; older answers are dropped
 
+/** Open a word's entry: one history step per word, so Back (browser or
+ *  Android) goes back through the words followed, then to the results. */
 function showEntry(s: Suggestion) {
   if (!frame.hidden) returnTo = { text: input.value, summary: summary.textContent ?? "", scrollTop: scroller.scrollTop };
-  // One history step per open word, so Back (browser or Android) closes it.
-  if (!history.state?.entry) history.pushState({ entry: true }, "");
+  history.pushState({ entry: s }, "");
+  drawEntry(s);
+}
+
+/** A word a definition links to: open it, if the index has it. */
+function openWord(text: string) {
+  void wordNamed(text).then((s) => s && showEntry(s));
+}
+
+function drawEntry(s: Suggestion) {
   input.value = s.display;
   frame.hidden = true;
   intro.hidden = true;
@@ -267,10 +307,40 @@ function showEntry(s: Suggestion) {
   $("entry-forms").textContent = others.length ? `Also written ${others.join(", ")}` : "";
   const page = sourcePageUrl({ headword: s.display, senses: [], attribution: { source: "Wiktionary", license: "CC-BY-SA-4.0" } });
   $<HTMLAnchorElement>("entry-link").href = page ?? "https://en.wiktionary.org";
+  hint.hidden = true; // the slider's tip belongs to the results
+  const body = $("entry-body");
+  const note = $("entry-note");
+  body.replaceChildren();
+  note.hidden = true;
   entry.hidden = false;
+  window.scrollTo(0, 0);
+  const seq = ++entrySeq;
+  void definitionsOf(s.id).then((definitions) => {
+    if (seq !== entrySeq) return;
+    renderEntry(body, note, definitions ? entryView(definitions, { safe: safe() }) : null, s.display, openWord);
+  });
 }
 
-window.addEventListener("popstate", () => {
+// The peek: hold a word in the results to see its first meanings.
+const peek = new Peek($("peek"));
+let peekSeq = 0;
+function peekAt(target: Element) {
+  const s = list.wordAt(target);
+  const row = target.closest("li.word");
+  if (!s || !row) return;
+  const seq = ++peekSeq;
+  pulse();
+  void definitionsOf(s.id).then((definitions) => {
+    if (seq !== peekSeq) return; // let go already
+    const view = definitions ? entryView(definitions, { safe: safe() }) : null;
+    const why = view ? "Its meanings are hidden by safe search." : "No definition for this word in the app yet.";
+    peek.show(row, s.display, view ? peekView(view) : null, why);
+  });
+}
+
+window.addEventListener("popstate", (event) => {
+  const earlier = (event.state as { entry?: Suggestion } | null)?.entry;
+  if (earlier) return drawEntry(earlier); // back to a word followed from
   if (entry.hidden) return;
   entry.hidden = true;
   if (!returnTo) return search(input.value);

@@ -16,8 +16,10 @@ from definitions import (  # noqa: E402
 )
 
 
-def sense(gloss=None, tags=(), categories=(), form_of=None, alt_of=None, qualifier=None, glosses=None):
+def sense(gloss=None, tags=(), categories=(), form_of=None, alt_of=None, qualifier=None, glosses=None, links=None):
     s = {"tags": list(tags), "categories": list(categories)}
+    if links:
+        s["links"] = links
     if glosses is not None:
         s["glosses"] = glosses
     elif gloss is not None:
@@ -73,6 +75,18 @@ class DefinitionOf(unittest.TestCase):
     def test_a_qualifier_is_a_label_too(self):
         d = definition_of(entry("zorble", sense("To wobble.", tags=["intransitive"], qualifier="of jelly")))
         self.assertEqual(d["meanings"], [{"gloss": "To wobble.", "labels": ["intransitive", "of jelly"]}])
+
+    def test_wiktionarys_links_inside_a_meaning_come_along(self):
+        # As on Wiktionary, words in a definition link to theirs. Anchors go;
+        # links to other wiki pages, or repeating the plural's word, don't come.
+        d = definition_of(entry("serene", sense(
+            "Calm and peaceful; running smoothly.",
+            links=[["Calm", "calm#English"], ["peaceful", "peaceful"], ["running", "run"],
+                   ["smoothly", "w:Smoothly"], ["absent", "absent"]]), pos="adj"))
+        self.assertEqual(d["meanings"][0]["links"], [["Calm", "calm"], ["peaceful"], ["running", "run"]])
+        plural = definition_of(entry("zorbles", sense("plural of zorble", tags=["form-of"], form_of="zorble",
+                                                      links=[["zorble", "zorble"]])))
+        self.assertNotIn("links", plural["meanings"][0])
 
     def test_etymology_and_pronunciation_come_along(self):
         d = definition_of(entry("serene", sense("Calm."), pos="adj", etymology="From Latin serēnus.", ipa=["/səˈriːn/"]))
@@ -136,7 +150,8 @@ class Packing(unittest.TestCase):
     defs = [
         {"form": "zorbles", "pos": "noun", "etymology": "From zorble.", "ipa": ["/ˈzɔː.bəlz/"],
          "meanings": [{"gloss": "plural of zorble", "of": ["zorble"]},
-                      {"gloss": "A made-up crowd.", "labels": ["slang"], "explicit": True}]},
+                      {"gloss": "A made-up crowd.", "labels": ["slang"], "explicit": True},
+                      {"gloss": "A crowd that wobbles.", "links": [["crowd"], ["wobbles", "wobble"]]}]},
         {"form": "Zorbles", "pos": "name", "etymology": "From zorble.",
          "meanings": [{"gloss": "Alternative form of Zorble.", "of": ["Zorble"]},
                       {"gloss": "Made up; see also zorble and zorbled.", "of": ["zorble", "zorbled"]}]},

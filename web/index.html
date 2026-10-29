@@ -74,7 +74,8 @@
       <article class="entry" id="entry" hidden>
         <h2 class="entry-word" id="entry-word"></h2>
         <p class="entry-forms" id="entry-forms"></p>
-        <p class="entry-note">Definitions aren’t in the app yet.</p>
+        <div class="entry-body" id="entry-body"></div>
+        <p class="entry-note" id="entry-note" hidden></p>
         <a class="entry-link" id="entry-link" target="_blank" rel="noopener">Read the entry on Wiktionary</a>
       </article>
 
@@ -93,6 +94,8 @@
         <button class="settings-done" value="done">Done</button>
       </form>
     </dialog>
+    <!-- The peek: a held word's first meanings (web/peek.ts). -->
+    <div class="peek" id="peek" hidden aria-live="polite"></div>
     <dialog class="settings" id="filters" aria-labelledby="filters-title">
       <form method="dialog">
         <h2 class="settings-title" id="filters-title">Filters</h2>
