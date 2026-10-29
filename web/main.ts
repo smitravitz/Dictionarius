@@ -23,6 +23,7 @@ import { Peek } from "./peek";
 import { pulse } from "./haptics";
 import { Trail } from "../src/trail";
 import { Swipes, type SwipeDirection } from "./swipe";
+import { guardEdges } from "./edge-gestures";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const input = $<HTMLInputElement>("q");
@@ -62,6 +63,9 @@ const slider = new OffsetSlider(frame, {
     remember(HINT_SEEN);
   },
 });
+
+// In the Android app, the phone's edge swipe mustn't take a thumb holding the slider's ends.
+guardEdges(frame);
 
 // Taps, holds and drags on the list (scroller-gestures.ts): a tap opens a word,
 // unless it's a finger putting the keyboard away; a hold on a blank spot opens

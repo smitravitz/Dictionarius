@@ -5,7 +5,8 @@
 
 [android]
 # A dictionary needs no permissions at all: the word list ships inside the app, settings
-# stay in the WebView's own storage, and haptics use View.performHapticFeedback.
+# stay in the WebView's own storage, haptics use View.performHapticFeedback, and the
+# edge strips (web/edge-gestures.ts) use View.setSystemGestureExclusionRects.
 permissions = []
 
 [ios]
