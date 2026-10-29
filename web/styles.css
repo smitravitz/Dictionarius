@@ -675,6 +675,15 @@ a:focus-visible {
   font-variant-numeric: tabular-nums;
 }
 
+/* An example of the meaning in use, under it: italic and quieter, as in print. */
+.example {
+  margin: 0.125rem 0 0;
+  color: var(--pencil);
+  font-size: 0.9375rem;
+  font-style: italic;
+  line-height: 1.5;
+}
+
 .label {
   color: var(--pencil);
   font-family: var(--font-ui);

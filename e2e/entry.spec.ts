@@ -27,7 +27,7 @@ test("tapping a word shows its definitions: word classes, numbered meanings, lab
   await expect(entry(page).locator(".word-class-name")).toHaveText(["noun", "verb"]);
   const meanings = entry(page).locator(".meanings > li");
   await expect(meanings).toHaveText([
-    "A made-up bar of cast metal.",
+    /^A made-up bar of cast metal\./,
     /archaic.*in old ledgers.*A made-up sub-meaning\./,
     /transitive.*To cast into made-up bars\./,
   ]);
@@ -36,6 +36,18 @@ test("tapping a word shows its definitions: word classes, numbered meanings, lab
   await expect(entry(page).locator(".clamp-toggle")).toHaveCount(2);
   await expect(entry(page).locator(".clamp-toggle:visible")).toHaveCount(0);
   await expect(entry(page).locator(".entry-note")).toBeHidden();
+});
+
+test("a meaning's example of use follows its definition", async ({ page }) => {
+  await open(page);
+  await openWord(page, "ingot", "ingot");
+  const first = entry(page).locator(".meanings > li").first();
+  await expect(first.locator(".example")).toHaveText("He weighed the made-up ingot.");
+  // Under the definition, not beside it.
+  const gloss = (await first.locator(".gloss").boundingBox())!;
+  const example = (await first.locator(".example").boundingBox())!;
+  expect(example.y).toBeGreaterThanOrEqual(gloss.y + gloss.height - 1);
+  await expect(entry(page).locator(".example")).toHaveCount(1); // the others have none
 });
 
 test("a word's page appears whole: its meanings are there the moment it shows", async ({ page }) => {
@@ -125,7 +137,7 @@ test("a plural links to its word", async ({ page }) => {
   await openWord(page, "zorbles", "zorbles");
   await entry(page).getByRole("button", { name: "zorble" }).click();
   await expect(page.locator("#entry-word")).toHaveText("zorble");
-  await expect(entry(page).locator(".meanings > li")).toHaveText(["to wobble (made up)"]);
+  await expect(entry(page).locator(".meanings > li .gloss")).toHaveText(["to wobble (made up)"]);
 });
 
 test("every written form of a word is there, the most common first", async ({ page }) => {

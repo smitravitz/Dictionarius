@@ -75,4 +75,11 @@ describe("unpack", () => {
       { form: "a$&bs", pos: "noun", meanings: [{ gloss: "plural of A$&B", of: ["A$&B"] }] },
     ]);
   });
+
+  it("gives back a meaning's example of use, after its links", () => {
+    const tables = { pos: ["verb"], templates: [] };
+    expect(unpack("zorble", '[[0],[[0,0,[["To wobble.",[],[],0,[],"The jelly began to zorble."]]]]]', tables)).toEqual([
+      { form: "zorble", pos: "verb", meanings: [{ gloss: "To wobble.", example: "The jelly began to zorble." }] },
+    ]);
+  });
 });
