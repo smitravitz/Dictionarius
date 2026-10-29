@@ -17,8 +17,9 @@ interface Golden {
 const hex = (bytes: Uint8Array | null) => (bytes ? Buffer.from(bytes).toString("hex") : null);
 
 function describeAgainstGolden(name: string, base: string) {
-  const present = existsSync(`${base}.definitions.bin`);
+  const present = [".bin", ".golden.json", ".definitions.bin"].every((ext) => existsSync(base + ext));
   describe.skipIf(!present)(`definitions vs golden: ${name}`, () => {
+    if (!present) return; // collecting the suite mustn't read files that aren't there
     const index = HeadwordIndex.fromBytes(new Uint8Array(readFileSync(`${base}.bin`)));
     const golden = JSON.parse(readFileSync(`${base}.golden.json`, "utf8")) as Golden;
     const bytes = () => new Uint8Array(readFileSync(`${base}.definitions.bin`));
