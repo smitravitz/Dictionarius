@@ -575,10 +575,52 @@ a:focus-visible {
 }
 
 .entry-ipa {
-  margin: 0 0 1rem;
+  margin: 0;
   color: var(--pencil);
   font-family: var(--font-word);
   font-size: 1.0625rem;
+  line-height: 1.5;
+}
+
+/* Where the word comes from, in brief: set apart like a margin note. */
+.entry-origin {
+  margin: 0.75rem 0 0;
+  padding-left: 0.75rem;
+  border-left: 2px solid var(--hairline);
+  color: var(--pencil);
+  font-size: 0.875rem;
+  line-height: 1.5;
+  white-space: pre-line; /* Wiktionary's paragraphs */
+}
+
+/* Long pronunciations and origins fold to a few lines (web/clamp.ts). */
+.clamped {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: var(--lines);
+  line-clamp: var(--lines);
+  overflow: hidden;
+}
+
+.clamp-toggle {
+  display: block;
+  min-height: 2rem;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--proof);
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.clamp-toggle[hidden] {
+  display: none;
+}
+
+.entry-origin + .clamp-toggle {
+  margin-left: calc(0.75rem + 2px); /* under the note, past its rule */
 }
 
 /* Definitions, set like a printed dictionary: the word class in italics, usage
@@ -589,14 +631,6 @@ a:focus-visible {
   border-top: 1px solid var(--hairline);
 }
 
-.etymology {
-  margin: 0 0 0.75rem;
-  padding-left: 0.75rem;
-  border-left: 2px solid var(--hairline);
-  color: var(--pencil);
-  font-size: 0.875rem;
-  line-height: 1.5;
-}
 
 .word-class-head {
   display: flex;
@@ -729,13 +763,6 @@ a:focus-visible {
   .peek {
     animation: none;
   }
-}
-
-.entry-link {
-  display: inline-block;
-  margin-top: 1.25rem;
-  color: var(--proof);
-  font-weight: 700;
 }
 
 /* ---------------------------------------------------------------- credit */
