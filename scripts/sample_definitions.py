@@ -38,7 +38,9 @@ def keep_sense(sense):
         words = [link.get("word") for link in sense.get(key) or () if isinstance(link, dict)]
         if words:
             kept[key] = words
-    examples = [ex.get("text") for ex in sense.get("examples") or () if isinstance(ex, dict) and ex.get("text")]
+    # Each example's text, its type ("example" or "quotation") and whether it has a source.
+    examples = [{"text": ex["text"], "type": ex.get("type"), "ref": bool(ex.get("ref"))}
+                for ex in sense.get("examples") or () if isinstance(ex, dict) and ex.get("text")]
     if examples:
         kept["examples"] = examples
     return kept

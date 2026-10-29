@@ -2,7 +2,8 @@
  * Draws a word's definitions (src/entry-view.ts shapes them): on the entry
  * page, its pronunciations and origin brief (folded when long), then every
  * word class with numbered meanings whose linked words open their own
- * entries, as on Wiktionary; in the peek card, the first meanings only.
+ * entries, as on Wiktionary, each followed by an example of its use; in the
+ * peek card, the first meanings only.
  */
 import { glossParts, type EntryView, type MeaningView, type PeekView } from "../src/entry-view";
 import { clamp } from "./clamp";
@@ -91,7 +92,8 @@ export function renderPeek(card: HTMLElement, word: string, peek: PeekView | nul
 }
 
 /** Numbered meanings: labels first ("archaic"), then the gloss with its links
- *  as buttons (or plain words when `open` is null: the peek can't be tapped). */
+ *  as buttons (or plain words when `open` is null: the peek can't be tapped),
+ *  then an example of use, if it has one. */
 function meanings(list: readonly MeaningView[], open: OpenWord | null): HTMLOListElement {
   const ol = el("ol", "meanings");
   for (const m of list) {
@@ -102,9 +104,10 @@ function meanings(list: readonly MeaningView[], open: OpenWord | null): HTMLOLis
       label.textContent = text;
       li.append(label, i < m.labels.length - 1 ? " · " : " "); // each label its own: "archaic · in old ledgers"
     });
+    const gloss = el("span", "gloss");
     for (const part of glossParts(m.gloss, m.links)) {
       if (typeof part === "string" || !open) {
-        li.append(typeof part === "string" ? part : part.text);
+        gloss.append(typeof part === "string" ? part : part.text);
         continue;
       }
       const link = el("button", "word-link");
@@ -112,7 +115,13 @@ function meanings(list: readonly MeaningView[], open: OpenWord | null): HTMLOLis
       link.textContent = part.text;
       if (part.word !== part.text) link.title = part.word;
       link.addEventListener("click", () => open(part.word));
-      li.append(link);
+      gloss.append(link);
+    }
+    li.append(gloss);
+    if (m.example) {
+      const example = el("p", "example");
+      example.textContent = m.example;
+      li.append(example);
     }
     ol.append(li);
   }

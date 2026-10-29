@@ -35,6 +35,8 @@ export interface MeaningView {
   labels: string[];
   /** the words to link: a plural's or spelling's own word, then Wiktionary's links */
   links: Link[];
+  /** one short example of the meaning in use */
+  example?: string;
 }
 
 export interface ClassView {
@@ -75,7 +77,11 @@ export function entryView(definitions: readonly Definition[], { safe }: { safe: 
     const view: ClassView = {
       form: d.form,
       pos: d.pos ? (PARTS_OF_SPEECH[d.pos] ?? d.pos.replace(/_/g, " ")) : "",
-      meanings: shown.map((m, i) => ({ n: i + 1, gloss: m.gloss, labels: m.labels ?? [], links: linksOf(m) })),
+      meanings: shown.map((m, i) => {
+        const meaning: MeaningView = { n: i + 1, gloss: m.gloss, labels: m.labels ?? [], links: linksOf(m) };
+        if (m.example) meaning.example = m.example;
+        return meaning;
+      }),
     };
     if (d.etymology) origins.add(d.etymology);
     classes.push(view);
@@ -88,7 +94,7 @@ export function entryView(definitions: readonly Definition[], { safe }: { safe: 
 export function peekView(view: EntryView, count = 2): PeekView | null {
   const first = view.classes[0];
   if (!first) return null;
-  const meanings = first.meanings.slice(0, count);
+  const meanings = first.meanings.slice(0, count).map(({ example: _example, ...m }) => m); // a peek is meanings only
   const total = view.classes.reduce((sum, c) => sum + c.meanings.length, 0);
   return { ...first, meanings, more: total - meanings.length, hidden: view.hidden };
 }

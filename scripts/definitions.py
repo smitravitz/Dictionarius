@@ -33,7 +33,8 @@ STRUCTURAL_TAGS = frozenset({"form-of", "alt-of", "no-gloss"})
 def definition_of(obj):
     """{"form", "pos", "meanings"} for one entry, or None when no meaning has a
     gloss. A meaning is {"gloss"} plus, when present, "labels", "of" (the
-    words a plural or spelling links to) and "explicit" (safe search hides it)."""
+    words a plural or spelling links to), "links" (Wiktionary's, inside the
+    gloss), "example" (one short use of it) and "explicit" (safe search hides it)."""
     word = obj.get("word")
     meanings = []
     for sense in obj.get("senses") or ():
@@ -54,6 +55,9 @@ def definition_of(obj):
         links = links_of(sense, gloss, linked)
         if links:
             meaning["links"] = links
+        example = example_of(sense)
+        if example:
+            meaning["example"] = example
         found = meaning_of(sense)
         if found and found[0] & EXPLICIT_LABELS:
             meaning["explicit"] = True
@@ -89,6 +93,30 @@ def links_of(sense, gloss, linked):
         if kept not in out:
             out.append(kept)
     return out
+
+
+# Longest example kept: about two lines under a meaning on a phone. Longer ones
+# are mostly literary quotations. One per meaning at this length adds about
+# 13 MB to the definitions (ADR-0004, measured on the sample).
+EXAMPLE_MAX = 200
+
+
+def example_of(sense):
+    """One short example of a meaning in use: Wiktionary's first usage example
+    up to EXAMPLE_MAX characters, else its first quotation that short (a
+    quotation has a "ref", its source), else None."""
+    usage, quoted = None, None
+    for ex in sense.get("examples") or ():
+        if not isinstance(ex, dict) or not isinstance(ex.get("text"), str):
+            continue
+        text = ex["text"].strip()
+        if not text or len(text) > EXAMPLE_MAX:
+            continue
+        if ex.get("ref") or ex.get("type") in ("quote", "quotation"):
+            quoted = quoted or text
+        else:
+            usage = usage or text
+    return usage or quoted
 
 
 HOLE = "\u0000"  # where a link template's word goes ("plural of \u0000")
@@ -133,8 +161,8 @@ def pack(key, definitions, tables):
     [forms, entries, etymologies, pronunciations], trailing empties dropped.
     A form equal to the search key is 0; an entry is [form, word class,
     meanings, etymology + 1, pronunciation + 1]; a meaning is [gloss or link
-    template number, labels, linked words, 1 if explicit, links], a link being
-    its text when that is also the word linked to, else [text, word]."""
+    template number, labels, linked words, 1 if explicit, links, example], a
+    link being its text when that is also the word linked to, else [text, word]."""
     pos_index = {p: i for i, p in enumerate(tables["pos"])}
     template_index = {t: i for i, t in enumerate(tables["templates"])}
     forms, etymologies, sounds, entries = [], [], [], []
@@ -147,8 +175,9 @@ def pack(key, definitions, tables):
             t = template_of(m)
             gloss = template_index[t] if t in template_index else m["gloss"]
             links = [link[0] if len(link) == 1 else link for link in m.get("links", [])]
-            meanings.append(trim([gloss, m.get("labels", []), m.get("of", []), 1 if m.get("explicit") else 0, links],
-                                 [None, [], [], 0, []]))
+            meanings.append(trim([gloss, m.get("labels", []), m.get("of", []), 1 if m.get("explicit") else 0, links,
+                                  m.get("example", "")],
+                                 [None, [], [], 0, [], ""]))
         etymology = sound = 0
         if "etymology" in d:
             if d["etymology"] not in etymologies:
@@ -188,6 +217,8 @@ def unpack(key, line, tables):
                 meaning["explicit"] = True
             if len(m) > 4 and m[4]:
                 meaning["links"] = [[link] if isinstance(link, str) else link for link in m[4]]
+            if len(m) > 5 and m[5]:
+                meaning["example"] = m[5]
             d["meanings"].append(meaning)
         if etymology:
             d["etymology"] = etymologies[etymology - 1]

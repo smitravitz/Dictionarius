@@ -5,7 +5,8 @@ Reads a sample made by scripts/sample_definitions.py (every 20th English word
 of the Wiktionary dump), puts it through the builder's own definition_of() and
 pack(), groups it per search key in key order like the real file, and prints
 whole-dictionary sizes (the sample scaled by its .stats.json totals) for each
-codec and block size, plus what each extra (etymology, pronunciation) adds.
+codec and block size, plus what each extra (etymology, pronunciation, one
+example per meaning) adds.
 
     python bench/definitions_packing.py definitions-sample.jsonl.gz
 
@@ -30,13 +31,17 @@ BLOCKS = (256, 1024, 4096)
 
 
 def wiktextract_shape(entry):
-    """The sampler stores linked words as strings; definition_of reads {"word": ...}."""
+    """The sampler stores linked words as strings; definition_of reads
+    {"word": ...}. Samples taken before the sampler kept each example's type
+    have bare strings, which read as usage examples."""
     senses = []
     for sense in entry.get("senses", []):
         sense = dict(sense)
         for key in ("form_of", "alt_of"):
             if key in sense:
                 sense[key] = [{"word": w} for w in sense[key]]
+        if "examples" in sense:
+            sense["examples"] = [ex if isinstance(ex, dict) else {"text": ex} for ex in sense["examples"]]
         senses.append(sense)
     shaped = {**entry, "senses": senses}
     if "ipa" in entry:
@@ -66,12 +71,18 @@ def main():
           f"x{scale:.2f} for the whole dictionary\n")
 
     def without(*fields):
-        return [[{k: v for k, v in d.items() if k not in fields} for d in per_key[k]] for k in keys]
+        def strip(d):
+            kept = {k: v for k, v in d.items() if k not in fields}
+            if "example" in fields:
+                kept["meanings"] = [{k: v for k, v in m.items() if k != "example"} for m in d["meanings"]]
+            return kept
+        return [[strip(d) for d in per_key[k]] for k in keys]
 
     variants = {
-        "definitions only": without("etymology", "ipa"),
-        "+ pronunciation": without("etymology"),
-        "+ etymology": without(),
+        "definitions only": without("etymology", "ipa", "example"),
+        "+ pronunciation": without("etymology", "example"),
+        "+ etymology": without("example"),
+        "+ examples": without(),
     }
     mb = lambda n: f"{n * scale / 1e6:6.1f} MB"
     print(f"{'contents':<18}{'packing':<9}{'block':>6}{'zlib-9':>10}{'brotli-11':>11}")

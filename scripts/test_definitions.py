@@ -88,6 +88,20 @@ class DefinitionOf(unittest.TestCase):
                                                       links=[["zorble", "zorble"]])))
         self.assertNotIn("links", plural["meanings"][0])
 
+    def test_a_meaning_keeps_one_short_example_of_its_use(self):
+        # A usage example first; else a short quotation; never one too long to
+        # read under a meaning on a phone.
+        long_quote = {"text": "Q" * 201, "type": "quotation", "ref": "1603, Someone"}
+        d = definition_of(entry(
+            "zorble",
+            dict(sense("To wobble."), examples=[{"text": "A short quote zorbles.", "type": "quotation", "ref": "1899"},
+                                                {"text": "  The jelly began to zorble. ", "type": "example"}]),
+            dict(sense("To quiver."), examples=[long_quote, {"text": "It zorbled, she wrote.", "type": "quotation", "ref": "2001"}]),
+            dict(sense("To shake."), examples=[long_quote, {"type": "example"}]),
+            pos="verb"))
+        self.assertEqual([m.get("example") for m in d["meanings"]],
+                         ["The jelly began to zorble.", "It zorbled, she wrote.", None])
+
     def test_etymology_and_pronunciation_come_along(self):
         d = definition_of(entry("serene", sense("Calm."), pos="adj", etymology="From Latin serēnus.", ipa=["/səˈriːn/"]))
         self.assertEqual((d["etymology"], d["ipa"]), ("From Latin serēnus.", ["/səˈriːn/"]))
@@ -162,7 +176,8 @@ class Packing(unittest.TestCase):
     defs = [
         {"form": "zorbles", "pos": "noun", "etymology": "From zorble.", "ipa": ["/ˈzɔː.bəlz/"],
          "meanings": [{"gloss": "plural of zorble", "of": ["zorble"]},
-                      {"gloss": "A made-up crowd.", "labels": ["slang"], "explicit": True},
+                      {"gloss": "A made-up crowd.", "labels": ["slang"], "explicit": True,
+                       "example": "The zorbles gathered."},
                       {"gloss": "A crowd that wobbles.", "links": [["crowd"], ["wobbles", "wobble"]]}]},
         {"form": "Zorbles", "pos": "name", "etymology": "From zorble.",
          "meanings": [{"gloss": "Alternative form of Zorble.", "of": ["Zorble"]},
@@ -195,7 +210,7 @@ class File(unittest.TestCase):
         keys = ["a", "b", "c", "d", "e", "zorble", "zorbles"]
         defs = {0: [{"form": "a", "pos": "noun", "meanings": [{"gloss": "The letter."}]}],
                 5: [{"form": "zorble", "pos": "verb", "ipa": ["/ˈzɔː.bəl/"],
-                     "meanings": [{"gloss": "To wobble.", "labels": ["intransitive"]}]}],
+                     "meanings": [{"gloss": "To wobble.", "labels": ["intransitive"], "example": "It zorbled."}]}],
                 6: [{"form": "zorbles", "pos": "noun", "meanings": [{"gloss": "plural of zorble", "of": ["zorble"]}]}]}
         tables = packing_tables(defs.values(), min_uses=1)
         with tempfile.TemporaryDirectory() as tmp:

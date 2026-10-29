@@ -24,6 +24,8 @@ export interface Meaning {
   /** Wiktionary's links inside the gloss: [text] links to the word it spells,
    *  [text, word] to another ("running" → "run") */
   links?: ([string] | [string, string])[];
+  /** one short example of the meaning in use */
+  example?: string;
 }
 
 /** One entry of one written form: its word class and meanings. */
@@ -118,7 +120,14 @@ export class DefinitionsFile {
   }
 }
 
-type PackedMeaning = [gloss: string | number, labels?: string[], of?: string[], explicit?: 0 | 1, links?: (string | [string, string])[]];
+type PackedMeaning = [
+  gloss: string | number,
+  labels?: string[],
+  of?: string[],
+  explicit?: 0 | 1,
+  links?: (string | [string, string])[],
+  example?: string,
+];
 type PackedEntry = [form: number, pos: number | string | null, meanings: PackedMeaning[], etymology?: number, sound?: number];
 type Packed = [forms: (0 | string)[], entries: PackedEntry[], etymologies?: string[], sounds?: string[][]];
 
@@ -131,12 +140,13 @@ export function unpack(key: string, line: string, tables: PackingTables): Defini
     const d: Definition = {
       form: written === 0 ? key : written,
       pos: typeof pos === "number" ? tables.pos[pos] : pos,
-      meanings: meanings.map(([gloss, labels = [], of = [], explicit = 0, links = []]) => {
+      meanings: meanings.map(([gloss, labels = [], of = [], explicit = 0, links = [], example = ""]) => {
         const m: Meaning = { gloss: typeof gloss === "number" ? tables.templates[gloss].replace(HOLE, () => of[0]) /* a function: "$" in a word stays literal, as in Python */ : gloss };
         if (labels.length) m.labels = labels;
         if (of.length) m.of = of;
         if (explicit) m.explicit = true;
         if (links.length) m.links = links.map((link) => (typeof link === "string" ? [link] : link));
+        if (example) m.example = example;
         return m;
       }),
     };

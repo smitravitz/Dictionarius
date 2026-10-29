@@ -51,6 +51,21 @@ describe("entryView", () => {
   });
 });
 
+describe("examples of use", () => {
+  it("carries a meaning's example along with it", () => {
+    const view = entryView(
+      [{ form: "zorble", pos: "verb", meanings: [{ gloss: "To wobble.", example: "The jelly began to zorble." }, { gloss: "To quiver." }] }],
+      { safe: true },
+    );
+    expect(view.classes[0].meanings.map((m) => m.example)).toEqual(["The jelly began to zorble.", undefined]);
+  });
+
+  it("leaves them out of the peek, which is meanings only", () => {
+    const view = entryView([{ form: "zorble", pos: "verb", meanings: [{ gloss: "To wobble.", example: "It zorbled." }] }], { safe: true });
+    expect(peekView(view)!.meanings[0]).not.toHaveProperty("example");
+  });
+});
+
 describe("peekView", () => {
   it("shows the first word class's first two meanings, and how many more the entry has", () => {
     expect(peekView(entryView(serene, { safe: false }))).toEqual({

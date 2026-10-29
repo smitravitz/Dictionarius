@@ -46,15 +46,21 @@ left out.
   `form` indexes `forms`; `pos` indexes `tables.pos` (or is the code itself, or
   null); `etymology` and `pronunciation` are 1-based into the word's lists (0
   or left out: none).
-- A meaning: `[gloss, labels, of, explicit]`, trailing empty values left out.
-  `gloss` is the text, or a number: `tables.templates[n]` with U+0000 replaced
-  by `of[0]` (literally). `labels` are tags and qualifiers to show
-  ("archaic", "of jelly"); `of` the words a plural or spelling links to;
+- A meaning: `[gloss, labels, of, explicit, links, example]`, trailing empty
+  values left out. `gloss` is the text, or a number: `tables.templates[n]` with
+  U+0000 replaced by `of[0]` (literally). `labels` are tags and qualifiers to
+  show ("archaic", "of jelly"); `of` the words a plural or spelling links to;
   `explicit` is 1 for a vulgar, offensive or slur meaning (the labels safe
-  search reads), which safe search hides.
+  search reads), which safe search hides. `links` are Wiktionary's links
+  inside the gloss: a string when the text is also the word linked to, else
+  `[text, word]`. `example` is one short use of the meaning (Wiktionary's
+  first usage example up to 200 characters, else its first quotation that
+  short), or `""`.
+- `links` and `example` came later, at the end of the row, so a reader that
+  doesn't know them still reads the rest; the version stayed 2.
 - `etymologies`: strings; `pronunciations`: lists of IPA strings.
 
 Unpacked, a word is a list of `{form, pos, meanings: [{gloss, labels?, of?,
-explicit?}], etymology?, ipa?}`; `scripts/definitions.py` and
+explicit?, links?, example?}], etymology?, ipa?}`; `scripts/definitions.py` and
 `src/definitions.ts` both unpack it, and the builder's golden file checks they
 agree.
