@@ -17,7 +17,8 @@ import { loadFilters, saveFilter } from "./saved-filters";
 import { FiltersPanel } from "./filters-panel";
 import { entryView, peekView } from "../src/entry-view";
 import type { Definition } from "../src/definitions";
-import { renderEntry } from "./entry-page";
+import { renderEntry, type EntryContent } from "./entry-page";
+import { fitClamps } from "./clamp";
 import { Peek } from "./peek";
 import { pulse } from "./haptics";
 
@@ -186,7 +187,7 @@ function mergeCounts(old: Counts | null, next: Counts): Counts {
 input.addEventListener("input", () => search(input.value));
 
 function search(text: string) {
-  entry.hidden = true;
+  leaveEntry();
   const next = normalize(text);
   if (next !== query) counts = null;
   query = next;
@@ -294,31 +295,53 @@ function openWord(text: string) {
   void wordNamed(text).then((s) => s && showEntry(s));
 }
 
+/** Past this wait, a word's page shows that its definitions are loading
+ *  (the file is still on its way) rather than nothing happening. */
+const SLOW_MS = 300;
+
+/** Show a word's page once its definitions are in, all of it at once, so
+ *  nothing appears and then moves (top to bottom, in reading order). */
 function drawEntry(s: Suggestion) {
+  const seq = ++entrySeq;
+  const slow = setTimeout(() => seq === entrySeq && paintEntry(seq, s, "loading"), SLOW_MS);
+  void definitionsOf(s.id).then((definitions) => {
+    clearTimeout(slow);
+    if (seq !== entrySeq) return;
+    paintEntry(seq, s, definitions ? entryView(definitions, { safe: safe() }) : null);
+  });
+}
+
+const source = $<HTMLAnchorElement>("source");
+const WIKTIONARY = source.getAttribute("href")!; // as written, not normalized
+
+let painted = 0; // the entry (by entrySeq) the page shows
+
+function paintEntry(seq: number, s: Suggestion, content: EntryContent) {
+  const parts = { word: $("entry-word"), forms: $("entry-forms"), body: $("entry-body"), note: $("entry-note") };
+  renderEntry(parts, s, content, openWord);
+  source.href = sourcePageUrl({ headword: s.display, source: "Wiktionary", license: "CC-BY-SA-4.0" }) ?? WIKTIONARY;
+  if (painted === seq) return fitClamps(parts.body); // its definitions, after "loading": the rest is in place
+  painted = seq;
   input.value = s.display;
   frame.hidden = true;
   intro.hidden = true;
+  hint.hidden = true; // the slider's tip belongs to the results
   input.setAttribute("aria-expanded", "false");
   input.removeAttribute("aria-activedescendant");
   summary.textContent = "";
-
-  $("entry-word").textContent = s.display;
-  const others = s.forms.filter((f) => f !== s.display);
-  $("entry-forms").textContent = others.length ? `Also written ${others.join(", ")}` : "";
-  const page = sourcePageUrl({ headword: s.display, source: "Wiktionary", license: "CC-BY-SA-4.0" });
-  $<HTMLAnchorElement>("entry-link").href = page ?? "https://en.wiktionary.org";
-  hint.hidden = true; // the slider's tip belongs to the results
-  const body = $("entry-body");
-  const note = $("entry-note");
-  body.replaceChildren();
-  note.hidden = true;
   entry.hidden = false;
+  fitClamps(parts.body); // laid out now, before the screen is painted
   window.scrollTo(0, 0);
-  const seq = ++entrySeq;
-  void definitionsOf(s.id).then((definitions) => {
-    if (seq !== entrySeq) return;
-    renderEntry(body, note, definitions ? entryView(definitions, { safe: safe() }) : null, s.display, openWord);
-  });
+}
+
+// Folded text that fitted may not after the page narrows (a phone turned), or the reverse.
+new ResizeObserver(() => fitClamps($("entry-body"))).observe($("entry-body"));
+
+/** Back to the results or the start screen: drop the open word, and any still on its way. */
+function leaveEntry() {
+  entrySeq++;
+  entry.hidden = true;
+  source.href = WIKTIONARY;
 }
 
 // The peek: hold a word in the results to see its first meanings.
@@ -342,7 +365,7 @@ window.addEventListener("popstate", (event) => {
   const earlier = (event.state as { entry?: Suggestion } | null)?.entry;
   if (earlier) return drawEntry(earlier); // back to a word followed from
   if (entry.hidden) return;
-  entry.hidden = true;
+  leaveEntry();
   if (!returnTo) return search(input.value);
   // The results are still in the list; show them again where they were.
   input.value = returnTo.text;

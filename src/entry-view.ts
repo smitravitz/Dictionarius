@@ -41,9 +41,6 @@ export interface ClassView {
   form: string;
   pos: string;
   meanings: MeaningView[];
-  /** where the word comes from: set on the first class with an origin, and
-   *  again only where it changes (Wiktionary groups classes under origins) */
-  etymology?: string;
 }
 
 export interface EntryView {
@@ -52,6 +49,10 @@ export interface EntryView {
   hidden: number;
   /** the main written form's pronunciations, each once */
   ipa: string[];
+  /** where the word comes from, when its word classes share one origin; a
+   *  word with several (lead: the metal, to guide) gets none until the
+   *  planned Etymology section shows each with its classes */
+  origin?: string;
 }
 
 export interface PeekView extends ClassView {
@@ -63,7 +64,7 @@ export interface PeekView extends ClassView {
 /** A word's entry: with `safe`, vulgar, offensive and slur meanings are left out. */
 export function entryView(definitions: readonly Definition[], { safe }: { safe: boolean }): EntryView {
   let hidden = 0;
-  let origin: string | undefined;
+  const origins = new Set<string>();
   const classes: ClassView[] = [];
   const ipa: string[] = [];
   for (const d of definitions) {
@@ -76,11 +77,11 @@ export function entryView(definitions: readonly Definition[], { safe }: { safe: 
       pos: d.pos ? (PARTS_OF_SPEECH[d.pos] ?? d.pos.replace(/_/g, " ")) : "",
       meanings: shown.map((m, i) => ({ n: i + 1, gloss: m.gloss, labels: m.labels ?? [], links: linksOf(m) })),
     };
-    if (d.etymology && d.etymology !== origin) view.etymology = d.etymology;
-    origin = d.etymology ?? origin;
+    if (d.etymology) origins.add(d.etymology);
     classes.push(view);
   }
-  return { classes, hidden, ipa };
+  const [origin] = origins;
+  return origins.size === 1 ? { classes, hidden, ipa, origin } : { classes, hidden, ipa };
 }
 
 /** The peek: the first word class's first `count` meanings; null when nothing is left to show. */
@@ -89,8 +90,7 @@ export function peekView(view: EntryView, count = 2): PeekView | null {
   if (!first) return null;
   const meanings = first.meanings.slice(0, count);
   const total = view.classes.reduce((sum, c) => sum + c.meanings.length, 0);
-  const { etymology: _origin, ...shown } = first; // a peek is meanings only
-  return { ...shown, meanings, more: total - meanings.length, hidden: view.hidden };
+  return { ...first, meanings, more: total - meanings.length, hidden: view.hidden };
 }
 
 /** A meaning's links: its plural's or spelling's words, then Wiktionary's, each once. */

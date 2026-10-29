@@ -71,7 +71,7 @@ describe("peekView", () => {
   });
 });
 
-describe("pronunciation and origin", () => {
+describe("pronunciation and origin brief", () => {
   const lead: Definition[] = [
     { form: "lead", pos: "noun", etymology: "From Old English lēad.", ipa: ["/lɛd/"], meanings: [{ gloss: "A metal." }] },
     { form: "lead", pos: "verb", etymology: "From Old English lǣdan.", ipa: ["/liːd/", "/lɛd/"], meanings: [{ gloss: "To guide." }] },
@@ -84,13 +84,20 @@ describe("pronunciation and origin", () => {
     expect(entryView([{ form: "a", pos: "noun", meanings: [{ gloss: "x" }] }], { safe: true }).ipa).toEqual([]);
   });
 
-  it("shows an origin before the first word class it belongs to, again only when it changes", () => {
-    expect(entryView(lead, { safe: true }).classes.map((c) => c.etymology)).toEqual([
-      "From Old English lēad.",
-      "From Old English lǣdan.",
-      undefined,
-      undefined,
-    ]);
+  it("briefs the word's origin once, at the top, when its word classes share one", () => {
+    const ingot: Definition[] = [
+      { form: "ingot", pos: "noun", etymology: "From Middle English.", meanings: [{ gloss: "A bar." }] },
+      { form: "ingot", pos: "verb", etymology: "From Middle English.", meanings: [{ gloss: "To cast." }] },
+      { form: "ingot", pos: "noun", meanings: [{ gloss: "No origin given." }] },
+    ];
+    const view = entryView(ingot, { safe: true });
+    expect(view.origin).toBe("From Middle English.");
+    expect(view.classes.every((c) => !("etymology" in c))).toBe(true);
+  });
+
+  it("has no brief for a word with several origins (that's the planned Etymology section)", () => {
+    expect(entryView(lead, { safe: true }).origin).toBeUndefined();
+    expect(entryView([{ form: "a", pos: "noun", meanings: [{ gloss: "x" }] }], { safe: true }).origin).toBeUndefined();
   });
 });
 

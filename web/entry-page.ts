@@ -1,41 +1,66 @@
 /**
  * Draws a word's definitions (src/entry-view.ts shapes them): on the entry
- * page, every word class under its origin, with numbered meanings whose
- * linked words open their own entries, as on Wiktionary; in the peek card,
- * the first meanings only.
+ * page, its pronunciations and origin brief (folded when long), then every
+ * word class with numbered meanings whose linked words open their own
+ * entries, as on Wiktionary; in the peek card, the first meanings only.
  */
 import { glossParts, type EntryView, type MeaningView, type PeekView } from "../src/entry-view";
+import { clamp } from "./clamp";
 
 /** Opens the word a link names. */
 export type OpenWord = (word: string) => void;
 
-/** Fill the entry page's body. `headword` is the word as the page titles it:
- *  a word class under another written form names that form. */
-export function renderEntry(body: HTMLElement, note: HTMLElement, view: EntryView | null, headword: string, open: OpenWord) {
-  body.replaceChildren();
+/** The entry page's parts, filled together so it never shows half drawn. */
+export interface EntryParts {
+  word: HTMLElement;
+  forms: HTMLElement;
+  body: HTMLElement;
+  note: HTMLElement;
+}
+
+/** What the page shows for a word: its definitions, none (null), or that
+ *  they're still on their way (the definitions file is loading). */
+export type EntryContent = EntryView | null | "loading";
+
+/** Fill the whole entry page at once. A word class under another written form
+ *  names that form; the title names the word as the results showed it. */
+export function renderEntry(
+  parts: EntryParts,
+  word: { display: string; forms: readonly string[] },
+  content: EntryContent,
+  open: OpenWord,
+) {
+  parts.word.textContent = word.display;
+  const others = word.forms.filter((f) => f !== word.display);
+  parts.forms.textContent = others.length ? `Also written ${others.join(", ")}` : "";
+  const view = content === "loading" ? null : content;
+  const body: Node[] = [];
   if (view?.ipa.length) {
     const ipa = el("p", "entry-ipa");
     ipa.textContent = view.ipa.join(" · ");
-    body.append(ipa);
+    body.push(clamp(ipa, 2));
+  }
+  if (view?.origin) {
+    const origin = el("p", "entry-origin");
+    origin.textContent = view.origin;
+    body.push(clamp(origin, 3));
   }
   for (const c of view?.classes ?? []) {
     const section = el("section", "word-class");
-    if (c.etymology) {
-      const origin = el("p", "etymology");
-      origin.textContent = c.etymology;
-      section.append(origin);
-    }
     const head = el("h3", "word-class-head");
     const form = el("span", "word-class-form");
-    form.textContent = c.form === headword ? "" : c.form;
+    form.textContent = c.form === word.display ? "" : c.form;
     const name = el("span", "word-class-name");
     name.textContent = c.pos;
     head.append(form, name);
     section.append(head, meanings(c.meanings, open));
-    body.append(section);
+    body.push(section);
   }
+  parts.body.replaceChildren(...body);
+  const { note } = parts;
   note.hidden = false;
-  if (!view) note.textContent = "No definition for this word in the app yet.";
+  if (content === "loading") note.textContent = "Loading the definitions…";
+  else if (!view) note.textContent = "No definition for this word in the app yet.";
   else if (view.hidden) note.textContent = `${view.hidden} ${view.hidden === 1 ? "meaning" : "meanings"} hidden by safe search.`;
   else note.hidden = true;
 }

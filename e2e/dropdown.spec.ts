@@ -111,13 +111,13 @@ test("every row lines up on the typed fragment", async ({ page }) => {
   await expect(page.locator("li.word mark.frag").first()).toHaveText("tion");
 });
 
-test("tapping a word opens it, with its Wiktionary link", async ({ page }) => {
+test("tapping a word opens it, crediting its Wiktionary page in the footer", async ({ page }) => {
   await open(page);
   await page.locator("#q").fill("resume");
   await page.locator("#opt-0").click();
   await expect(page.locator("#entry-word")).toHaveText("resume");
   await expect(page.locator("#entry-forms")).toContainText("Résumé");
-  await expect(page.locator("#entry-link")).toHaveAttribute("href", "https://en.wiktionary.org/wiki/resume");
+  await expect(page.locator("#source")).toHaveAttribute("href", "https://en.wiktionary.org/wiki/resume");
   await expect(page.locator("#q")).toHaveAttribute("aria-expanded", "false");
 });
 
