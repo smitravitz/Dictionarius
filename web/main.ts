@@ -305,7 +305,7 @@ function drawEntry(s: Suggestion) {
   $("entry-word").textContent = s.display;
   const others = s.forms.filter((f) => f !== s.display);
   $("entry-forms").textContent = others.length ? `Also written ${others.join(", ")}` : "";
-  const page = sourcePageUrl({ headword: s.display, senses: [], attribution: { source: "Wiktionary", license: "CC-BY-SA-4.0" } });
+  const page = sourcePageUrl({ headword: s.display, source: "Wiktionary", license: "CC-BY-SA-4.0" });
   $<HTMLAnchorElement>("entry-link").href = page ?? "https://en.wiktionary.org";
   hint.hidden = true; // the slider's tip belongs to the results
   const body = $("entry-body");

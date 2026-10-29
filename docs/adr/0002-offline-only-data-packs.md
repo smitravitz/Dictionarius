@@ -1,6 +1,6 @@
 # ADR-0002: The app never connects; more definitions arrive as a file the user brings
 
-- **Status:** Proposed
+- **Status:** Superseded by [ADR-0004](0004-all-definitions-bundled.md) (never accepted): every definition is bundled, so there is no Tail to bring
 - **Date:** 2026-10-28
 - **Deciders:** project owner
 - **Supersedes in part:** [ADR-0001](0001-frequency-tiered-gloss-storage.md), on how the **Tail**

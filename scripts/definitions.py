@@ -61,9 +61,9 @@ def definition_of(obj):
     if not isinstance(word, str) or not word.strip(JS_WHITESPACE) or not meanings:
         return None
     definition = {"form": word.strip(JS_WHITESPACE), "pos": obj.get("pos"), "meanings": meanings}  # trimmed like headwords
-    etymology = obj.get("etymology_text")
-    if isinstance(etymology, str) and etymology.strip():
-        definition["etymology"] = etymology.strip()
+    etymology = etymology_of(obj.get("etymology_text"))
+    if etymology:
+        definition["etymology"] = etymology
     ipa = []
     for sound in obj.get("sounds") or ():
         if isinstance(sound, dict) and isinstance(sound.get("ipa"), str) and sound["ipa"] not in ipa:
@@ -195,6 +195,36 @@ def unpack(key, line, tables):
             d["ipa"] = sounds[sound - 1]
         definitions.append(d)
     return definitions
+
+
+# How an etymology's prose usually starts, after an "Etymology tree" diagram.
+PROSE_OPENERS = ("From ", "Borrowed", "Inherited", "Learned", "Semi-learned", "Compound", "Blend", "Clipping",
+                 "Coined", "Back-formation", "Probably", "Possibly", "Perhaps", "Uncertain", "Unknown",
+                 "Of uncertain", "Ultimately", "Calque", "Named after", "Abbreviation", "Univerbation",
+                 "Equivalent to", "Short for", "Shortened", "Derived", "Partly", "Onomatopoeic", "Imitative")
+
+
+def etymology_of(text):
+    """An etymology's prose. Wiktionary's "Etymology tree" diagram arrives as
+    one ancestor per line ("Proto-Germanic *ainaz", "▲"); it's dropped, up to
+    the first line that reads as a sentence. None when nothing is left."""
+    if not isinstance(text, str):
+        return None
+    lines = text.strip().split("\n")
+    if lines[0].strip() == "Etymology tree":
+        lines.pop(0)
+        while lines and is_tree_line(lines[0]):
+            lines.pop(0)
+    prose = "\n".join(lines).strip()
+    return prose or None
+
+
+def is_tree_line(line):
+    """One node of an etymology tree drawn as text, not a sentence."""
+    line = line.strip()
+    if line.startswith(PROSE_OPENERS):
+        return False
+    return len(line) <= 80 and ", " not in line and ". " not in line
 
 
 def labels_of(sense, said=""):

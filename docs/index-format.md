@@ -82,6 +82,7 @@ plain word list, which has no labels to go on).
 | `HOTK` | u8 | total | keys of the first `numHot` words in rank order, each followed by `SEP`; only if flag bit 1 |
 | `SHAPE` | u8 | `k` | per word: 0 = one word, 1 = hyphenated, 2 = has spaces; only if flag bit 2. See *Ranking* |
 | `EXPLICIT` | u32 | total | ascending IDs of explicit words; only if flag bit 3. See *Safe search* |
+| `KEYHASH` | u8 | 32 | SHA-256 of the keys in id order, joined by `SEP`: a [definitions file](definitions-format.md) names it to say it belongs to this index |
 | `LEN` | u8 | `k` | word column: characters per word. See *Word columns* |
 | `NAME` | bits | `⌈k / 32⌉` u32 | word column: proper nouns; only when parts of speech were read. See *Word columns* |
 
