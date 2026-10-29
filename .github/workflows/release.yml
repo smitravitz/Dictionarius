@@ -54,8 +54,11 @@ jobs:
           # uploaded them as a release named after that list's own checksum.
           sum=$(sha256sum data/headwords.sha256 | cut -c1-8)
           mkdir -p release-data
-          gh release download "data-$sum" --repo "$GITHUB_REPOSITORY" \
-            --pattern headwords.bin --pattern headwords.definitions.bin --dir release-data
+          if ! gh release download "data-$sum" --repo "$GITHUB_REPOSITORY" \
+            --pattern headwords.bin --pattern headwords.definitions.bin --dir release-data; then
+            echo "::error::No release data-$sum for this commit's data/headwords.sha256. Run scripts/setup-release.sh with the files it lists, commit and push that list, then tag a commit that has it."
+            exit 1
+          fi
           cd release-data
           sha256sum --check ../data/headwords.sha256
 
