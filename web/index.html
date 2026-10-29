@@ -35,6 +35,8 @@
 
       <div class="search">
         <label class="visually-hidden" for="q">Find a word</label>
+        <!-- The field: the box and, at its end, a magnifying glass (a second label: tapping it focuses the box). -->
+        <div class="field">
         <input
           id="q"
           type="search"
@@ -47,8 +49,15 @@
           autocorrect="off"
           spellcheck="false"
           enterkeyhint="search"
-          placeholder="Search for a pattern..."
+          placeholder="Search for a pattern…"
         />
+        <label class="lens" for="q" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
+            <circle cx="10.5" cy="10.5" r="6.25" />
+            <path d="M15.2 15.2 20 20" />
+          </svg>
+        </label>
+        </div>
         <!-- Under the cog: the Filters panel (word length wheels). Shown once the index says it can. -->
         <button class="cog funnel" id="filters-open" type="button" aria-label="Filters" aria-haspopup="dialog" aria-controls="filters" hidden>
           <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round">

@@ -36,6 +36,23 @@ test("shows how many words are loaded", async ({ page }) => {
   await expect(page.locator("#status")).toHaveText("17,082 words");
 });
 
+test("a magnifying glass sits at the end of the search field, beside the funnel, and focuses it", async ({ page }) => {
+  await open(page);
+  const lens = page.locator(".search .lens");
+  await expect(lens).toBeVisible();
+  const field = (await page.locator(".search .field").boundingBox())!;
+  const glass = (await lens.locator("svg").boundingBox())!; // the glyph; its tap area reaches further
+  const funnel = (await page.getByRole("button", { name: "Filters" }).boundingBox())!;
+  // Inside the field, on the right, over its underline; the funnel just past it.
+  expect(glass.x).toBeGreaterThan(field.x + field.width / 2);
+  expect(glass.x + glass.width).toBeLessThanOrEqual(field.x + field.width + 1);
+  expect(funnel.x - (glass.x + glass.width)).toBeLessThan(24);
+  expect(Math.abs(glass.y + glass.height / 2 - (funnel.y + funnel.height / 2))).toBeLessThan(6);
+  await page.locator("#q").blur();
+  await lens.click();
+  await expect(page.locator("#q")).toBeFocused();
+});
+
 test("typing shows results straight away, exact match first", async ({ page }) => {
   await open(page);
   await page.locator("#q").fill("e");
