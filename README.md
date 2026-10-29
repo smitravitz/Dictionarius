@@ -15,7 +15,7 @@ The open dictionary ecosystem (StarDict, Aard2, ZIM) does prefix/exact lookup ov
 ## How it stays small
 
 - **Every word, offline, from the first run:** the headword index for all 1,357,380 English search keys is 31 MB on disk (~13 MB zipped in the APK), including a hot list that makes mid-word search instant.
-- **Every definition inside the app (43 MB):** meanings, usage labels, links between words, pronunciation and etymology for all ~1.5 million entries, packed small (link glosses as templates, words and word classes as numbers) and compressed with brotli in blocks of 4,096 words, so opening a word unpacks one block. That is within ~11% of compressing it all as one stream, measured on a 5% sample ([ADR-0004](docs/adr/0004-all-definitions-bundled.md)).
+- **Every definition inside the app (43 MB):** meanings, usage labels, links between words, pronunciation and etymology for all ~1.5 million entries (one short example per meaning adds an estimated ~13 MB from the next data build), packed small (link glosses as templates, words and word classes as numbers) and compressed with brotli in blocks of 4,096 words, so opening a word unpacks one block. That is within ~11% of compressing it all as one stream, measured on a 5% sample ([ADR-0004](docs/adr/0004-all-definitions-bundled.md)).
 
 Nothing is downloaded later; the app has no network permission at all.
 
@@ -42,7 +42,8 @@ Nothing is downloaded later; the app has no network permission at all.
 - ✅ Safe search (⚙️ Settings, on by default): hides vulgar words and slurs, even typed out in full ([rule](docs/index-format.md#safe-search))
 - ✅ Common words only by default: phrases and names (proper nouns) are switched off in ⚙️ Settings
 - ✅ Word length filter: two roller wheels (min, max) in the filter panel under ⚙️; drag to turn ([how filters work](docs/adr/0003-filters-from-word-columns.md))
-- ✅ Definitions: tap a word for its meanings, pronunciation and origin; words inside a definition open their own entries, as on Wiktionary, and Back retraces them ([format](docs/definitions-format.md))
+- ✅ Definitions: tap a word for its meanings, a short example of each in use, its pronunciation and a brief origin; long pronunciations and origins fold behind *more*; words inside a definition open their own entries, as on Wiktionary ([format](docs/definitions-format.md))
+- ✅ Swipe sideways to step back and forward through the words you followed; Back goes straight to the results, and a swipe from there takes you down the same trail again
 - ✅ Peek: hold a word in the results to see its first meanings; let go and it's gone
 - ✅ Speed in Chromium on the full index: ready in ~0.3–0.7 s; keystroke to results ~33 ms (~35–135 ms with the CPU slowed 4× to mimic a mid-range phone)
 - ✅ Android app with the full word list inside; signed APKs on GitHub releases
@@ -50,7 +51,8 @@ Nothing is downloaded later; the app has no network permission at all.
 
 **⏳ Next**
 
-- Definitions in a release: the builder, file format and app are done; the first full data build is next
+- Examples in a release: the builder and app are done; the next data build adds them
+- Etymology section: each origin shown with the word classes it belongs to (today only a word with one origin shows it, as a brief)
 - Testing on real phones (the phone timings above are emulated)
 - PWA, iOS and F-Droid builds
 

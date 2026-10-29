@@ -46,6 +46,11 @@ decision or module makes it load-bearing.
   while typing, it only puts the keyboard away); a **hold** on a blank spot
   opens the position slider; a hold on a word is reserved; a moving finger
   scrolls; the mouse drags the list or a row.
+- **Edge strips** — in the Android app, a strip down each side of the results,
+  centred on their lower half, where the phone's own edge swipe (Back) is
+  turned off, so a thumb holding the slider's ends isn't taken away mid-slide
+  (`web/edge-gestures.ts`, `EdgeGesturesPlugin`). Android allows 200 dp per
+  edge.
 - **Filter** — a rule that leaves words out of every search (`src/filters.ts`):
   a **switch** in Settings (safe search; *Disable phrases*, entries with spaces;
   *Disable names*, proper nouns; all on by default, so only common words show)
@@ -59,10 +64,20 @@ decision or module makes it load-bearing.
   written form, a **word class** (Wiktionary's part of speech) with numbered
   **meanings** (gloss, usage **labels**, a safe-search flag), the words a
   plural or spelling is **of**, **links** inside the gloss (as on Wiktionary),
-  **pronunciation** and **etymology**. Tied to the index by `KEYHASH`.
+  one short **example** of the meaning in use, **pronunciation** and
+  **etymology**. Tied to the index by `KEYHASH`.
 - **Entry** — a word's page: its definitions shaped by `src/entry-view.ts`
-  (safe search's meanings left out and counted). Following a link opens that
-  word's entry; Back retraces.
+  (safe search's meanings left out and counted), drawn whole once they are in.
+  Pronunciations fold to two lines and the **origin brief** to three, with
+  more/less (`web/clamp.ts`). The origin brief is the word's etymology when
+  all its word classes share one; a word with several gets none until the
+  planned **Etymology section** shows each origin with its classes.
+- **Trail** — the words followed since leaving the results, kept as a browser
+  keeps history (`src/trail.ts`): opening a word from the results starts one,
+  following a link adds to it. A **swipe** (a quick sideways flick,
+  `web/swipe.ts`) steps along it: rightward back, leftward forward. Back goes
+  straight to the results, keeping the trail, so a swipe leftward from there
+  goes down it again.
 - **Peek** — hold a word in the results to see its first two meanings beside
   the row until the finger lifts (`web/peek.ts`).
 
