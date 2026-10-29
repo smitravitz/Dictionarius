@@ -1,5 +1,6 @@
 import type { Suggestion } from "../src/complete";
 import type { FilterInfo, FilterState } from "../src/filters";
+import type { Definition } from "../src/definitions";
 
 /** Results per page: the first screen, and each lazy load after it. */
 export const PAGE_SIZE = 50;
@@ -24,7 +25,12 @@ export interface Counts {
 
 /** Messages from the page to the search worker. */
 export type ToWorker =
-  | { type: "load"; url: string }
+  /** Load the index from `url`, then (in the background) its definitions file. */
+  | { type: "load"; url: string; definitions: string }
+  /** A word's definitions, by word id (answered by "definitions" with the same `ask`). */
+  | { type: "definitions"; ask: number; id: number }
+  /** The word a text names exactly, for a link (answered by "word" with the same `ask`). */
+  | { type: "word"; ask: number; text: string }
   /** Which words to leave out (src/filters.ts); the next search uses them. */
   | { type: "settings"; filters: FilterState }
   /** A new search: answered with its first page of rows. */
@@ -56,4 +62,7 @@ export type FromWorker =
       seek?: { offset: number; row: number };
     }
   /** Counting finished in the background (for the query in `query`). */
-  | { type: "counts"; query: string; counts: Counts };
+  | { type: "counts"; query: string; counts: Counts }
+  /** null: no definitions for that word (or no definitions file). */
+  | { type: "definitions"; ask: number; definitions: Definition[] | null }
+  | { type: "word"; ask: number; suggestion: Suggestion | null };

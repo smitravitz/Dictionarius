@@ -1079,7 +1079,16 @@
       "pos": "verb",
       "meanings": [
        {
-        "gloss": "to wobble (made up)"
+        "gloss": "to wobble (made up)",
+        "links": [
+         [
+          "wobble"
+         ],
+         [
+          "made up",
+          "make up"
+         ]
+        ]
        }
       ]
      }

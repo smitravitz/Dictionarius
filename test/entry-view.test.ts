@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { entryView, peekView } from "../src/entry-view";
+import { entryView, glossParts, peekView } from "../src/entry-view";
 import type { Definition } from "../src/definitions";
 
 // What a word's entry shows: each written form's word classes in order,
@@ -17,16 +17,17 @@ describe("entryView", () => {
     expect(entryView(serene, { safe: false })).toEqual({
       classes: [
         { form: "serene", pos: "adjective", meanings: [
-          { n: 1, gloss: "Calm, peaceful.", labels: [], of: [] },
-          { n: 2, gloss: "Clear, fair.", labels: ["archaic"], of: [] },
+          { n: 1, gloss: "Calm, peaceful.", labels: [], links: [] },
+          { n: 2, gloss: "Clear, fair.", labels: ["archaic"], links: [] },
         ] },
         { form: "serene", pos: "noun", meanings: [
-          { n: 1, gloss: "Serenity.", labels: [], of: [] },
-          { n: 2, gloss: "A made-up slur.", labels: ["slur"], of: [] },
+          { n: 1, gloss: "Serenity.", labels: [], links: [] },
+          { n: 2, gloss: "A made-up slur.", labels: ["slur"], links: [] },
         ] },
-        { form: "Serene", pos: "proper noun", meanings: [{ n: 1, gloss: "A made-up surname.", labels: [], of: [] }] },
+        { form: "Serene", pos: "proper noun", meanings: [{ n: 1, gloss: "A made-up surname.", labels: [], links: [] }] },
       ],
       hidden: 0,
+      ipa: [],
     });
   });
 
@@ -35,7 +36,7 @@ describe("entryView", () => {
     expect(view.hidden).toBe(1);
     expect(view.classes[1].meanings.map((m) => m.gloss)).toEqual(["Serenity."]);
     const allRude: Definition[] = [{ form: "gapword", pos: "noun", meanings: [{ gloss: "Rude.", explicit: true }] }];
-    expect(entryView(allRude, { safe: true })).toEqual({ classes: [], hidden: 1 });
+    expect(entryView(allRude, { safe: true })).toEqual({ classes: [], hidden: 1, ipa: [] });
   });
 
   it("keeps the words a plural or spelling links to, and an unknown word class as given", () => {
@@ -45,7 +46,7 @@ describe("entryView", () => {
     expect(view.classes[0]).toEqual({
       form: "zorbles",
       pos: "particle-ish",
-      meanings: [{ n: 1, gloss: "plural of zorble", labels: [], of: ["zorble"] }],
+      meanings: [{ n: 1, gloss: "plural of zorble", labels: [], links: [{ text: "zorble", word: "zorble" }] }],
     });
   });
 });
@@ -56,8 +57,8 @@ describe("peekView", () => {
       form: "serene",
       pos: "adjective",
       meanings: [
-        { n: 1, gloss: "Calm, peaceful.", labels: [], of: [] },
-        { n: 2, gloss: "Clear, fair.", labels: ["archaic"], of: [] },
+        { n: 1, gloss: "Calm, peaceful.", labels: [], links: [] },
+        { n: 2, gloss: "Clear, fair.", labels: ["archaic"], links: [] },
       ],
       more: 3,
       hidden: 0,
@@ -66,6 +67,67 @@ describe("peekView", () => {
   });
 
   it("has nothing to show when safe search hides every meaning", () => {
-    expect(peekView({ classes: [], hidden: 2 })).toBeNull();
+    expect(peekView({ classes: [], hidden: 2, ipa: [] })).toBeNull();
+  });
+});
+
+describe("pronunciation and origin", () => {
+  const lead: Definition[] = [
+    { form: "lead", pos: "noun", etymology: "From Old English lēad.", ipa: ["/lɛd/"], meanings: [{ gloss: "A metal." }] },
+    { form: "lead", pos: "verb", etymology: "From Old English lǣdan.", ipa: ["/liːd/", "/lɛd/"], meanings: [{ gloss: "To guide." }] },
+    { form: "lead", pos: "noun", etymology: "From Old English lǣdan.", meanings: [{ gloss: "The front." }] },
+    { form: "Lead", pos: "name", ipa: ["/liːd/ (place)"], meanings: [{ gloss: "A made-up town." }] },
+  ];
+
+  it("lists the main written form's pronunciations once each", () => {
+    expect(entryView(lead, { safe: true }).ipa).toEqual(["/lɛd/", "/liːd/"]);
+    expect(entryView([{ form: "a", pos: "noun", meanings: [{ gloss: "x" }] }], { safe: true }).ipa).toEqual([]);
+  });
+
+  it("shows an origin before the first word class it belongs to, again only when it changes", () => {
+    expect(entryView(lead, { safe: true }).classes.map((c) => c.etymology)).toEqual([
+      "From Old English lēad.",
+      "From Old English lǣdan.",
+      undefined,
+      undefined,
+    ]);
+  });
+});
+
+describe("links inside a meaning", () => {
+  it("joins Wiktionary's links and a plural's word, each linking to its word", () => {
+    const view = entryView(
+      [{ form: "zorbles", pos: "noun", meanings: [
+        { gloss: "plural of zorble", of: ["zorble"] },
+        { gloss: "Crowds, running about.", links: [["Crowds", "crowd"], ["running", "run"], ["about"]] },
+      ] }],
+      { safe: true },
+    );
+    expect(view.classes[0].meanings.map((m) => m.links)).toEqual([
+      [{ text: "zorble", word: "zorble" }],
+      [{ text: "Crowds", word: "crowd" }, { text: "running", word: "run" }, { text: "about", word: "about" }],
+    ]);
+  });
+
+  it("splits a gloss into text and tappable words, in order", () => {
+    const links = [{ text: "running", word: "run" }, { text: "Calm", word: "calm" }];
+    expect(glossParts("Calm and peaceful; running smoothly.", links)).toEqual([
+      { text: "Calm", word: "calm" },
+      " and peaceful; ",
+      { text: "running", word: "run" },
+      " smoothly.",
+    ]);
+  });
+
+  it("links a repeated text where it next appears, and adds a plural's word the gloss doesn't spell out", () => {
+    expect(glossParts("a b a", [{ text: "a", word: "x" }, { text: "a", word: "y" }])).toEqual([
+      { text: "a", word: "x" },
+      " b ",
+      { text: "a", word: "y" },
+    ]);
+    expect(glossParts("Its plural.", [{ text: "zorble", word: "zorble" }])).toEqual([
+      "Its plural. → ",
+      { text: "zorble", word: "zorble" },
+    ]);
   });
 });

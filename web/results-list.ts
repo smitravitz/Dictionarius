@@ -129,6 +129,12 @@ export class ResultsList {
   }
 
   /** The highlighted word, or the first one if none is highlighted. */
+  /** The word on the row holding `element`, or null. */
+  wordAt(element: Element): Suggestion | null {
+    const row = element.closest<HTMLElement>("li.word");
+    return row ? (this.rows.get(Number(row.dataset.row)) ?? null) : null;
+  }
+
   current(): Suggestion | null {
     return this.rows.get(Math.max(this.active, 0)) ?? null;
   }

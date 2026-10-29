@@ -158,6 +158,10 @@ export interface ScrollerGestureEvents {
   holdStart(x: number): boolean;
   holdMove(x: number): void;
   holdEnd(): void;
+  /** A word is held: peek at it (`target` is what the finger is on). */
+  peek(target: Element): void;
+  /** It was let go. */
+  unpeek(): void;
 }
 
 /** Connects a PressClassifier to the results list's scroller. */
@@ -234,6 +238,11 @@ export class ScrollerGestures {
 
   private hold() {
     const action = this.classifier.hold();
+    if (action?.type === "hold-word") {
+      this.holding = true; // the list stays put under the peek
+      this.events.peek(this.touched as Element);
+      return;
+    }
     if (action?.type !== "hold") return;
     if (!this.events.holdStart(action.x)) {
       this.classifier.cancel(this.pointerId);
@@ -272,6 +281,7 @@ export class ScrollerGestures {
     this.touched = null;
     this.holding = false;
     if (action?.type === "release") this.events.holdEnd();
+    if (action?.type === "release-word") this.events.unpeek();
     if (action?.type === "drop") {
       this.scroller.classList.remove("dragging");
       if (action.axis === "list") this.coast(e.timeStamp);

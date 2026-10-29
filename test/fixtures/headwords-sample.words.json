@@ -17093,7 +17093,7 @@
 {"word": "Quillmarch", "pos": "name", "senses": [{"glosses": ["a made-up surname"]}]},
 {"word": "Turkeyword", "pos": "name", "senses": [{"glosses": ["a made-up country"]}]},
 {"word": "turkeyword", "pos": "noun", "senses": [{"glosses": ["a made-up bird"]}]},
-{"word": "zorble", "pos": "verb", "senses": [{"glosses": ["to wobble (made up)"]}]},
+{"word": "zorble", "pos": "verb", "senses": [{"glosses": ["to wobble (made up)"], "links": [["wobble", "wobble#English"], ["made up", "make up"]]}]},
 {"word": "zorbles", "pos": "noun", "senses": [{"glosses": ["plural of zorble"], "tags": ["form-of", "plural"], "form_of": [{"word": "zorble"}]}]},
 {"word": "ingot", "pos": "noun", "senses": [{"glosses": ["A made-up bar of cast metal."]}, {"glosses": ["Metal in general.", "A made-up sub-meaning."], "tags": ["archaic"], "qualifier": "in old ledgers"}], "etymology_text": "From a made-up Middle English word.", "sounds": [{"ipa": "/ˈɪŋ.ɡət/"}]},
 {"word": "ingot", "pos": "verb", "senses": [{"glosses": ["To cast into made-up bars."], "tags": ["transitive"]}], "etymology_text": "From a made-up Middle English word."}

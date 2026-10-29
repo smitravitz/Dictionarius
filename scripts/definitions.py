@@ -51,6 +51,9 @@ def definition_of(obj):
             meaning["labels"] = labels
         if linked:
             meaning["of"] = linked
+        links = links_of(sense, gloss, linked)
+        if links:
+            meaning["links"] = links
         found = meaning_of(sense)
         if found and found[0] & EXPLICIT_LABELS:
             meaning["explicit"] = True
@@ -68,6 +71,24 @@ def definition_of(obj):
     if ipa:
         definition["ipa"] = ipa
     return definition
+
+
+def links_of(sense, gloss, linked):
+    """Wiktionary's links inside a meaning, as on its pages: [text] when the
+    text is the word linked to, else [text, word]. Kept: links whose text is
+    in the gloss, to another dictionary word (an "#English" anchor dropped; no
+    "Appendix:" or "w:" pages), and not a plural's or spelling's own word."""
+    out = []
+    for link in sense.get("links") or ():
+        if not (isinstance(link, (list, tuple)) and len(link) == 2 and all(isinstance(x, str) for x in link)):
+            continue
+        text, target = link[0], link[1].split("#")[0].strip()
+        if not text or text not in gloss or not target or ":" in target or target in linked:
+            continue
+        kept = [text] if target == text else [text, target]
+        if kept not in out:
+            out.append(kept)
+    return out
 
 
 HOLE = "\u0000"  # where a link template's word goes ("plural of \u0000")
@@ -112,7 +133,8 @@ def pack(key, definitions, tables):
     [forms, entries, etymologies, pronunciations], trailing empties dropped.
     A form equal to the search key is 0; an entry is [form, word class,
     meanings, etymology + 1, pronunciation + 1]; a meaning is [gloss or link
-    template number, labels, linked words, 1 if explicit]."""
+    template number, labels, linked words, 1 if explicit, links], a link being
+    its text when that is also the word linked to, else [text, word]."""
     pos_index = {p: i for i, p in enumerate(tables["pos"])}
     template_index = {t: i for i, t in enumerate(tables["templates"])}
     forms, etymologies, sounds, entries = [], [], [], []
@@ -124,8 +146,9 @@ def pack(key, definitions, tables):
         for m in d["meanings"]:
             t = template_of(m)
             gloss = template_index[t] if t in template_index else m["gloss"]
-            meanings.append(trim([gloss, m.get("labels", []), m.get("of", []), 1 if m.get("explicit") else 0],
-                                 [None, [], [], 0]))
+            links = [link[0] if len(link) == 1 else link for link in m.get("links", [])]
+            meanings.append(trim([gloss, m.get("labels", []), m.get("of", []), 1 if m.get("explicit") else 0, links],
+                                 [None, [], [], 0, []]))
         etymology = sound = 0
         if "etymology" in d:
             if d["etymology"] not in etymologies:
@@ -163,6 +186,8 @@ def unpack(key, line, tables):
                 meaning["of"] = linked
             if len(m) > 3 and m[3]:
                 meaning["explicit"] = True
+            if len(m) > 4 and m[4]:
+                meaning["links"] = [[link] if isinstance(link, str) else link for link in m[4]]
             d["meanings"].append(meaning)
         if etymology:
             d["etymology"] = etymologies[etymology - 1]

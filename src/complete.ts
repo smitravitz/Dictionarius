@@ -93,6 +93,14 @@ export class Completer {
   availableFilters(): FilterInfo[] {
     return this.filters.available();
   }
+
+  /** The word `text` names exactly (as a link in a definition does), or null
+   *  when the index hasn't it. Filters don't apply: it was asked for by name. */
+  word(text: string): Suggestion | null {
+    const key = normalize(text);
+    const id = key && !/[\u0000\u0001]/.test(key) ? this.index.exact(key) : null;
+    return id === null ? null : suggestionOf(this.index, id, 0, true);
+  }
 }
 
 export class Matches {
@@ -238,16 +246,7 @@ export class Matches {
 
   /** @internal */
   suggestion(id: number, offset: number): Suggestion {
-    const forms = this.index.displayForms(id);
-    return {
-      id,
-      key: this.index.key(id),
-      display: forms[0],
-      forms,
-      offset,
-      exact: id === this.exactId,
-      frequency: this.index.frequency(id),
-    };
+    return suggestionOf(this.index, id, offset, id === this.exactId);
   }
 
   /** Turn every position the walk has settled into a ranked chunk. */
@@ -301,6 +300,12 @@ export class Matches {
     for (const id of out) sorted[starts[maxRank - ranks[id]]++] = id;
     return sorted;
   }
+}
+
+/** A word as a result row shows it. */
+function suggestionOf(index: HeadwordIndex, id: number, offset: number, exact: boolean): Suggestion {
+  const forms = index.displayForms(id);
+  return { id, key: index.key(id), display: forms[0], forms, offset, exact, frequency: index.frequency(id) };
 }
 
 /** Reads the list in order from a starting position, a page at a time. */
