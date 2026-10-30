@@ -8,7 +8,7 @@
 set -euo pipefail   # stop at the first failed command instead of carrying on
 
 key_folder="$HOME/.dictionarius"          # what setup-release.sh created
-backup_folder="$HOME/dictionarius-backups" # where backups go; point it at a USB drive or synced folder
+backup_folder="$HOME/Documents/dictionarius-backups" # where backups go; point it at a USB drive or synced folder
 
 # Step 1: make sure there's a key to back up.
 if [[ ! -d "$key_folder" ]]; then
