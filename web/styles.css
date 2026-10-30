@@ -78,14 +78,24 @@ body {
 
 /* ---------------------------------------------------------------- layout */
 
+/* How far the phone's status and navigation bars reach into the page, which
+   draws edge to edge. Newer Android WebViews (140+) and iOS report it through
+   env(); in the Android app, Capacitor's SystemBars plugin also sets
+   --safe-area-inset-* (older WebViews report 0 through env()). The larger wins. */
+:root {
+  --inset-top: max(env(safe-area-inset-top, 0px), var(--safe-area-inset-top, 0px));
+  --inset-right: max(env(safe-area-inset-right, 0px), var(--safe-area-inset-right, 0px));
+  --inset-bottom: max(env(safe-area-inset-bottom, 0px), var(--safe-area-inset-bottom, 0px));
+  --inset-left: max(env(safe-area-inset-left, 0px), var(--safe-area-inset-left, 0px));
+}
+
 .app {
   display: flex;
   flex-direction: column;
   height: 100dvh;
   max-width: 44rem;
   margin: 0 auto;
-  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom)
-    env(safe-area-inset-left);
+  padding: var(--inset-top) var(--inset-right) var(--inset-bottom) var(--inset-left);
 }
 
 .masthead {
@@ -201,6 +211,35 @@ body {
   color: var(--proof);
 }
 
+/* While you type, a cross takes the glass's place: one icon at a time. */
+.clear {
+  display: none;
+  flex: none;
+  align-self: flex-end;
+  place-items: center;
+  width: 30px;
+  height: 44px;
+  margin-right: -0.25rem;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--pencil);
+  cursor: pointer;
+}
+
+.clear:hover,
+.clear:active {
+  color: var(--proof);
+}
+
+.field:focus-within:has(input:not(:placeholder-shown)) .clear {
+  display: grid;
+}
+
+.field:focus-within:has(input:not(:placeholder-shown)) .lens {
+  display: none;
+}
+
 .search input {
   flex: 1 1 auto;
   min-width: 0;
@@ -223,28 +262,11 @@ body {
   color: var(--pencil);
 }
 
-/* The browser's clear button, redrawn as a pencil-coloured cross. */
+/* The browser's own clear button is tiny and sits inside the box: the cross
+   above replaces it (Escape still clears). */
 .search input::-webkit-search-cancel-button {
-  width: 1.125rem;
-  height: 1.125rem;
-  margin-left: 0.75rem;
-  background: var(--pencil);
-  cursor: pointer;
-  appearance: none;
-  -webkit-appearance: none;
-  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 18'%3E%3Cpath d='M3 3l12 12M15 3L3 15' stroke='black' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E")
-    center / contain no-repeat;
-  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 18'%3E%3Cpath d='M3 3l12 12M15 3L3 15' stroke='black' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E")
-    center / contain no-repeat;
-}
-
-/* With nothing typed there's nothing to clear: give its room to the placeholder. */
-.search input:placeholder-shown::-webkit-search-cancel-button {
   display: none;
-}
-
-.search input::-webkit-search-cancel-button:hover {
-  background: var(--proof);
+  -webkit-appearance: none;
 }
 
 .summary {
@@ -837,15 +859,20 @@ a:focus-visible {
 
 /* ---------------------------------------------------------------- credit */
 
+/* Small print, but each link is a 44 px tall target (its padding reaches past
+   the line without making the footer taller), and the footer's own padding
+   keeps those targets clear of the list above and the gesture bar below. */
 .credit {
   margin-top: auto;
-  padding: 0.75rem var(--pad);
+  padding: 0.875rem var(--pad) 1.125rem;
   border-top: 1px solid var(--hairline);
   color: var(--pencil);
   font-size: 0.75rem;
+  line-height: 1.5;
 }
 
 .credit a {
+  padding: 0.875rem 0;
   color: inherit;
 }
 
@@ -868,7 +895,7 @@ a:focus-visible {
 
 .settings {
   width: min(26rem, calc(100vw - 2 * var(--pad)));
-  margin: max(4.5rem, calc(env(safe-area-inset-top) + 4rem)) auto auto;
+  margin: max(4.5rem, calc(var(--inset-top) + 4rem)) auto auto;
   padding: 1.25rem 1.25rem 1rem;
   border: 1px solid var(--hairline);
   border-radius: 0.75rem;
