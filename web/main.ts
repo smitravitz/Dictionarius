@@ -192,6 +192,16 @@ function mergeCounts(old: Counts | null, next: Counts): Counts {
 
 input.addEventListener("input", () => search(input.value));
 
+// The cross at the field's end (shown while typing) clears it and keeps the
+// keyboard up: pressing it mustn't take the focus from the box.
+const clear = $<HTMLButtonElement>("clear");
+for (const type of ["pointerdown", "mousedown"]) clear.addEventListener(type, (event) => event.preventDefault());
+clear.addEventListener("click", () => {
+  input.value = "";
+  input.focus();
+  input.dispatchEvent(new Event("input"));
+});
+
 function search(text: string) {
   leaveEntry();
   const next = normalize(text);

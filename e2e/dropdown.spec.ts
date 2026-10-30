@@ -53,6 +53,36 @@ test("a magnifying glass sits at the end of the search field, beside the funnel,
   await expect(page.locator("#q")).toBeFocused();
 });
 
+test("while typing, a cross takes the glass's place and clears the search; away from the field the glass is back", async ({
+  page,
+}) => {
+  await open(page);
+  const q = page.locator("#q");
+  const lens = page.locator(".search .lens");
+  const clear = page.getByRole("button", { name: "Clear the search" });
+  const funnel = (await page.getByRole("button", { name: "Filters" }).boundingBox())!;
+  await q.fill("a");
+  await expect(lens).toBeHidden();
+  await expect(clear).toBeVisible();
+  // In the glass's place: just before the funnel, big enough for a thumb.
+  const cross = (await clear.boundingBox())!;
+  expect(funnel.x - (cross.x + cross.width)).toBeLessThan(24);
+  expect(cross.height).toBeGreaterThanOrEqual(44);
+  expect(await page.locator(".search .field svg:visible").count()).toBe(1); // one icon, not two
+
+  await clear.click();
+  await expect(q).toHaveValue("");
+  await expect(q).toBeFocused(); // still typing: the keyboard stays up
+  await expect(page.locator("#intro")).toBeVisible();
+  await expect(clear).toBeHidden(); // nothing left to clear
+  await expect(lens).toBeVisible();
+
+  await q.fill("a");
+  await q.blur();
+  await expect(clear).toBeHidden();
+  await expect(lens).toBeVisible();
+});
+
 test("typing shows results straight away, exact match first", async ({ page }) => {
   await open(page);
   await page.locator("#q").fill("e");
