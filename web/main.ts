@@ -11,7 +11,7 @@ import { ResultsList } from "./results-list";
 import { OffsetSlider } from "./offset-slider";
 import { ScrollerGestures } from "./scroller-gestures";
 import { setUpNativeShell } from "./native";
-import { EXAMPLES, exampleLabel } from "./examples";
+import { EXAMPLES, PER_ROW, exampleLabel, tileWeight } from "./examples";
 import { FILTERS, filterKey, type FilterInfo } from "../src/filters";
 import { loadFilters, saveFilter } from "./saved-filters";
 import { FiltersPanel } from "./filters-panel";
@@ -28,6 +28,7 @@ import { guardEdges } from "./edge-gestures";
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const input = $<HTMLInputElement>("q");
 const status = $("status");
+const facts = $("facts");
 const summary = $("summary");
 const intro = $("intro");
 const frame = $("frame");
@@ -151,11 +152,13 @@ worker.onmessage = ({ data }: MessageEvent<FromWorker>) => {
     case "ready":
       ready = true;
       status.textContent = `${data.words.toLocaleString()} words`;
+      facts.textContent = `${data.words.toLocaleString()} words · every definition · fully offline`;
       offerFilters(data.filters);
       if (normalize(input.value)) summary.textContent = "Searching…";
       break;
     case "failed":
       status.textContent = "Word list unavailable";
+      facts.textContent = "Word list unavailable";
       summary.textContent = `Couldn’t load the word list (${data.message}). Reload the app to try again.`;
       break;
     case "rows":
@@ -470,17 +473,41 @@ for (const panel of panels) {
   });
 }
 
-// Example fragments fill the start screen; tapping one searches for it.
+// The bag of pieces on the start screen, four to a row; tapping one searches
+// for it. A tile is a little bigger for a piece that finds more words, and its
+// letters lean a little, as if shaken out of a bag (the tiles stay level).
 const examples = $("examples");
-for (const [fragment, where] of EXAMPLES) {
+const TILTS = [-1.5, 1, -0.5, 1.5, -1, 0.5, -1.5, 0.5, -0.5, 1];
+const bagCounts = EXAMPLES.map(([, , words]) => words);
+let row: HTMLElement | null = null;
+EXAMPLES.forEach(([fragment, where, words], i) => {
+  if (i % PER_ROW === 0) {
+    row = document.createElement("div");
+    row.className = "bag-row";
+    examples.append(row);
+  }
   const button = document.createElement("button");
   button.type = "button";
+  button.className = "tile";
   button.dataset.query = fragment;
-  button.textContent = exampleLabel(fragment, where);
-  const item = document.createElement("li");
-  item.append(button);
-  examples.append(item);
-}
+  button.style.setProperty("--k", tileWeight(words, bagCounts).toFixed(3));
+  button.style.setProperty("--tilt", `${TILTS[i % TILTS.length]}deg`);
+  const face = document.createElement("span");
+  face.className = "tile-face";
+  const text = document.createElement("span");
+  text.className = "tile-text";
+  const [before, after] = exampleLabel(fragment, where).split(fragment);
+  for (const [part, className] of [[before, "dots"], [fragment, "piece"], [after, "dots"]]) {
+    if (!part) continue;
+    const span = document.createElement("span");
+    span.className = className;
+    span.textContent = part;
+    text.append(span);
+  }
+  face.append(text);
+  button.append(face);
+  row!.append(button);
+});
 examples.addEventListener("click", (event) => {
   const button = (event.target as Element).closest<HTMLButtonElement>("button[data-query]");
   if (!button) return;

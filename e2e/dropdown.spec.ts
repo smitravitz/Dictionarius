@@ -213,19 +213,64 @@ test("says so when no word contains the fragment", async ({ page }) => {
   await expect(page.locator("li.word")).toHaveCount(0);
 });
 
-test("the start screen fills with everyday examples", async ({ page }) => {
+test("the start screen is a title page: the name, what it finds, the word count, and a bag of pieces", async ({ page }) => {
   await open(page);
-  const chips = page.locator("#examples button");
-  expect(await chips.count()).toBeGreaterThanOrEqual(40);
-  const labels = await chips.allTextContents();
-  expect(labels.slice(0, 3)).toEqual(["…ate", "…ease", "…ing"]);
+  await expect(page.getByRole("heading", { level: 1, name: "Dictionarius" })).toBeVisible();
+  await expect(page.locator("#title")).toContainText("finds a word from any part of it");
+  await expect(page.locator("#facts")).toHaveText("17,082 words · every definition · fully offline");
+  await expect(page.locator("#status")).toBeHidden(); // the count is in the facts line here
+
+  const tiles = page.locator("#examples button");
+  expect(await tiles.count()).toBe(20);
+  const labels = await tiles.allTextContents();
+  expect(labels.slice(0, 4)).toEqual(["…tion", "un…", "…ough…", "…ness"]);
   expect(new Set(labels).size).toBe(labels.length);
-  // The chips reach well down the screen rather than sitting in one short row.
-  const listBottom = await page.locator("#examples").evaluate((el) => el.getBoundingClientRect().bottom);
-  expect(listBottom).toBeGreaterThan(page.viewportSize()!.height * 0.6);
-  await page.getByRole("button", { name: "…ease" }).click();
-  await expect(page.locator("#q")).toHaveValue("ease");
-  await expect(page.locator("li.word mark.frag").first()).toHaveText("ease");
+  // Bigger for pieces that find more words, but only a little.
+  const size = (name: string) =>
+    page.getByRole("button", { name, exact: true }).evaluate((el) => parseFloat(getComputedStyle(el).fontSize));
+  expect(await size("…ing")).toBeGreaterThan(await size("…hood"));
+  expect((await size("…ing")) / (await size("…hood"))).toBeLessThan(1.35);
+
+  await page.getByRole("button", { name: "…ough…", exact: true }).click();
+  await expect(page.locator("#q")).toHaveValue("ough");
+  await expect(page.locator("li.word mark.frag").first()).toHaveText("ough");
+  // With results showing, the title page gives way to the usual header.
+  await expect(page.locator("#title")).toBeHidden();
+  await expect(page.locator("#status")).toBeVisible();
+});
+
+for (const width of [412, 360]) {
+  test(`the bag sits four to a row, none stranded or cut off, ${width} px wide`, async ({ page, isMobile }) => {
+    test.skip(!isMobile, "a phone's screen");
+    await page.setViewportSize({ width, height: width === 412 ? 839 : 740 });
+    await open(page);
+    const rows = page.locator("#examples .bag-row");
+    expect(await rows.count()).toBe(5);
+    const footerTop = await page.locator(".credit").evaluate((el) => el.getBoundingClientRect().top);
+    for (const row of await rows.all()) {
+      expect(await row.locator("button").count()).toBe(4);
+      expect(await row.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
+      for (const tile of await row.locator("button").all()) {
+        const box = (await tile.boundingBox())!;
+        expect(box.x).toBeGreaterThanOrEqual(0);
+        expect(box.x + box.width).toBeLessThanOrEqual(width);
+        expect(box.height).toBeGreaterThanOrEqual(44);
+        expect(box.y + box.height, "in view without scrolling").toBeLessThanOrEqual(footerTop);
+      }
+    }
+  });
+}
+
+test("the space under the bag answers the space over the name: less, but in proportion", async ({ page, isMobile }) => {
+  test.skip(!isMobile, "a phone's screen");
+  await page.setViewportSize({ width: 412, height: 839 });
+  await open(page);
+  const top = await page.getByRole("heading", { level: 1 }).evaluate((el) => el.getBoundingClientRect().top);
+  const bagBottom = await page.locator("#examples").evaluate((el) => el.getBoundingClientRect().bottom);
+  const footerTop = await page.locator(".credit").evaluate((el) => el.getBoundingClientRect().top);
+  const below = footerTop - bagBottom;
+  expect(below).toBeLessThan(top);
+  expect(below).toBeGreaterThan(top * 0.45);
 });
 
 test("a word too long for the row scrolls sideways to show its start", async ({ page, isMobile }) => {

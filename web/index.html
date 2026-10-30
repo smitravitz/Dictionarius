@@ -33,6 +33,14 @@
         </div>
       </header>
 
+      <!-- The start screen is a title page: the name above (the masthead's, set large), what it
+           does, a worked example, and the facts. It gives way to the results once you type. -->
+      <section class="title-page" id="title" aria-label="About">
+        <p class="tagline">The English dictionary that finds a word from any part of it.</p>
+        <p class="specimen">“<mark>eren</mark>” finds s<mark>eren</mark>e, coh<mark>eren</mark>t, adh<mark>eren</mark>ce, etc.</p>
+        <p class="facts" id="facts">Loading the word list…</p>
+      </section>
+
       <div class="search">
         <label class="visually-hidden" for="q">Find a word</label>
         <!-- The field: the box and, at its end, a magnifying glass (a second label: tapping it
@@ -50,7 +58,7 @@
           autocorrect="off"
           spellcheck="false"
           enterkeyhint="search"
-          placeholder="Search for a pattern…"
+          placeholder="Type any part of a word"
         />
         <label class="lens" for="q" aria-hidden="true">
           <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
@@ -74,9 +82,12 @@
       <p class="summary" id="summary" aria-live="polite"></p>
       <p class="hint" id="hint" hidden>Hold a blank spot in the list, then slide sideways to choose how many letters come before.</p>
 
-      <section class="intro" id="intro">
-        <p id="examples-label">Find every word containing:</p>
-        <ul class="examples" id="examples" aria-labelledby="examples-label"></ul>
+      <section class="intro" id="intro" aria-labelledby="examples-label">
+        <div class="bag-wrap">
+          <p class="bag-label" id="examples-label">Or pick one from the bag below</p>
+          <!-- Rows of four tiles (main.ts), sized a little by how many words each piece finds. -->
+          <div class="bag" id="examples"></div>
+        </div>
       </section>
 
       <div class="frame" id="frame" hidden>
@@ -97,7 +108,7 @@
         <!-- With a word open, "Wiktionary" links to its page there: where its authors are credited. -->
         Words from <a id="source" href="https://en.wiktionary.org">Wiktionary</a>,
         <a href="https://creativecommons.org/licenses/by-sa/4.0/">CC BY-SA 4.0</a> ·
-        <a href="https://github.com/smitravitz/Dictionarius">Source code</a>, GPL-3.0
+        <a href="https://github.com/smitravitz/Dictionarius">Source code</a>, GPL‑3.0
       </footer>
     </main>
 
