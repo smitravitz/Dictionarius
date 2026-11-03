@@ -36,9 +36,12 @@ decision or module makes it load-bearing.
   (0 = the headword starts with the typed text).
 - **Start screen** — what shows with nothing typed: a title page (the name set
   large, what Dictionarius does, a worked example, the word count), the field,
-  and the **bag of pieces** (`web/examples.ts`): twenty general pieces of words
-  ("…tion", "un…", "…ough…"), four to a row, each tile a little bigger the more
-  words it finds. Typing brings back the usual header.
+  and the **suggestions** (`web/examples.ts`): general pieces of words, shown
+  plain ("tion", "ough", "ere"), in two lanes drifting slowly opposite ways,
+  shuffled each start, each tile a little bigger the more words it finds.
+  Tapping one opens its words around the middle of the list (**landing**,
+  `src/landing.ts`: 35–65% of the way down, at random). Typing brings back the
+  usual header.
 - **Position slider** — hold a blank spot in the results and slide sideways to
   jump to a position. Its **active range** is the middle 80% of the screen; the
   **position scale** (`web/position-scale.ts`) gives positions 4–6 the most

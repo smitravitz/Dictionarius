@@ -223,25 +223,27 @@ test("says so when no word contains the fragment", async ({ page }) => {
   await expect(page.locator("li.word")).toHaveCount(0);
 });
 
-test("the start screen is a title page: the name, what it finds, the word count, and a bag of pieces", async ({ page }) => {
+test("the start screen is a title page: the name, what it finds, the word count, and suggestions", async ({ page }) => {
   await open(page);
   await expect(page.getByRole("heading", { level: 1, name: "Dictionarius" })).toBeVisible();
   await expect(page.locator("#title")).toContainText("finds a word from any part of it");
   await expect(page.locator("#facts")).toHaveText("17,082 words · every definition · fully offline");
   await expect(page.locator("#status")).toBeHidden(); // the count is in the facts line here
 
-  const tiles = page.locator("#examples button");
-  expect(await tiles.count()).toBe(20);
+  // Plain pieces, no ellipses, each once (the moving lanes' second copies are hidden from screen readers).
+  const tiles = page.locator("#examples").getByRole("button");
+  expect(await tiles.count()).toBe(34);
   const labels = await tiles.allTextContents();
-  expect(labels.slice(0, 4)).toEqual(["…tion", "un…", "…ough…", "…ness"]);
+  for (const label of labels) expect(label).toMatch(/^[a-z]+$/);
   expect(new Set(labels).size).toBe(labels.length);
   // Bigger for pieces that find more words, but only a little.
   const size = (name: string) =>
-    page.getByRole("button", { name, exact: true }).evaluate((el) => parseFloat(getComputedStyle(el).fontSize));
-  expect(await size("…ing")).toBeGreaterThan(await size("…hood"));
-  expect((await size("…ing")) / (await size("…hood"))).toBeLessThan(1.35);
+    page.locator(`#examples button[data-query="${name}"]`).first().evaluate((el) => parseFloat(getComputedStyle(el).fontSize));
+  expect(await size("ing")).toBeGreaterThan(await size("hood"));
+  expect((await size("ing")) / (await size("hood"))).toBeLessThan(1.35);
 
-  await page.getByRole("button", { name: "…ough…", exact: true }).click();
+  await page.emulateMedia({ reducedMotion: "reduce" }); // still, to tap reliably
+  await page.locator('#examples button[data-query="ough"]').first().click();
   await expect(page.locator("#q")).toHaveValue("ough");
   await expect(page.locator("li.word mark.frag").first()).toHaveText("ough");
   // With results showing, the title page gives way to the usual header.
@@ -277,27 +279,39 @@ test("tapping a suggestion opens its words around the middle of the list, a litt
   expect(new Set(landings).size).toBeGreaterThan(1);
 });
 
-for (const width of [412, 360]) {
-  test(`the bag sits four to a row, none stranded or cut off, ${width} px wide`, async ({ page, isMobile }) => {
-    test.skip(!isMobile, "a phone's screen");
-    await page.setViewportSize({ width, height: width === 412 ? 839 : 740 });
-    await open(page);
-    const rows = page.locator("#examples .bag-row");
-    expect(await rows.count()).toBe(5);
-    const footerTop = await page.locator(".credit").evaluate((el) => el.getBoundingClientRect().top);
-    for (const row of await rows.all()) {
-      expect(await row.locator("button").count()).toBe(4);
-      expect(await row.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
-      for (const tile of await row.locator("button").all()) {
-        const box = (await tile.boundingBox())!;
-        expect(box.x).toBeGreaterThanOrEqual(0);
-        expect(box.x + box.width).toBeLessThanOrEqual(width);
-        expect(box.height).toBeGreaterThanOrEqual(44);
-        expect(box.y + box.height, "in view without scrolling").toBeLessThanOrEqual(footerTop);
-      }
-    }
-  });
-}
+test("the suggestions drift slowly in two lanes, opposite ways, and hold still under a finger", async ({ page }) => {
+  await open(page);
+  const lanes = page.locator("#examples .lane");
+  expect(await lanes.count()).toBe(2);
+  const shift = (i: number) =>
+    lanes.nth(i).locator(".lane-track").evaluate((el) => new DOMMatrixReadOnly(getComputedStyle(el).transform).m41);
+  const before = [await shift(0), await shift(1)];
+  await page.waitForTimeout(1000);
+  const after = [await shift(0), await shift(1)];
+  const moved = [after[0] - before[0], after[1] - before[1]];
+  for (const m of moved) {
+    expect(Math.abs(m)).toBeGreaterThan(5); // moving…
+    expect(Math.abs(m)).toBeLessThan(60); // …slowly
+  }
+  expect(Math.sign(moved[0])).toBe(-Math.sign(moved[1])); // opposite ways
+
+  const box = (await lanes.nth(0).boundingBox())!;
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  const held = await shift(0);
+  await page.waitForTimeout(500);
+  expect(Math.abs((await shift(0)) - held)).toBeLessThan(1);
+  await page.mouse.up();
+});
+
+test("with reduced motion the lanes stay still and scroll sideways by hand", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await open(page);
+  const lane = page.locator("#examples .lane").first();
+  expect(await lane.locator(".lane-track").evaluate((el) => getComputedStyle(el).animationName)).toBe("none");
+  expect(await lane.evaluate((el) => el.scrollWidth > el.clientWidth && getComputedStyle(el).overflowX === "auto")).toBe(true);
+  expect(await page.locator("#examples button:visible").count()).toBe(34); // no moving copies
+});
 
 test("the space under the bag answers the space over the name: less, but in proportion", async ({ page, isMobile }) => {
   test.skip(!isMobile, "a phone's screen");
@@ -357,7 +371,8 @@ test("clearing the search brings back the examples", async ({ page }) => {
   await page.locator("#q").fill("e");
   await page.locator("#q").press("Escape");
   await expect(page.locator("#intro")).toBeVisible();
-  await page.getByRole("button", { name: "…tion" }).click();
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.locator('#examples button[data-query="tion"]').first().click();
   await expect(page.locator("#q")).toHaveValue("tion");
   await expect(page.locator("li.word").first()).toBeVisible();
 });

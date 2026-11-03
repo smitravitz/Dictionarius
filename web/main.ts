@@ -11,7 +11,7 @@ import { ResultsList } from "./results-list";
 import { OffsetSlider } from "./offset-slider";
 import { ScrollerGestures } from "./scroller-gestures";
 import { setUpNativeShell } from "./native";
-import { EXAMPLES, PER_ROW, exampleLabel, tileWeight } from "./examples";
+import { LANES, PIECES, lanesOf, tileWeight } from "./examples";
 import { landingRow } from "../src/landing";
 import { FILTERS, describeRange, filterKey, type FilterInfo, type Range } from "../src/filters";
 import { loadFilters, saveFilter } from "./saved-filters";
@@ -529,41 +529,74 @@ for (const panel of panels) {
   });
 }
 
-// The bag of pieces on the start screen, four to a row; tapping one searches
-// for it. A tile is a little bigger for a piece that finds more words, and its
-// letters lean a little, as if shaken out of a bag (the tiles stay level).
+// The suggestions on the start screen (web/examples.ts): two lanes drifting
+// slowly opposite ways, shuffled each start; tapping one searches for it and
+// opens its words around the middle. A tile is a little bigger for a piece
+// that finds more words, and its letters lean a little (the tiles stay level).
+// Each lane holds its tiles twice, the second set hidden from screen readers,
+// so the drift loops without a seam.
 const examples = $("examples");
 const TILTS = [-1.5, 1, -0.5, 1.5, -1, 0.5, -1.5, 0.5, -0.5, 1];
-const bagCounts = EXAMPLES.map(([, , words]) => words);
-let row: HTMLElement | null = null;
-EXAMPLES.forEach(([fragment, where, words], i) => {
-  if (i % PER_ROW === 0) {
-    row = document.createElement("div");
-    row.className = "bag-row";
-    examples.append(row);
-  }
+const pieceCounts = PIECES.map(([, words]) => words);
+const DRIFT = 16; // px per second: slow enough to read, quick enough to notice
+
+function tile(piece: string, words: number, i: number, copy: boolean): HTMLButtonElement {
   const button = document.createElement("button");
   button.type = "button";
   button.className = "tile";
-  button.dataset.query = fragment;
-  button.style.setProperty("--k", tileWeight(words, bagCounts).toFixed(3));
+  button.dataset.query = piece;
+  if (copy) button.tabIndex = -1;
+  button.style.setProperty("--k", tileWeight(words, pieceCounts).toFixed(3));
   button.style.setProperty("--tilt", `${TILTS[i % TILTS.length]}deg`);
   const face = document.createElement("span");
   face.className = "tile-face";
   const text = document.createElement("span");
   text.className = "tile-text";
-  const [before, after] = exampleLabel(fragment, where).split(fragment);
-  for (const [part, className] of [[before, "dots"], [fragment, "piece"], [after, "dots"]]) {
-    if (!part) continue;
-    const span = document.createElement("span");
-    span.className = className;
-    span.textContent = part;
-    text.append(span);
-  }
+  text.textContent = piece;
   face.append(text);
   button.append(face);
-  row!.append(button);
+  return button;
+}
+
+lanesOf(PIECES, LANES).forEach((pieces, lane) => {
+  const box = document.createElement("div");
+  box.className = "lane";
+  const track = document.createElement("div");
+  track.className = "lane-track";
+  for (const copy of [false, true]) {
+    const set = document.createElement("div");
+    set.className = "tile-set";
+    if (copy) set.setAttribute("aria-hidden", "true");
+    pieces.forEach(([piece, words], i) => set.append(tile(piece, words, i + lane * 5, copy)));
+    track.append(set);
+  }
+  box.append(track);
+  examples.append(box);
 });
+
+/** One set's width is a lap of the drift; its time follows from the speed. */
+function pace() {
+  for (const track of examples.querySelectorAll<HTMLElement>(".lane-track")) {
+    const lap = (track.firstElementChild as HTMLElement).offsetWidth;
+    if (!lap) continue;
+    track.style.setProperty("--lap", `${lap}px`);
+    track.style.setProperty("--lap-time", `${(lap / DRIFT).toFixed(1)}s`);
+  }
+}
+pace();
+new ResizeObserver(pace).observe(examples);
+
+// A finger on a lane holds it still (and a little after), so a tile can be read and tapped.
+let release = 0;
+examples.addEventListener("pointerdown", () => {
+  clearTimeout(release);
+  examples.classList.add("held");
+});
+for (const type of ["pointerup", "pointercancel"])
+  window.addEventListener(type, () => {
+    clearTimeout(release);
+    release = window.setTimeout(() => examples.classList.remove("held"), 1500);
+  });
 examples.addEventListener("click", (event) => {
   const button = (event.target as Element).closest<HTMLButtonElement>("button[data-query]");
   if (!button) return;

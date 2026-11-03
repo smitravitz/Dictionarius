@@ -399,8 +399,8 @@ body {
   padding-bottom: 0;
 }
 
-/* The bag sits at the foot of the screen (and scrolls, on a short one). The
-   space under it answers the space over the name: less, in proportion. */
+/* The suggestions sit at the foot of the screen (and scroll, on a short one).
+   The space under them answers the space over the name: less, in proportion. */
 .intro {
   display: flex;
   flex: 1;
@@ -423,20 +423,66 @@ body {
   font-style: italic;
 }
 
-.bag {
+/* Two lanes of suggestions, drifting slowly opposite ways, edge to edge.
+   Each lane holds its tiles twice (main.ts): moving one set's width
+   (--lap) brings the second exactly where the first began, so it loops. */
+.carousel {
   display: flex;
   flex-direction: column;
   gap: 0.625rem;
+  margin: 0 -0.75rem;
 }
 
-/* Four to a row, centred, so rows come out uneven but none is stranded.
-   Below 412 px everything shrinks with the screen, so four always fit. */
-.bag-row {
+.lane {
+  overflow-x: auto;
+  scrollbar-width: none;
+  overscroll-behavior-x: contain;
+}
+
+.lane::-webkit-scrollbar {
+  display: none;
+}
+
+.lane-track {
   display: flex;
-  flex-wrap: nowrap;
-  justify-content: center;
-  align-items: center;
-  gap: min(0.625rem, 2.4vw);
+  width: max-content;
+  animation: drift var(--lap-time, 120s) linear infinite;
+}
+
+.lane:nth-child(2) .lane-track {
+  animation-direction: reverse;
+}
+
+.tile-set {
+  display: flex;
+  gap: 0.625rem;
+  padding-right: 0.625rem; /* the gap between the sets, so the loop has no seam */
+}
+
+@keyframes drift {
+  to {
+    transform: translateX(calc(-1 * var(--lap, 0px)));
+  }
+}
+
+/* Held still under a finger or the mouse, or while a tile has focus. */
+.carousel.held .lane-track,
+.lane:hover .lane-track,
+.lane:focus-within .lane-track {
+  animation-play-state: paused;
+}
+
+/* Reduced motion: still lanes that scroll sideways by hand, one set each. */
+@media (prefers-reduced-motion: reduce) {
+  .lane-track {
+    animation: none;
+  }
+  .tile-set[aria-hidden] {
+    display: none;
+  }
+  .tile-set {
+    padding-left: 0.75rem;
+  }
 }
 
 /* --k (0-1) says how many words the piece finds, among the bag's: a tile is
@@ -472,19 +518,11 @@ body {
 .tile-text {
   display: inline-block;
   transform: rotate(var(--tilt, 0deg));
-}
-
-.tile .dots {
-  color: var(--pencil);
-}
-
-.tile .piece {
   color: var(--proof);
   font-weight: 600;
 }
 
-/* A shorter phone: the same page, its spacing tightened in proportion, so the
-   whole bag shows without scrolling. */
+/* A shorter phone: the same page, its spacing tightened in proportion. */
 @media (max-height: 800px) {
   .app:has(> .intro:not([hidden])) .wordmark {
     margin-top: 1.5rem;

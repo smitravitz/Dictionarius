@@ -57,7 +57,8 @@ test("the summary counts words that start with, end with, and contain the fragme
 
 test("tapping an example searches without opening the keyboard", async ({ page }) => {
   await open(page);
-  await page.getByRole("button", { name: "…ing" }).click();
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.locator('#examples button[data-query="ing"]').first().click();
   await expect(page.locator("#q")).toHaveValue("ing");
   await expect(page.locator("li.word").first()).toBeVisible();
   await expect(page.locator("#q")).not.toBeFocused();
