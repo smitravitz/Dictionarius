@@ -25,6 +25,7 @@ import { pulse } from "./haptics";
 import { Trail } from "../src/trail";
 import { Swipes, type SwipeDirection } from "./swipe";
 import { guardEdges } from "./edge-gestures";
+import { setUpLoader } from "./loader";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const input = $<HTMLInputElement>("q");
@@ -43,6 +44,7 @@ const panels = [settings, $<HTMLDialogElement>("filters")];
 
 const worker = new Worker(new URL("./search-worker.ts", import.meta.url), { type: "module" });
 const send = (message: ToWorker) => worker.postMessage(message);
+const loader = setUpLoader($("loader"), $("app"));
 
 let seq = 0; // id of the latest search; older answers are ignored
 let ready = false;
@@ -174,7 +176,12 @@ const indexUrl = asked.origin === location.origin ? asked : new URL("headwords.b
 // screen, not just on its way), so its first frame isn't held up.
 requestAnimationFrame(() =>
   requestAnimationFrame(() =>
-    setTimeout(() => send({ type: "load", url: indexUrl.href, definitions: indexUrl.href.replace(/\.bin$/, ".definitions.bin") })),
+    setTimeout(() => send({
+        type: "load",
+        url: indexUrl.href,
+        definitions: indexUrl.href.replace(/\.bin$/, ".definitions.bin"),
+        definitionsNow: loader.waits, // a browser shows the app only once they're in too
+      })),
   ),
 );
 
@@ -207,6 +214,10 @@ worker.onmessage = ({ data }: MessageEvent<FromWorker>) => {
       facts.textContent = "Word list unavailable";
       facts.classList.add("ready");
       summary.textContent = `Couldn’t load the word list (${data.message}). Reload the app to try again.`;
+      loader.failed();
+      break;
+    case "loaded":
+      loader.done();
       break;
     case "rows":
       if (data.seq !== seq) return; // an answer to an older search

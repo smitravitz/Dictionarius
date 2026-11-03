@@ -75,18 +75,23 @@ test("no link out on the page; the footer's credit names the open word's Wiktion
   await expect(page.locator("#source")).toHaveAttribute("href", "https://en.wiktionary.org");
 });
 
-test("while the definitions are still loading, the page says so, then fills in", async ({ page }) => {
+test("a browser shows the loading screen until the definitions are in, then nothing says loading", async ({ page }) => {
   let release!: () => void;
   const held = new Promise<void>((resolve) => (release = resolve));
   await page.context().route("**/headwords-sample.definitions.bin", async (route) => {
     await held;
     await route.continue();
   });
-  await open(page);
-  await openWord(page, "ingot", "ingot");
-  await expect(entry(page).locator(".entry-note")).toHaveText("Loading the definitions…");
-  await expect(entry(page).locator(".meaning")).toHaveCount(0);
+  await page.goto("/?index=headwords-sample.bin");
+  const loader = page.locator("#loader");
+  await expect(loader).toContainText("Loading Dictionarius");
+  await expect(page.locator(".loader-dots")).toHaveText("..."); // the dots come and go
+  await expect(page.locator("#status")).toHaveText(/^[\d,]+ words$/); // the word list is in, behind it…
+  await expect(loader).toBeVisible(); // …but the app waits for the definitions too
+  expect(await page.locator("#app").evaluate((app) => (app as HTMLElement).inert)).toBe(true);
   release();
+  await expect(loader).toHaveCount(0);
+  await openWord(page, "ingot", "ingot");
   await expect(entry(page).locator(".meaning")).toHaveCount(3);
   await expect(entry(page).locator(".entry-note")).toBeHidden();
 });

@@ -38,7 +38,7 @@ let definitionsTimer: ReturnType<typeof setTimeout> | undefined;
 scope.onmessage = ({ data }) => {
   switch (data.type) {
     case "load":
-      void load(data.url, data.definitions);
+      void load(data.url, data.definitions, data.definitionsNow === true);
       break;
     case "definitions": {
       startDefinitions(); // wanted now: no more waiting
@@ -72,7 +72,7 @@ scope.onmessage = ({ data }) => {
   }
 };
 
-async function load(url: string, definitionsUrl: string) {
+async function load(url: string, definitionsUrl: string, definitionsNow: boolean) {
   const started = performance.now();
   try {
     const response = await fetch(url);
@@ -92,7 +92,8 @@ async function load(url: string, definitionsUrl: string) {
       clearTimeout(definitionsTimer);
       void loadDefinitions(definitionsUrl, index);
     };
-    definitionsTimer = setTimeout(() => startDefinitions(), DEFINITIONS_AFTER_MS);
+    if (definitionsNow) startDefinitions();
+    else definitionsTimer = setTimeout(() => startDefinitions(), DEFINITIONS_AFTER_MS);
   } catch (error) {
     scope.postMessage({ type: "failed", message: error instanceof Error ? error.message : String(error) });
   }
@@ -107,6 +108,7 @@ async function loadDefinitions(url: string, index: HeadwordIndex) {
     console.warn("no definitions:", error instanceof Error ? error.message : error);
     found(null);
   }
+  scope.postMessage({ type: "loaded" });
 }
 
 function search({ seq, query }: { seq: number; query: string }) {

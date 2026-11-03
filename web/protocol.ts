@@ -25,8 +25,9 @@ export interface Counts {
 
 /** Messages from the page to the search worker. */
 export type ToWorker =
-  /** Load the index from `url`, then (in the background) its definitions file. */
-  | { type: "load"; url: string; definitions: string }
+  /** Load the index from `url`, then its definitions file: straight after it when
+   *  `definitionsNow`, otherwise in the background once the start screen has settled. */
+  | { type: "load"; url: string; definitions: string; definitionsNow?: boolean }
   /** A word's definitions, by word id (answered by "definitions" with the same `ask`). */
   | { type: "definitions"; ask: number; id: number }
   /** The word a text names exactly, for a link (answered by "word" with the same `ask`). */
@@ -46,6 +47,8 @@ export type FromWorker =
   /** The index loaded; `filters` are the ones it has the data for. */
   | { type: "ready"; words: number; ms: number; filters: FilterInfo[] }
   | { type: "failed"; message: string }
+  /** The definitions file is in (or there is none): everything is loaded. */
+  | { type: "loaded" }
   | {
       type: "rows";
       seq: number;

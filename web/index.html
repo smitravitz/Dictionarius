@@ -19,7 +19,19 @@
     <title>Dictionarius</title>
   </head>
   <body>
-    <main class="app">
+    <!-- In a browser, shown until the word list and its definitions are in (web/loader.ts):
+         a book leafing forward and back. The app itself never shows it. -->
+    <div class="loader" id="loader" role="status">
+      <div class="book" aria-hidden="true">
+        <div class="leaf left"></div>
+        <div class="leaf right"></div>
+        <div class="leaf turning"></div>
+        <div class="leaf turning"></div>
+        <div class="leaf turning"></div>
+      </div>
+      <p class="loader-text">Loading Dictionarius<span class="loader-dots" aria-hidden="true">.</span></p>
+    </div>
+    <main class="app" id="app">
       <header class="masthead">
         <h1 class="wordmark">Dictionarius</h1>
         <div class="masthead-end">
