@@ -1,16 +1,11 @@
 name: Pages
 
 # Builds the web app for one release and publishes it on GitHub Pages, replacing what was
-# there: only one version is online. The release workflow runs this for each new release;
-# run it by hand (Actions > Pages > Run workflow) to republish one, the latest by default.
+# there: only one version is online. The release workflow starts this, on main, for each
+# new release (Pages takes deploys from main only); run it by hand (Actions > Pages > Run
+# workflow) to republish one, the latest by default.
 # One-time setup: Settings > Pages > Source: GitHub Actions.
 on:
-  workflow_call:
-    inputs:
-      tag:
-        description: The release tag to publish (v1.2.3)
-        type: string
-        required: true
   workflow_dispatch:
     inputs:
       tag:

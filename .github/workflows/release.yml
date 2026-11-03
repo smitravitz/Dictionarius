@@ -122,13 +122,18 @@ jobs:
             --repo "$GITHUB_REPOSITORY" --verify-tag \
             --title "Dictionarius $GITHUB_REF_NAME" --notes-file notes.md
 
+  # GitHub Pages only takes deploys from main (the github-pages environment's rule), not
+  # from a tag, so this asks pages.yml to run on main and publish this release.
   pages:
     name: Web app on GitHub Pages
     needs: android # only a release that built, passed its checks and was published
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
     permissions:
-      contents: read
-      pages: write
-      id-token: write
-    uses: ./.github/workflows/pages.yml
-    with:
-      tag: ${{ github.ref_name }}
+      actions: write # to start pages.yml
+    steps:
+      - name: Publish ${{ github.ref_name }} on Pages (pages.yml, run from main)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          tag: ${{ github.ref_name }}
+        run: gh workflow run pages.yml --repo "$GITHUB_REPOSITORY" --ref main -f tag="$tag"
