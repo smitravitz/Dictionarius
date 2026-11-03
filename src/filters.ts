@@ -59,6 +59,8 @@ export interface RangeFilter extends FilterBase {
   column: string;
   /** The smallest value offered. */
   min: number;
+  /** What the values count, one and many ("letter", "letters"), for describing a choice. */
+  unit?: readonly [one: string, many: string];
 }
 
 export type Filter = SwitchFilter | RangeFilter;
@@ -95,8 +97,24 @@ export const FILTERS: readonly Filter[] = [
     help: "Characters in the word.",
     column: "LEN",
     min: 1,
+    unit: ["letter", "letters"],
   },
 ];
+
+/** A range filter's choice in words ("Word length: 4–7 letters"), or null when it's on Any. */
+export function describeRange(f: { label: string; unit?: readonly [string, string] }, [min, max]: Range): string | null {
+  if (min === null && max === null) return null;
+  const unit = (n: number) => (f.unit ? ` ${n === 1 ? f.unit[0] : f.unit[1]}` : "");
+  const what =
+    min !== null && max !== null
+      ? min === max
+        ? `${min}${unit(min)}`
+        : `${min}–${max}${unit(max)}`
+      : min !== null
+        ? `at least ${min}${unit(min)}`
+        : `up to ${max}${unit(max!)}`;
+  return `${f.label}: ${what}`;
+}
 
 /** One string per choice of filters: equal strings, equal choices. */
 export function filterKey(state: FilterState = {}): string {

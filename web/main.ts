@@ -12,7 +12,7 @@ import { OffsetSlider } from "./offset-slider";
 import { ScrollerGestures } from "./scroller-gestures";
 import { setUpNativeShell } from "./native";
 import { EXAMPLES, PER_ROW, exampleLabel, tileWeight } from "./examples";
-import { FILTERS, filterKey, type FilterInfo } from "../src/filters";
+import { FILTERS, describeRange, filterKey, type FilterInfo, type Range } from "../src/filters";
 import { loadFilters, saveFilter } from "./saved-filters";
 import { FiltersPanel } from "./filters-panel";
 import { entryView, peekView } from "../src/entry-view";
@@ -29,6 +29,7 @@ const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as 
 const input = $<HTMLInputElement>("q");
 const status = $("status");
 const facts = $("facts");
+const activeFilters = $("active-filters");
 const summary = $("summary");
 const intro = $("intro");
 const frame = $("frame");
@@ -96,6 +97,7 @@ function setFilter(id: string, value: (typeof filters)[string]) {
   send({ type: "settings", filters });
   counts = null; // counted under the old filters
   if (query) search(input.value);
+  else showActiveFilters();
 }
 
 for (const f of FILTERS) {
@@ -120,11 +122,43 @@ for (const f of FILTERS) {
 // The ranges (word length) are wheels in the Filters panel, under the cog.
 const filtersPanel = new FiltersPanel($<HTMLDialogElement>("filters"), $("ranges"), $<HTMLButtonElement>("filters-open"), filters, setFilter);
 
+/** Under the totals: each range filter that's set, in words, with a cross that
+ *  puts it back on Any. Only with results showing, and only filters this index offers. */
+function showActiveFilters() {
+  const lines: HTMLElement[] = [];
+  for (const f of FILTERS) {
+    if (f.kind !== "range" || !offered.some((o) => o.id === f.id)) continue;
+    const text = describeRange(f, (filters[f.id] ?? [null, null]) as Range);
+    if (!text) continue;
+    const line = document.createElement("p");
+    line.className = "active-filter";
+    const words = document.createElement("span");
+    words.textContent = text;
+    const clear = document.createElement("button");
+    clear.type = "button";
+    clear.className = "clear-filter";
+    clear.setAttribute("aria-label", `Clear the ${f.label.toLowerCase()} filter`);
+    clear.innerHTML = `<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6.5 6.5l11 11M17.5 6.5l-11 11" /></svg>`;
+    clear.addEventListener("click", () => {
+      setFilter(f.id, [null, null]);
+      filtersPanel.offer(offered); // the wheels back on Any, the funnel's dot gone
+    });
+    line.append(words, clear);
+    lines.push(line);
+  }
+  activeFilters.replaceChildren(...lines);
+  activeFilters.hidden = !query || lines.length === 0;
+}
+
+let offered: FilterInfo[] = []; // the filters this index has the data for
+
 /** Offer only the filters this index has the data for. */
 function offerFilters(available: FilterInfo[]) {
+  offered = available;
   const ids = new Set(available.map((f) => f.id));
   for (const row of switches.querySelectorAll<HTMLElement>("[data-filter]")) row.hidden = !ids.has(row.dataset.filter!);
   filtersPanel.offer(available);
+  showActiveFilters();
 }
 
 // The word list file: ?index= overrides it (tests use a small one), but only
@@ -215,6 +249,7 @@ function search(text: string) {
   query = next;
   seeking = -1;
   seq++;
+  showActiveFilters();
   if (!query) {
     frame.hidden = true;
     intro.hidden = false;

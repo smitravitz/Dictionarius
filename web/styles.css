@@ -278,6 +278,40 @@ body {
   font-size: 0.8125rem;
 }
 
+/* The filter that's set, under the totals: in proof magenta, so it's noticed. */
+.active-filters {
+  padding: 0 var(--pad) 0.375rem;
+  margin-top: -0.25rem;
+}
+
+.active-filter {
+  display: flex;
+  align-items: center;
+  gap: 0.125rem;
+  margin: 0;
+  color: var(--proof);
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+.clear-filter {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  margin: -14px 0 -14px -10px; /* a full tap target that doesn't push the lines apart */
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--proof);
+  cursor: pointer;
+}
+
+/* A word's page has no totals, so no filter line either. */
+.app:has(> .entry:not([hidden])) .active-filters {
+  display: none;
+}
+
 .hint {
   margin: -0.25rem 0 0;
   padding: 0 var(--pad) 0.5rem;

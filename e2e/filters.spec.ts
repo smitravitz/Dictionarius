@@ -77,3 +77,41 @@ test("the funnel under the cog opens word-length wheels that filter the list, an
   await expect(min).toHaveAttribute("aria-valuetext", "3");
   await expect(max).toHaveAttribute("aria-valuetext", "Any");
 });
+
+test("a set filter is named under the totals, and its cross clears it", async ({ page }) => {
+  await page.addInitScript(() => {
+    if (sessionStorage.getItem("seeded")) return; // once: a reload must find what the app saved
+    sessionStorage.setItem("seeded", "1");
+    localStorage.setItem("dictionarius.length", "4-6");
+  });
+  await open(page);
+  const funnel = page.getByRole("button", { name: "Filters" });
+  await expect(funnel).toHaveAttribute("data-active", "");
+  await page.locator("#q").fill("e");
+  await expect(page.locator("#summary")).toHaveText(/ [\d,]+ in all$/);
+  const filtered = Number((await page.locator("#summary").textContent())!.match(/([\d,]+) in all$/)![1].replace(/,/g, ""));
+
+  const line = page.locator("#active-filters");
+  await expect(line).toHaveText("Word length: 4–6 letters");
+  const below = (await line.boundingBox())!.y >= (await page.locator("#summary").boundingBox())!.y + 1;
+  expect(below).toBe(true);
+
+  await page.getByRole("button", { name: "Clear the word length filter" }).click();
+  await expect(line).toBeHidden();
+  await expect(funnel).not.toHaveAttribute("data-active", "");
+  await expect(page.locator("#summary")).toHaveText(/ [\d,]+ in all$/);
+  const all = Number((await page.locator("#summary").textContent())!.match(/([\d,]+) in all$/)![1].replace(/,/g, ""));
+  expect(all).toBeGreaterThan(filtered);
+  await funnel.click(); // the wheels say Any again
+  await expect(page.getByRole("spinbutton", { name: "Minimum word length" })).toHaveAttribute("aria-valuetext", "Any");
+  await page.reload();
+  await expect(page.locator("#status")).toHaveText(/^[\d,]+ words$/);
+  await expect(funnel).not.toHaveAttribute("data-active", ""); // and it stays cleared
+});
+
+test("no filter line on the start screen or while no range is set", async ({ page }) => {
+  await open(page);
+  await page.locator("#q").fill("e");
+  await expect(page.locator("#summary")).toHaveText(/ [\d,]+ in all$/);
+  await expect(page.locator("#active-filters")).toBeHidden();
+});
