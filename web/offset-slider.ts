@@ -1,7 +1,8 @@
 /**
  * The position slider: hold a blank spot in the results (scroller-gestures.ts
- * decides what counts as a hold), feel a pulse, then slide sideways to choose
- * how many letters come before the match. A histogram sits centred across the
+ * decides what counts as a hold), feel a pulse, and it shows where the list
+ * is now; then slide sideways to choose how many letters come before the
+ * match (up or down instead lets it go and scrolls). A histogram sits centred across the
  * middle 80% of the screen (the active range): one bar per position, left to
  * right, as tall as the words found there, and as wide as position-scale.ts
  * gives it: 4-6 letters wide, 6 at about 75%, the rare far end squeezed. A
@@ -28,6 +29,8 @@ export interface SliderState {
   byOffset: readonly number[];
   /** every position has been counted */
   complete: boolean;
+  /** the position at the top of the list now, if known */
+  current?: number | null;
 }
 
 export interface SliderEvents {
@@ -75,7 +78,8 @@ export class OffsetSlider {
     frame.append(this.el);
   }
 
-  /** Open under a finger at screen x. False when there's nothing to slide. */
+  /** Show it, held by a finger at screen x, on the position the list is at:
+   *  nothing changes until the finger slides. False when there's nothing to slide. */
   open(x: number): boolean {
     const state = this.events.state();
     if (!state) return false;
@@ -84,9 +88,12 @@ export class OffsetSlider {
     pulse();
     this.events.used();
     this.el.classList.add("on");
-    this.value = -1; // so the position under the finger is applied now
+    this.value = state.current ?? -1; // unknown: the first slide applies without a tick
     this.layout(state);
-    this.slideTo(x);
+    // The cursor on the current position's bar (in the histogram's own left-to-right terms).
+    const at = Math.max(0, Math.min(this.max, this.value));
+    const { edges } = this.scale;
+    this.thumb.style.transform = `translateX(${this.rangeX + ((edges[at] + edges[at + 1]) / 2) * this.range}px)`;
     return true;
   }
 

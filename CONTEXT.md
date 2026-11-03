@@ -48,8 +48,9 @@ decision or module makes it load-bearing.
   left to right.
 - **Scroller gestures** — what a press on the results means, decided in one
   place (`web/scroller-gestures.ts`): a **tap** opens a word (on a touch screen
-  while typing, it only puts the keyboard away); a **hold** on a blank spot
-  opens the position slider; a hold on a word is reserved; a moving finger
+  while typing, it only puts the keyboard away); a **hold** (300 ms) on a
+  blank spot shows the position slider, and the finger's first clear move
+  decides: sideways scrubs, up or down lets it go and scrolls the list; a hold on a word is reserved; a moving finger
   scrolls; the mouse drags the list or a row.
 - **Edge strips** — in the Android app, a strip down each side of the results,
   centred on their lower half, where the phone's own edge swipe (Back) is

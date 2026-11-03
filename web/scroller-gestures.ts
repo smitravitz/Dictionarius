@@ -4,9 +4,10 @@
  * - A tap opens the word under it. On a touch screen while typing, it only
  *   puts the keyboard away: the keyboard closing moves the list under the
  *   finger, so the tap would land on a word nobody aimed at.
- * - A hold on a blank spot opens the position slider, which then follows the
- *   finger until it lifts. A hold on a word peeks at its definition until
- *   the finger lifts.
+ * - A hold on a blank spot shows the position slider. The finger's first
+ *   clear move then decides: sideways scrubs (the slider follows the finger
+ *   until it lifts); up or down lets the slider go and scrolls the list. A
+ *   hold on a word peeks at its definition until the finger lifts.
  * - A finger that moves is scrolling, which the browser does itself.
  * - The mouse drags the list up and down (with momentum on release) and a
  *   row sideways, as a finger would.
@@ -16,8 +17,9 @@
  * carries out the scrolling.
  */
 
-export const HOLD_MS = 420; // just under Android's long-press, so ours wins
+export const HOLD_MS = 300; // well under Android's long-press (400 ms), so ours comes first
 const SLOP = 8; // moving further than this means scrolling or dragging, not a tap or hold
+const DECIDE = 10; // after a hold, moving this far says which way: sideways scrubs, up or down scrolls
 
 export interface PressStart {
   pointerId: number;
@@ -36,10 +38,11 @@ export interface PressStart {
 
 export type GestureAction =
   | { type: "cancel-hold" } // moved before the hold: no slider
-  | { type: "hold"; x: number } // open the slider at x
+  | { type: "arm"; x: number } // held a blank spot: show the slider (held at x), nothing chosen yet
   | { type: "hold-word" } // held a word: peek at it
   | { type: "release-word" } // let go of it: close the peek
   | { type: "slide"; x: number } // the slider follows the finger
+  | { type: "unhold"; dx: number; dy: number } // held, then up or down: close the slider, scroll the list
   | { type: "release" } // close the slider
   | { type: "drag"; axis: "list" | "row"; dx: number; dy: number } // mouse drag, from where it started
   | { type: "drop"; axis: "list" | "row" };
@@ -47,12 +50,13 @@ export type GestureAction =
 /** What the click that follows a press should do. */
 export type ClickVerdict = "open" | "suppress" | "dismiss-keyboard";
 
-type State = "idle" | "pending" | "holding" | "holding-word" | "dragging" | "scrolling";
+type State = "idle" | "pending" | "armed" | "holding" | "holding-word" | "dragging" | "scrolling";
 
 export class PressClassifier {
   private state: State = "idle";
   private press: PressStart | null = null;
   private lastX = 0;
+  private lastY = 0;
   private axis: "list" | "row" = "list";
   private verdict: ClickVerdict | null = null;
 
@@ -68,7 +72,7 @@ export class PressClassifier {
 
   /** The current press is still undecided or holding (the browser's own long-press menu must wait). */
   get pressing(): boolean {
-    return this.state === "pending" || this.state === "holding" || this.state === "holding-word";
+    return this.state === "pending" || this.state === "armed" || this.state === "holding" || this.state === "holding-word";
   }
 
   down(p: PressStart): void {
@@ -76,6 +80,7 @@ export class PressClassifier {
     this.press = p;
     this.state = "pending";
     this.lastX = p.x;
+    this.lastY = p.y;
     this.verdict = null;
   }
 
@@ -85,12 +90,27 @@ export class PressClassifier {
     const dx = x - p.x;
     const dy = y - p.y;
     switch (this.state) {
+      case "armed": {
+        // Measured from where the hold landed, so a finger that crept a little
+        // while holding still has its whole move to say which way.
+        const hx = x - this.lastX;
+        const hy = y - this.lastY;
+        if (Math.hypot(hx, hy) < DECIDE) return null;
+        if (Math.abs(hx) >= Math.abs(hy)) {
+          this.state = "holding"; // a diagonal counts as sideways: scrubbing is what the hold was for
+          return { type: "slide", x };
+        }
+        this.state = "dragging";
+        this.axis = "list";
+        return { type: "unhold", dx, dy };
+      }
       case "holding":
         return { type: "slide", x };
       case "dragging":
         return { type: "drag", axis: this.axis, dx, dy };
       case "pending":
         this.lastX = x;
+        this.lastY = y;
         if (Math.hypot(dx, dy) <= SLOP) return null;
         if (p.pointerType === "mouse") {
           this.state = "dragging";
@@ -111,8 +131,8 @@ export class PressClassifier {
       this.state = "holding-word";
       return { type: "hold-word" };
     }
-    this.state = "holding";
-    return { type: "hold", x: this.lastX };
+    this.state = "armed";
+    return { type: "arm", x: this.lastX };
   }
 
   up(pointerId: number): GestureAction | null {
@@ -143,7 +163,7 @@ export class PressClassifier {
   private finish(state: State): GestureAction | null {
     this.press = null;
     this.state = "idle";
-    if (state === "holding") return { type: "release" };
+    if (state === "armed" || state === "holding") return { type: "release" };
     if (state === "holding-word") return { type: "release-word" };
     if (state === "dragging") return { type: "drop", axis: this.axis };
     return null;
@@ -154,7 +174,7 @@ export interface ScrollerGestureEvents {
   /** The search box has focus (on a touch screen, its keyboard is up). */
   typing(): boolean;
   dismissKeyboard(): void;
-  /** Open the position slider at screen x; false when there's nothing to slide. */
+  /** Show the position slider, held at screen x (nothing chosen yet); false when there's nothing to slide. */
   holdStart(x: number): boolean;
   holdMove(x: number): void;
   holdEnd(): void;
@@ -243,7 +263,7 @@ export class ScrollerGestures {
       this.events.peek(this.touched as Element);
       return;
     }
-    if (action?.type !== "hold") return;
+    if (action?.type !== "arm") return;
     if (!this.events.holdStart(action.x)) {
       this.classifier.cancel(this.pointerId);
       return;
@@ -259,17 +279,30 @@ export class ScrollerGestures {
     if (action.type === "slide") {
       e.preventDefault();
       this.events.holdMove(action.x);
+    } else if (action.type === "unhold") {
+      // Up or down after a hold: the slider goes, and the list follows the
+      // finger from here (the browser's own scrolling was stopped by the hold).
+      e.preventDefault();
+      this.events.holdEnd();
+      this.samples = [{ t: e.timeStamp, y: e.clientY }]; // the flick's speed counts from here, not the hold
+      this.drag(e, "list", action.dy);
     } else if (action.type === "drag") {
-      if (!this.scroller.classList.contains("dragging")) {
-        this.capture();
-        this.scroller.classList.add("dragging");
-      }
-      if (action.axis === "row") this.row!.scrollLeft = this.startLeft - action.dx;
-      else {
-        this.scroller.scrollTop = this.startTop - action.dy;
-        this.samples.push({ t: e.timeStamp, y: e.clientY });
-        if (this.samples.length > 6) this.samples.shift();
-      }
+      if (this.holding) e.preventDefault(); // a finger's scroll after a hold: ours, not the browser's
+      this.drag(e, action.axis, action.dy, action.dx);
+    }
+  }
+
+  /** Move the list (or a row) with the pointer, from where the press began. */
+  private drag(e: PointerEvent, axis: "list" | "row", dy: number, dx = 0) {
+    if (!this.scroller.classList.contains("dragging")) {
+      this.capture();
+      this.scroller.classList.add("dragging");
+    }
+    if (axis === "row") this.row!.scrollLeft = this.startLeft - dx;
+    else {
+      this.scroller.scrollTop = this.startTop - dy;
+      this.samples.push({ t: e.timeStamp, y: e.clientY });
+      if (this.samples.length > 6) this.samples.shift();
     }
   }
 

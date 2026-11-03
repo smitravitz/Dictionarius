@@ -56,7 +56,7 @@ const list = new ResultsList(scroller, $("results"), {
 const slider = new OffsetSlider(frame, {
   state: () =>
     query && counts && counts.occurrences > 0
-      ? { query, byOffset: counts.byOffset, complete: counts.total !== null }
+      ? { query, byOffset: counts.byOffset, complete: counts.total !== null, current: list.topOffset() }
       : null,
   change: (value) => seek(value),
   used: () => {

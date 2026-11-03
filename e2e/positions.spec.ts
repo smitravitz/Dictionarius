@@ -88,6 +88,14 @@ async function holdBlankSpot(page: Page, isMobile: boolean, side: "left" | "righ
       }
       fingerX = to;
     },
+    /** Move the finger by (dx, dy), in small steps. */
+    async moveBy(dx: number, dy: number) {
+      for (let i = 1; i <= 8; i++) {
+        const at = { x: fingerX + (dx * i) / 8, y: y + (dy * i) / 8 };
+        if (cdp) await touch("touchMove", at);
+        else await page.mouse.move(at.x, at.y);
+      }
+    },
     get x() {
       return fingerX;
     },
@@ -148,6 +156,30 @@ test("holding a blank spot opens the scrubber; the screen's width spans every po
   await expect(page.locator("#opt-0 mark.frag")).toHaveText("ate");
   await expect(page.locator("#entry")).toBeHidden(); // no word opened
   await expect(page.locator("#hint")).toBeHidden(); // the tip has done its job
+});
+
+test("a hold alone changes nothing; swiping up or down after it lets the slider go and scrolls the list", async ({
+  page,
+  isMobile,
+}) => {
+  await open(page);
+  await page.locator("#q").fill("ate");
+  await counted(page);
+  const scroller = page.locator("#scroller");
+  const still = await holdBlankSpot(page, isMobile);
+  await still.lift(); // held, then let go without moving
+  await expect(page.locator(".slider")).not.toHaveClass(/\bon\b/);
+  expect(await scroller.evaluate((el) => el.scrollTop)).toBe(0);
+  expect(await topLetters(page)).toBe(0);
+
+  const finger = await holdBlankSpot(page, isMobile);
+  await finger.moveBy(4, -160); // mostly up: the list should follow the finger
+  await expect(page.locator(".slider")).not.toHaveClass(/\bon\b/);
+  const scrolled = await scroller.evaluate((el) => el.scrollTop);
+  expect(scrolled).toBeGreaterThan(120);
+  expect(scrolled).toBeLessThan(200);
+  await finger.lift();
+  await expect(page.locator("#entry")).toBeHidden(); // no word opened
 });
 
 test("on a long list, 6 letters sit at 75% of the scrubber's range and the rare far end is squeezed", async ({ page, isMobile }) => {

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { PressClassifier, type PressStart } from "../web/scroller-gestures";
+import { HOLD_MS, PressClassifier, type PressStart } from "../web/scroller-gestures";
 
 // What a press on the results list means. The classifier hears the press start,
 // moves, the hold timer and the release, says what to do at each step, and
@@ -45,15 +45,45 @@ describe("PressClassifier", () => {
     expect(c.click()).toBe("open");
   });
 
-  it("opens the slider on a hold of a blank spot, follows the finger, and closes on release", () => {
+  it("holds sooner than the phone's own long-press (400 ms), so ours comes first", () => {
+    expect(HOLD_MS).toBeLessThan(400);
+    expect(HOLD_MS).toBeGreaterThanOrEqual(250); // still a hold, not a slow tap
+  });
+
+  it("after a hold on a blank spot, a sideways swipe scrubs: the slider follows the finger until it lifts", () => {
     const c = new PressClassifier();
-    c.down(press({ onWord: false, x: 40 }));
+    c.down(press({ onWord: false, x: 40, y: 200 }));
     expect(c.holdDue).toBe(true);
-    expect(c.hold()).toEqual({ type: "hold", x: 40 });
-    expect(c.move(1, 120, 205)).toEqual({ type: "slide", x: 120 });
-    expect(c.move(1, 300, 260)).toEqual({ type: "slide", x: 300 }); // any direction, any distance
+    expect(c.hold()).toEqual({ type: "arm", x: 40 }); // the slider shows; nothing is chosen yet
+    expect(c.move(1, 44, 203)).toBeNull(); // a wobble decides nothing
+    expect(c.move(1, 60, 206)).toEqual({ type: "slide", x: 60 }); // sideways: scrubbing starts
+    expect(c.move(1, 62, 300)).toEqual({ type: "slide", x: 62 }); // and then follows the finger anywhere
     expect(c.up(1)).toEqual({ type: "release" });
     expect(c.click()).toBe("suppress");
+  });
+
+  it("after a hold, an up or down swipe lets the slider go and scrolls the list instead", () => {
+    const c = new PressClassifier();
+    c.down(press({ onWord: false, x: 100, y: 200 }));
+    c.hold();
+    expect(c.move(1, 103, 214)).toEqual({ type: "unhold", dx: 3, dy: 14 }); // mostly down
+    expect(c.move(1, 104, 260)).toEqual({ type: "drag", axis: "list", dx: 4, dy: 60 });
+    expect(c.move(1, 160, 262)).toEqual({ type: "drag", axis: "list", dx: 60, dy: 62 }); // stays a scroll
+    expect(c.up(1)).toEqual({ type: "drop", axis: "list" });
+    expect(c.click()).toBe("suppress");
+  });
+
+  it("leans towards scrubbing on a diagonal, and lets go cleanly when lifted before deciding", () => {
+    const diagonal = new PressClassifier();
+    diagonal.down(press({ onWord: false, x: 100, y: 200 }));
+    diagonal.hold();
+    expect(diagonal.move(1, 110, 209)).toEqual({ type: "slide", x: 110 }); // as far sideways as down: scrub
+
+    const lifted = new PressClassifier();
+    lifted.down(press({ onWord: false }));
+    lifted.hold();
+    expect(lifted.up(1)).toEqual({ type: "release" }); // the slider closes, nothing chosen
+    expect(lifted.click()).toBe("suppress");
   });
 
   it("peeks at a held word until it's let go, and doesn't let it open the word", () => {
