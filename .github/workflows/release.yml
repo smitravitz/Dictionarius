@@ -1,14 +1,16 @@
 name: Release
 
 # Pushing a tag like v1.2.3 builds a signed Android APK and publishes it as a
-# GitHub release (which Obtainium picks up). One-time setup: scripts/setup-release.sh.
+# GitHub release (which Obtainium picks up), then puts the same web app on GitHub
+# Pages to try in a browser (only the latest release; each one replaces it).
+# One-time setup: scripts/setup-release.sh, and Settings > Pages > Source: GitHub Actions.
 # Release notes come from the tag's message: git tag -a v1.2.3 -m "What's new"
 on:
   push:
     tags: ["v*"]
 
 permissions:
-  contents: write # to create the release
+  contents: read
 
 defaults:
   run:
@@ -19,6 +21,8 @@ jobs:
     name: Signed Android APK
     runs-on: ubuntu-24.04 # comes with the Android SDK
     timeout-minutes: 30
+    permissions:
+      contents: write # to create the release
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -66,6 +70,12 @@ jobs:
         run: npm run build
         env:
           DICTIONARIUS_PUBLIC: ../release-data
+
+      # The same build the APK packs, kept for the Pages job (published only if this whole job succeeds).
+      - name: Keep the web app for GitHub Pages
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: build/web
 
       - run: npx cap sync android
 
@@ -129,3 +139,23 @@ jobs:
           gh release create "$GITHUB_REF_NAME" "${{ steps.apk.outputs.file }}" \
             --repo "$GITHUB_REPOSITORY" --verify-tag \
             --title "Dictionarius $GITHUB_REF_NAME" --notes-file notes.md
+
+  pages:
+    name: Web app on GitHub Pages
+    needs: android # only a release that built, passed its checks and was published
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      pages: write # to publish the site
+      id-token: write # to prove the deploy comes from this workflow
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    # One deploy at a time; a newer release waits rather than cancelling one halfway.
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+    steps:
+      - name: Publish (replaces the previous release's site)
+        id: deploy
+        uses: actions/deploy-pages@v5

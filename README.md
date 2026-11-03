@@ -56,9 +56,15 @@ Nothing is downloaded later; the app has no network permission at all.
 - Testing on real phones (the phone timings above are emulated)
 - PWA, iOS and F-Droid builds
 
+## Try it in your browser
+
+The latest release runs at **[smitravitz.github.io/Dictionarius](https://smitravitz.github.io/Dictionarius/)**, the same app as the Android one. The first visit downloads the word list and definitions (about 90 MB); after that, your browser keeps them.
+
+Privacy on the web version: the page loads only its own files and sends nothing anywhere, but GitHub hosts it, so GitHub sees your visit (your IP address and browser), as any website's host does. The Android app connects to nothing at all.
+
 ## Install (Android)
 
-Add `https://github.com/smitravitz/Dictionarius` to [Obtainium](https://obtainium.imranr.dev) to install it and get updates, or download the APK from the latest [release](https://github.com/smitravitz/Dictionarius/releases/latest). Until the first build with definitions is released, it finds words and links each one to Wiktionary.
+Add `https://github.com/smitravitz/Dictionarius` to [Obtainium](https://obtainium.imranr.dev) to install it and get updates, or download the APK from the latest [release](https://github.com/smitravitz/Dictionarius/releases/latest).
 
 ## Licensing
 

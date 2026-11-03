@@ -5,6 +5,9 @@ import { preloadFonts } from "./tools/preload-fonts";
 // scripts/build_fm_index.py writes it), or from $DICTIONARIUS_PUBLIC.
 export default defineConfig({
   root: "web",
+  // Files named relative to the page, so the build works from any folder: the
+  // Android app's root and GitHub Pages' /Dictionarius/ alike.
+  base: "./",
   publicDir: process.env.DICTIONARIUS_PUBLIC ?? "../dist",
   build: { outDir: "../build/web", emptyOutDir: true },
   worker: { format: "es" },

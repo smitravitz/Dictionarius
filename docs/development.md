@@ -45,7 +45,7 @@ npx cap open android                    # or: cd android && ./gradlew assembleDe
 
 ## Releasing
 
-Once, on your own computer: `bash scripts/setup-release.sh path/to/headwords.bin`. It creates the signing key, stores it in GitHub's Actions secrets and uploads the word index. After that, pushing a tag such as `v0.2.0` builds a signed APK and publishes it as a release ([`release.yml`](../.github/workflows/release.yml)). The release notes are the tag's message, so make it an annotated tag: `git tag -a v0.2.0 -m "What's new"` (several `-m` make several paragraphs; `-F notes.md` reads a file).
+Once, on your own computer: `bash scripts/setup-release.sh path/to/headwords.bin`. It creates the signing key, stores it in GitHub's Actions secrets and uploads the word index. After that, pushing a tag such as `v0.2.0` builds a signed APK and publishes it as a release ([`release.yml`](../.github/workflows/release.yml)), then publishes the same web build to GitHub Pages (only the latest release; once, set Settings → Pages → Source to **GitHub Actions**). The build names its files relative to the page (`base: "./"` in `vite.config.ts`), so it works from Pages' `/Dictionarius/` folder as well as inside the app. The release notes are the tag's message, so make it an annotated tag: `git tag -a v0.2.0 -m "What's new"` (several `-m` make several paragraphs; `-F notes.md` reads a file).
 
 ## More
 
