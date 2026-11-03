@@ -57,7 +57,13 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - uses: ./.github/actions/release-data
+      # The data step comes from this workflow's own commit: an older tag may predate it.
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.workflow_sha }}
+          path: .workflow
+          sparse-checkout: .github/actions
+      - uses: ./.workflow/.github/actions/release-data
         with:
           token: ${{ github.token }}
       - name: Build the web app
