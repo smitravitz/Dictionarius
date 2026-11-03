@@ -199,6 +199,16 @@ test("arrow keys move through the results and Enter opens one", async ({ page })
   await expect(page.locator("#entry-word")).toHaveText(word!);
 });
 
+test("Enter on a word typed out in full opens it and puts the keyboard away", async ({ page }) => {
+  await open(page);
+  const input = page.locator("#q");
+  await input.fill("zorble");
+  await expect(page.locator("#opt-0")).toHaveText("zorble");
+  await input.press("Enter");
+  await expect(page.locator("#entry-word")).toHaveText("zorble");
+  await expect(input).not.toBeFocused();
+});
+
 test("fast typing shows results for the final text only", async ({ page }) => {
   await open(page);
   await page.locator("#q").pressSequentially("tion", { delay: 0 });

@@ -292,8 +292,13 @@ input.addEventListener("keydown", (event) => {
     const id = list.move(event.key === "ArrowDown" ? 1 : -1);
     if (id) input.setAttribute("aria-activedescendant", id);
   } else if (event.key === "Enter") {
+    // Opens the highlighted word, or the first: the word itself, when typed in
+    // full. Its page is for reading, so the keyboard goes.
     const s = list.current();
-    if (s) showEntry(s);
+    if (s) {
+      showEntry(s);
+      input.blur();
+    }
   } else if (event.key === "Escape") {
     input.value = "";
     search("");
