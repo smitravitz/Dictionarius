@@ -66,8 +66,10 @@ jobs:
       - uses: ./.workflow/.github/actions/release-data
         with:
           token: ${{ github.token }}
+      # Pages serves the site from /Dictionarius/, so its files must be named relative to
+      # the page. vite.config.ts says so since v0.5.1; --base says it for older tags too.
       - name: Build the web app
-        run: npm run build
+        run: npx vite build --base ./
         env:
           DICTIONARIUS_PUBLIC: ../release-data
       - uses: actions/upload-pages-artifact@v5
