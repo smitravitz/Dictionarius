@@ -102,6 +102,9 @@ export class ResultsList {
 
   /** Scroll so row `i` is at the top. */
   scrollToRow(i: number) {
+    // Tall enough first: rows just learned of aren't drawn yet, and the
+    // browser won't scroll past the height it has.
+    this.list.style.height = `${Math.min(this.contentHeight(), MAX_HEIGHT)}px`;
     this.scroller.scrollTop = (Math.max(0, i) * ROW_HEIGHT) / this.scale();
     this.render();
   }

@@ -249,6 +249,34 @@ test("the start screen is a title page: the name, what it finds, the word count,
   await expect(page.locator("#status")).toBeVisible();
 });
 
+test("tapping a suggestion opens its words around the middle of the list, a little differently each time", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" }); // a still start screen, to tap reliably
+  await open(page);
+  const tile = page.locator("#examples button[data-query='ing']").first();
+  const landings: number[] = [];
+  for (let i = 0; i < 4; i++) {
+    await tile.click();
+    await expect(page.locator("#summary")).toHaveText(/ [\d,]+ in all$/);
+    const total = Number((await page.locator("#summary").textContent())!.match(/([\d,]+) in all$/)![1].replace(/,/g, ""));
+    // The row at the top of the list, counted from 0.
+    const top = await page.waitForFunction(() => {
+      const scroller = document.querySelector("#scroller")!;
+      const edge = scroller.getBoundingClientRect().top;
+      const rows = [...scroller.querySelectorAll<HTMLElement>("li.word:not(.pending)")].filter(
+        (row) => row.getBoundingClientRect().bottom > edge + 1,
+      );
+      rows.sort((a, b) => a.getBoundingClientRect().top - b.getBoundingClientRect().top);
+      return rows.length && scroller.scrollTop > 0 ? Number(rows[0].getAttribute("aria-posinset")) - 1 : null;
+    });
+    const row = (await top.jsonValue())!;
+    expect(row).toBeGreaterThanOrEqual(Math.round((total - 1) * 0.35) - 1); // the top row, give or take one
+    expect(row).toBeLessThanOrEqual(Math.round((total - 1) * 0.65) + 1);
+    landings.push(row);
+    await page.locator("#q").fill(""); // back to the start screen
+  }
+  expect(new Set(landings).size).toBeGreaterThan(1);
+});
+
 for (const width of [412, 360]) {
   test(`the bag sits four to a row, none stranded or cut off, ${width} px wide`, async ({ page, isMobile }) => {
     test.skip(!isMobile, "a phone's screen");

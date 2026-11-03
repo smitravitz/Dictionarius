@@ -12,6 +12,7 @@ import { OffsetSlider } from "./offset-slider";
 import { ScrollerGestures } from "./scroller-gestures";
 import { setUpNativeShell } from "./native";
 import { EXAMPLES, PER_ROW, exampleLabel, tileWeight } from "./examples";
+import { landingRow } from "../src/landing";
 import { FILTERS, describeRange, filterKey, type FilterInfo, type Range } from "../src/filters";
 import { loadFilters, saveFilter } from "./saved-filters";
 import { FiltersPanel } from "./filters-panel";
@@ -48,6 +49,7 @@ let ready = false;
 let query = ""; // the normalized query on screen
 let counts: Counts | null = null; // for `query`
 let seeking = -1; // the position a seek is on its way to
+let landing: string | null = null; // a suggestion's query: open its list around the middle once counted
 
 const list = new ResultsList(scroller, $("results"), {
   needRows: (from, to) => send({ type: "rows", seq, from, to }),
@@ -68,6 +70,9 @@ const slider = new OffsetSlider(frame, {
 
 // In the Android app, the phone's edge swipe mustn't take a thumb holding the slider's ends.
 guardEdges(frame);
+
+// A finger or wheel on the list before a suggestion's landing: it stays where they put it.
+for (const type of ["pointerdown", "wheel"]) scroller.addEventListener(type, () => (landing = null), { passive: true });
 
 // Taps, holds and drags on the list (scroller-gestures.ts): a tap opens a word,
 // unless it's a finger putting the keyboard away; a hold on a blank spot opens
@@ -204,6 +209,7 @@ worker.onmessage = ({ data }: MessageEvent<FromWorker>) => {
         seeking = -1;
       }
       describe();
+      land();
       break;
     case "definitions":
     case "word":
@@ -215,6 +221,7 @@ worker.onmessage = ({ data }: MessageEvent<FromWorker>) => {
       counts = data.counts;
       list.grow(sum(counts.byOffset), counts.total !== null);
       describe();
+      land();
       break;
   }
 };
@@ -239,9 +246,18 @@ clear.addEventListener("click", () => {
   input.dispatchEvent(new Event("input"));
 });
 
+/** A suggestion's list, once every word is counted: open it around the middle (src/landing.ts). */
+function land() {
+  if (landing === null || landing !== query || !counts || counts.total === null) return;
+  landing = null;
+  const row = landingRow(sum(counts.byOffset));
+  if (row !== null) list.scrollToRow(row);
+}
+
 function search(text: string) {
   leaveEntry();
   const next = normalize(text);
+  if (next !== landing) landing = null; // typed over it
   if (next !== query) {
     counts = null;
     trail.clear(); // the words followed from the old results
@@ -554,6 +570,7 @@ examples.addEventListener("click", (event) => {
   input.value = button.dataset.query ?? "";
   // Leave the keyboard closed, so the results have the whole screen to explore.
   input.blur();
+  landing = normalize(input.value);
   search(input.value);
 });
 
