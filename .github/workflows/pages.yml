@@ -1,0 +1,89 @@
+name: Pages
+
+# Builds the web app for one release and publishes it on GitHub Pages, replacing what was
+# there: only one version is online. The release workflow runs this for each new release;
+# run it by hand (Actions > Pages > Run workflow) to republish one, the latest by default.
+# One-time setup: Settings > Pages > Source: GitHub Actions.
+on:
+  workflow_call:
+    inputs:
+      tag:
+        description: The release tag to publish (v1.2.3)
+        type: string
+        required: true
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: The release tag to publish (empty for the latest release)
+        type: string
+        required: false
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  build:
+    name: Build the web app
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
+    steps:
+      - name: Which release
+        id: tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+          asked: ${{ inputs.tag }}
+        run: |
+          tag="$asked"
+          if [ -z "$tag" ]; then
+            # The latest release: data-… releases are pre-releases, so they never count.
+            tag=$(gh release view --repo "$GITHUB_REPOSITORY" --json tagName --jq .tagName)
+          fi
+          if [[ ! "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::$tag isn't a release tag like v1.2.3"
+            exit 1
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ steps.tag.outputs.tag }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - uses: ./.github/actions/release-data
+        with:
+          token: ${{ github.token }}
+      - name: Build the web app
+        run: npm run build
+        env:
+          DICTIONARIUS_PUBLIC: ../release-data
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: build/web
+
+  deploy:
+    name: Publish on GitHub Pages
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      pages: write # to publish the site
+      id-token: write # to prove the deploy comes from this workflow
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    # One deploy at a time; a newer one waits rather than cancelling one halfway.
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+    steps:
+      - name: Publish ${{ needs.build.outputs.tag }} (replaces what was there)
+        id: deploy
+        uses: actions/deploy-pages@v5

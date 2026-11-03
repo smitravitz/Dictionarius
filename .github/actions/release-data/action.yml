@@ -1,0 +1,28 @@
+name: Release data
+description: >
+  Downloads the word index and definitions this commit's data/headwords.sha256 names
+  (the data-<sum> release scripts/setup-release.sh uploaded) into release-data/, and
+  checks them against that list. The APK and the web app on Pages both build from it.
+inputs:
+  token:
+    description: A token that can read the repository's releases
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Fetch the word index and definitions
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.token }}
+      run: |
+        # data/headwords.sha256 lists the index and its definitions; scripts/setup-release.sh
+        # uploaded them as a release named after that list's own checksum.
+        sum=$(sha256sum data/headwords.sha256 | cut -c1-8)
+        mkdir -p release-data
+        if ! gh release download "data-$sum" --repo "$GITHUB_REPOSITORY" \
+          --pattern headwords.bin --pattern headwords.definitions.bin --dir release-data; then
+          echo "::error::No release data-$sum for this commit's data/headwords.sha256. Run scripts/setup-release.sh with the files it lists, commit and push that list, then tag a commit that has it."
+          exit 1
+        fi
+        cd release-data
+        sha256sum --check ../data/headwords.sha256

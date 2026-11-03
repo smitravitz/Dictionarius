@@ -1,8 +1,8 @@
 name: Release
 
 # Pushing a tag like v1.2.3 builds a signed Android APK and publishes it as a
-# GitHub release (which Obtainium picks up), then puts the same web app on GitHub
-# Pages to try in a browser (only the latest release; each one replaces it).
+# GitHub release (which Obtainium picks up), then puts the same version's web app on
+# GitHub Pages (pages.yml; only the latest release is online).
 # One-time setup: scripts/setup-release.sh, and Settings > Pages > Source: GitHub Actions.
 # Release notes come from the tag's message: git tag -a v1.2.3 -m "What's new"
 on:
@@ -50,32 +50,14 @@ jobs:
           echo "name=$major.$minor.$patch" >> "$GITHUB_OUTPUT"
           echo "code=$((major * 10000 + minor * 100 + patch))" >> "$GITHUB_OUTPUT"
 
-      - name: Fetch the word index and definitions
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          # data/headwords.sha256 lists the index and its definitions; scripts/setup-release.sh
-          # uploaded them as a release named after that list's own checksum.
-          sum=$(sha256sum data/headwords.sha256 | cut -c1-8)
-          mkdir -p release-data
-          if ! gh release download "data-$sum" --repo "$GITHUB_REPOSITORY" \
-            --pattern headwords.bin --pattern headwords.definitions.bin --dir release-data; then
-            echo "::error::No release data-$sum for this commit's data/headwords.sha256. Run scripts/setup-release.sh with the files it lists, commit and push that list, then tag a commit that has it."
-            exit 1
-          fi
-          cd release-data
-          sha256sum --check ../data/headwords.sha256
+      - uses: ./.github/actions/release-data
+        with:
+          token: ${{ github.token }}
 
       - name: Build the web app
         run: npm run build
         env:
           DICTIONARIUS_PUBLIC: ../release-data
-
-      # The same build the APK packs, kept for the Pages job (published only if this whole job succeeds).
-      - name: Keep the web app for GitHub Pages
-        uses: actions/upload-pages-artifact@v5
-        with:
-          path: build/web
 
       - run: npx cap sync android
 
@@ -143,19 +125,10 @@ jobs:
   pages:
     name: Web app on GitHub Pages
     needs: android # only a release that built, passed its checks and was published
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
     permissions:
-      pages: write # to publish the site
-      id-token: write # to prove the deploy comes from this workflow
-    environment:
-      name: github-pages
-      url: ${{ steps.deploy.outputs.page_url }}
-    # One deploy at a time; a newer release waits rather than cancelling one halfway.
-    concurrency:
-      group: pages
-      cancel-in-progress: false
-    steps:
-      - name: Publish (replaces the previous release's site)
-        id: deploy
-        uses: actions/deploy-pages@v5
+      contents: read
+      pages: write
+      id-token: write
+    uses: ./.github/workflows/pages.yml
+    with:
+      tag: ${{ github.ref_name }}
