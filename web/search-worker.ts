@@ -31,6 +31,9 @@ let matchesFilters = filterKey(filters);
 // The definitions file, loaded after the index; null when there is none (or it doesn't fit the index).
 let found: (file: DefinitionsFile | null) => void = () => {};
 const definitions = new Promise<DefinitionsFile | null>((resolve) => (found = resolve));
+const DEFINITIONS_AFTER_MS = 1500;
+let startDefinitions = () => {}; // set once the index is in
+let definitionsTimer: ReturnType<typeof setTimeout> | undefined;
 
 scope.onmessage = ({ data }) => {
   switch (data.type) {
@@ -38,6 +41,7 @@ scope.onmessage = ({ data }) => {
       void load(data.url, data.definitions);
       break;
     case "definitions": {
+      startDefinitions(); // wanted now: no more waiting
       const { ask, id } = data;
       void definitions
         .then((file) => file?.of(id) ?? null)
@@ -81,7 +85,14 @@ async function load(url: string, definitionsUrl: string) {
     waiting = null;
     // Work out the filters' words now, before the first search needs them.
     setTimeout(() => completer?.prepare(filters), 0);
-    void loadDefinitions(definitionsUrl, index);
+    // The definitions (the bigger file) once the start screen has settled, or
+    // as soon as a word's are asked for.
+    startDefinitions = () => {
+      startDefinitions = () => {};
+      clearTimeout(definitionsTimer);
+      void loadDefinitions(definitionsUrl, index);
+    };
+    definitionsTimer = setTimeout(() => startDefinitions(), DEFINITIONS_AFTER_MS);
   } catch (error) {
     scope.postMessage({ type: "failed", message: error instanceof Error ? error.message : String(error) });
   }

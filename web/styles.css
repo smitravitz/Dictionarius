@@ -142,6 +142,13 @@ body {
 
 /* The Filters funnel sits right under the cog, at the end of the search line;
    a proof-magenta dot says a filter is set. */
+/* Its place is kept while the word list loads, so the field doesn't narrow
+   (and its glass jump) when it appears. */
+.funnel[hidden] {
+  display: grid !important;
+  visibility: hidden;
+}
+
 .funnel {
   position: relative;
   flex: none;
@@ -383,6 +390,21 @@ body {
   font-size: 0.8125rem;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
+  /* Its place is kept from the start; it shows once the word count is known. */
+  visibility: hidden;
+  opacity: 0;
+  transition: opacity 0.4s ease-out;
+}
+
+.facts.ready {
+  visibility: visible;
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .facts {
+    transition: none;
+  }
 }
 
 /* The field stands out on the title page: it's where to start. */
@@ -430,6 +452,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: 0.625rem;
+  min-height: calc(2 * 44px + 0.625rem); /* two lanes of 44 px tiles, kept before they're built */
   margin: 0 -0.75rem;
 }
 

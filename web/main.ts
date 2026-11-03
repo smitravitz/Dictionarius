@@ -170,7 +170,13 @@ function offerFilters(available: FilterInfo[]) {
 // with a file of the app's own: a link mustn't make the app fetch from elsewhere.
 const asked = new URL(new URLSearchParams(location.search).get("index") ?? "headwords.bin", location.href);
 const indexUrl = asked.origin === location.origin ? asked : new URL("headwords.bin", location.href);
-send({ type: "load", url: indexUrl.href, definitions: indexUrl.href.replace(/\.bin$/, ".definitions.bin") });
+// Loaded once the start screen has been drawn (two frames on, so it's on the
+// screen, not just on its way), so its first frame isn't held up.
+requestAnimationFrame(() =>
+  requestAnimationFrame(() =>
+    setTimeout(() => send({ type: "load", url: indexUrl.href, definitions: indexUrl.href.replace(/\.bin$/, ".definitions.bin") })),
+  ),
+);
 
 // Questions for the worker that get one answer each, matched up by number.
 let questions = 0;
@@ -192,12 +198,14 @@ worker.onmessage = ({ data }: MessageEvent<FromWorker>) => {
       ready = true;
       status.textContent = `${data.words.toLocaleString()} words`;
       facts.textContent = `${data.words.toLocaleString()} words · every definition · fully offline`;
+      facts.classList.add("ready"); // fades in, in the place kept for it
       offerFilters(data.filters);
       if (normalize(input.value)) summary.textContent = "Searching…";
       break;
     case "failed":
       status.textContent = "Word list unavailable";
       facts.textContent = "Word list unavailable";
+      facts.classList.add("ready");
       summary.textContent = `Couldn’t load the word list (${data.message}). Reload the app to try again.`;
       break;
     case "rows":
