@@ -1,5 +1,8 @@
 # Notes for Claude
 
+Start with [`docs/handoff.md`](../docs/handoff.md): what the project is, where things are,
+how it ships and what's open. Update it before ending a session that changes any of that.
+
 ## Never link to the chat
 
 Never put a link to a Claude chat or session in anything published: commit messages,
