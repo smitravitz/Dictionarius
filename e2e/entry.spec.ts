@@ -51,6 +51,16 @@ test("a meaning's example of use follows its definition", async ({ page }) => {
   await expect(entry(page).locator(".example")).toHaveCount(1); // the others have none
 });
 
+test("without the examples file, a word's page still has its meanings and origin, just no examples", async ({ page }) => {
+  // An app built without the examples layer (ADR-0005): everything else still shows.
+  await page.context().route("**/headwords-sample.examples.bin", (route) => route.fulfill({ status: 404 }));
+  await open(page);
+  await openWord(page, "ingot", "ingot");
+  await expect(entry(page).locator(".meanings > li").first().locator(".gloss")).toBeVisible();
+  await expect(entry(page).locator(".entry-origin")).toHaveText("From a made-up Middle English word.");
+  await expect(entry(page).locator(".example")).toHaveCount(0);
+});
+
 test("a word's page appears whole: its meanings are there the moment it shows", async ({ page }) => {
   await open(page);
   await page.locator("#q").fill("ingot");

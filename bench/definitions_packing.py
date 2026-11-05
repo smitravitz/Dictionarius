@@ -88,7 +88,9 @@ def main():
     print(f"{'contents':<18}{'packing':<9}{'block':>6}{'zlib-9':>10}{'brotli-11':>11}")
     for name, defs in variants.items():
         tables = packing_tables(defs)
-        lines = {"JSON": [encode(d) for d in defs], "compact": [pack(k, d, tables) for k, d in zip(keys, defs)]}
+        # pack() now gives one line per file (ADR-0005); joined, they're one word's line as ADR-0004 measured it.
+        lines = {"JSON": [encode(d) for d in defs],
+                 "compact": [b"\x1f".join(pack(k, d, tables).values()) for k, d in zip(keys, defs)]}
         for packing, packed in lines.items():
             if packing == "JSON" and name != "definitions only":
                 continue

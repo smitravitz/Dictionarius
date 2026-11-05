@@ -22,12 +22,25 @@ except ImportError:
 from build_fm_index import EXPLICIT_LABELS, JS_WHITESPACE, display_forms, meaning_of, normalize
 
 MAGIC = b"DICTDEF1"
-VERSION = 2
+VERSION = 3  # 3: the content split into a core and layers (ADR-0005); 2 held everything in one file
 CODEC_BROTLI = 2  # each block compressed with brotli (quality 11); see ADR-0004 for why
 HEADER = struct.Struct("<8sIIIIII32s")  # magic, version, codec, numWords, perBlock, numBlocks, tablesLength, keysHash
 # Word ids per block: bigger packs tighter (brotli on the whole dictionary: 30.5 MB at
 # 1,024, 29.0 MB at 4,096, 25.9 MB as one stream), smaller unpacks less to show a word.
 PER_BLOCK = 4096
+
+# What a word's page shows beyond its meanings, each in its own file beside the core
+# (ADR-0005), so an app can ship without any of them: headwords.examples.bin, …
+LAYERS = ("examples", "etymology", "pronunciation")
+
+
+def layer_path(path, kind):
+    """Where a layer file goes, beside the core `….definitions.bin`."""
+    suffix = ".definitions.bin"
+    if not path.endswith(suffix):
+        raise ValueError(f"a definitions file's name ends with {suffix}: {path}")
+    return path[:-len(suffix)] + f".{kind}.bin"
+
 
 # Tags that say how Wiktionary's data is shaped, not something to show.
 STRUCTURAL_TAGS = frozenset({"form-of", "alt-of", "no-gloss"})
@@ -160,15 +173,19 @@ def trim(row, empty):
 
 
 def pack(key, definitions, tables):
-    """One word's definitions, small (docs/definitions-format.md):
-    [forms, entries, etymologies, pronunciations], trailing empties dropped.
-    A form equal to the search key is 0; an entry is [form, word class,
+    """One word's definitions, small (docs/definitions-format.md), as one line per
+    file: {"core": [forms, entries], "examples": [...], "etymology": [...],
+    "pronunciation": [...]}, b"" for a file with nothing of this word's.
+
+    Core: a form equal to the search key is 0; an entry is [form, word class,
     meanings, etymology + 1, pronunciation + 1]; a meaning is [gloss or link
-    template number, labels, linked words, 1 if explicit, links, example], a
-    link being its text when that is also the word linked to, else [text, word]."""
+    template number, labels, linked words, 1 if explicit, links], a link being
+    its text when that is also the word linked to, else [text, word]. Examples:
+    one per meaning, in reading order ("" for none). Etymology and pronunciation:
+    the word's lists, which entries point into. Trailing empties dropped."""
     pos_index = {p: i for i, p in enumerate(tables["pos"])}
     template_index = {t: i for i, t in enumerate(tables["templates"])}
-    forms, etymologies, sounds, entries = [], [], [], []
+    forms, etymologies, sounds, entries, examples = [], [], [], [], []
     for d in definitions:
         form = 0 if d["form"] == key else d["form"]
         if form not in forms:
@@ -178,9 +195,9 @@ def pack(key, definitions, tables):
             t = template_of(m)
             gloss = template_index[t] if t in template_index else m["gloss"]
             links = [link[0] if len(link) == 1 else link for link in m.get("links", [])]
-            meanings.append(trim([gloss, m.get("labels", []), m.get("of", []), 1 if m.get("explicit") else 0, links,
-                                  m.get("example", "")],
-                                 [None, [], [], 0, [], ""]))
+            meanings.append(trim([gloss, m.get("labels", []), m.get("of", []), 1 if m.get("explicit") else 0, links],
+                                 [None, [], [], 0, []]))
+            examples.append(m.get("example", ""))
         etymology = sound = 0
         if "etymology" in d:
             if d["etymology"] not in etymologies:
@@ -192,16 +209,22 @@ def pack(key, definitions, tables):
             sound = sounds.index(d["ipa"]) + 1
         pos = pos_index.get(d["pos"], d["pos"])
         entries.append(trim([forms.index(form), pos, meanings, etymology, sound], [None, None, None, 0, 0]))
-    return encode(trim([forms, entries, etymologies, sounds], [None, None, [], []]))
+    while examples and examples[-1] == "":
+        examples.pop()
+    return {"core": encode([forms, entries]),
+            "examples": encode(examples) if examples else b"",
+            "etymology": encode(etymologies) if etymologies else b"",
+            "pronunciation": encode(sounds) if sounds else b""}
 
 
-def unpack(key, line, tables):
-    """The definitions pack() was given (the app's reader does the same)."""
-    packed = json.loads(line)
-    forms, entries = packed[0], packed[1]
-    etymologies = packed[2] if len(packed) > 2 else []
-    sounds = packed[3] if len(packed) > 3 else []
+def unpack(key, lines, tables):
+    """The definitions pack() was given, from its lines (the app's reader does the
+    same). Only "core" is needed: a layer left out leaves out only its content."""
+    forms, entries = json.loads(lines["core"])
+    layer = lambda kind: json.loads(lines[kind]) if lines.get(kind) else []
+    examples, etymologies, sounds = layer("examples"), layer("etymology"), layer("pronunciation")
     definitions = []
+    n = 0  # meanings so far: examples are one per meaning, in reading order
     for row in entries:
         form, pos, meanings = row[0], row[1], row[2]
         etymology = row[3] if len(row) > 3 else 0
@@ -220,12 +243,13 @@ def unpack(key, line, tables):
                 meaning["explicit"] = True
             if len(m) > 4 and m[4]:
                 meaning["links"] = [[link] if isinstance(link, str) else link for link in m[4]]
-            if len(m) > 5 and m[5]:
-                meaning["example"] = m[5]
+            if n < len(examples) and examples[n]:
+                meaning["example"] = examples[n]
+            n += 1
             d["meanings"].append(meaning)
-        if etymology:
+        if etymology and etymology <= len(etymologies):
             d["etymology"] = etymologies[etymology - 1]
-        if sound:
+        if sound and sound <= len(sounds):
             d["ipa"] = sounds[sound - 1]
         definitions.append(d)
     return definitions
@@ -331,73 +355,118 @@ def cpu_cores():
 
 
 def compress_block(raw):
-    return brotli.compress(raw, quality=11, lgwin=22)
+    """One block, brotli at its best, declaring a window just big enough for the block:
+    it can't refer further back anyway, and the app's decoder sets aside the declared
+    window for every block it unpacks (a 4 MB one, unasked, made each word's page
+    allocate several times what it needed)."""
+    lgwin = min(24, max(10, (len(raw) + 15).bit_length()))  # (1 << lgwin) - 16 >= len(raw)
+    return brotli.compress(raw, quality=11, lgwin=lgwin)
 
 
 def write_definitions(path, keys, by_id, keys_hash, tables, per_block=PER_BLOCK, workers=None):
-    """Write the definitions file (docs/definitions-format.md). `by_id` gives
+    """Write the definitions (docs/definitions-format.md): the core at `path`
+    (….definitions.bin) and each of LAYERS beside it (layer_path). `by_id` gives
     (word id, [definitions]) in ascending id order; words left out have none.
-    `keys_hash` is the index's KEYHASH, so a reader can tell the two belong
-    together; `tables` comes from packing_tables(). Returns the number of blocks.
+    `keys_hash` is the index's KEYHASH, so a reader can tell they belong together;
+    `tables` comes from packing_tables(). Returns the number of blocks (each file's)."""
+    packed = ((i, pack(keys[i], definitions, tables)) for i, definitions in by_id)
+    return write_packed(path, len(keys), packed, keys_hash, tables, per_block, workers)
+
+
+def write_packed(path, num_words, by_id, keys_hash, tables, per_block=PER_BLOCK, workers=None):
+    """write_definitions() for words already packed: `by_id` gives (word id,
+    {kind: line}) in ascending id order, as pack() makes them.
 
     Brotli at its best setting is most of the build's time, so blocks are
     compressed on `workers` threads at once (default: every core; brotli lets
     go of Python's lock while it works) while the next ones are packed. Each
-    block is compressed on its own, so the file is the same however many."""
+    block is compressed on its own, so the files are the same however many."""
     workers = workers or cpu_cores()
-    num_words = len(keys)
+    kinds = ("core",) + LAYERS
     num_blocks = (num_words + per_block - 1) // per_block
     by_id = iter(by_id)
     pending = next(by_id, None)
-    blocks = []
-    waiting = collections.deque()  # blocks being compressed, in order
+    blocks = {kind: [] for kind in kinds}
+    waiting = collections.deque()  # (kind, block being compressed), in order
     with concurrent.futures.ThreadPoolExecutor(workers) as pool:
         for b in range(num_blocks):
-            lines = []
+            lines = {kind: [] for kind in kinds}
             for i in range(b * per_block, min(num_words, (b + 1) * per_block)):
                 if pending is not None and pending[0] == i:
-                    lines.append(pack(keys[i], pending[1], tables))
+                    packed = pending[1]
                     pending = next(by_id, None)
                 else:
-                    lines.append(b"")
-            waiting.append(pool.submit(compress_block, b"\n".join(lines)))
-            while len(waiting) > 2 * workers:  # packing got ahead: wait, so memory stays flat
-                blocks.append(waiting.popleft().result())
-        blocks.extend(block.result() for block in waiting)
+                    packed = {}
+                for kind in kinds:
+                    lines[kind].append(packed.get(kind, b""))
+            for kind in kinds:
+                waiting.append((kind, pool.submit(compress_block, b"\n".join(lines[kind]))))
+            while len(waiting) > 2 * workers * len(kinds):  # packing got ahead: wait, so memory stays flat
+                kind, block = waiting.popleft()
+                blocks[kind].append(block.result())
+        for kind, block in waiting:
+            blocks[kind].append(block.result())
     if pending is not None:
         raise ValueError(f"word id {pending[0]} is out of range or out of order")
-    table_bytes = encode(tables)
-    table_bytes += b" " * (-len(table_bytes) % 4)  # keeps the block table 4-byte aligned
-    offsets = [HEADER.size + len(table_bytes) + 4 * (num_blocks + 1)]
-    for block in blocks:
-        offsets.append(offsets[-1] + len(block))
-    with open(path, "wb") as f:
-        f.write(HEADER.pack(MAGIC, VERSION, CODEC_BROTLI, num_words, per_block, num_blocks, len(table_bytes), keys_hash))
-        f.write(table_bytes)
-        f.write(struct.pack(f"<{num_blocks + 1}I", *offsets))
-        for block in blocks:
-            f.write(block)
+    write_layer(path, {"kind": "core", **tables}, blocks["core"], num_words, per_block, keys_hash)
+    for kind in LAYERS:
+        write_layer(layer_path(path, kind), {"kind": kind}, blocks[kind], num_words, per_block, keys_hash)
     return num_blocks
 
 
-def read_definitions(path, keys, ids=None):
-    """Read a definitions file (for checks and tests): its header fields,
-    tables, and {word id: [definitions]} for every word that has any, or only
-    for `ids` (then only their blocks are unpacked)."""
+def write_layer(path, tables, blocks, num_words, per_block, keys_hash):
+    """One file of the container: header, tables (JSON), block offsets, blocks."""
+    table_bytes = encode(tables)
+    table_bytes += b" " * (-len(table_bytes) % 4)  # keeps the block table 4-byte aligned
+    offsets = [HEADER.size + len(table_bytes) + 4 * (len(blocks) + 1)]
+    for block in blocks:
+        offsets.append(offsets[-1] + len(block))
+    with open(path, "wb") as f:
+        f.write(HEADER.pack(MAGIC, VERSION, CODEC_BROTLI, num_words, per_block, len(blocks), len(table_bytes), keys_hash))
+        f.write(table_bytes)
+        f.write(struct.pack(f"<{len(blocks) + 1}I", *offsets))
+        for block in blocks:
+            f.write(block)
+
+
+def read_layer(path):
+    """One file of the container: its header fields, tables, and a function giving
+    block b's lines."""
     with open(path, "rb") as f:
         data = f.read()
     magic, version, codec, num_words, per_block, num_blocks, tables_length, keys_hash = HEADER.unpack_from(data)
     if magic != MAGIC or version != VERSION or codec != CODEC_BROTLI:
-        raise ValueError("not a definitions file this reader knows")
+        raise ValueError(f"not a definitions file this reader knows: {path}")
     tables = json.loads(data[HEADER.size:HEADER.size + tables_length])
     offsets = struct.unpack_from(f"<{num_blocks + 1}I", data, HEADER.size + tables_length)
+    lines = lambda b: brotli.decompress(data[offsets[b]:offsets[b + 1]]).split(b"\n")
+    return {"numWords": num_words, "perBlock": per_block, "blocks": num_blocks, "keysHash": keys_hash,
+            "tables": tables, "lines": lines}
+
+
+def read_definitions(path, keys, ids=None):
+    """Read the definitions (for checks and tests): the core's header fields and
+    tables, and {word id: [definitions]} for every word that has any, or only for
+    `ids` (then only their blocks are unpacked). Layers missing beside the core
+    are left out; one built for another word list is an error."""
+    core = read_layer(path)
+    layers = {}
+    for kind in LAYERS:
+        if os.path.exists(layer_path(path, kind)):
+            layer = read_layer(layer_path(path, kind))
+            same = [layer[k] == core[k] for k in ("numWords", "perBlock", "keysHash")]
+            if not all(same) or layer["tables"].get("kind") != kind:
+                raise ValueError(f"{layer_path(path, kind)} doesn't belong with {path}")
+            layers[kind] = layer
     entries = {}
     wanted = None if ids is None else set(ids)
-    for b in range(num_blocks) if wanted is None else sorted({i // per_block for i in wanted}):
-        lines = brotli.decompress(data[offsets[b]:offsets[b + 1]]).split(b"\n")
-        for j, line in enumerate(lines):
+    per_block = core["perBlock"]
+    for b in range(core["blocks"]) if wanted is None else sorted({i // per_block for i in wanted}):
+        block = {"core": core["lines"](b), **{kind: layer["lines"](b) for kind, layer in layers.items()}}
+        for j, line in enumerate(block["core"]):
             i = b * per_block + j
             if line and (wanted is None or i in wanted):
-                entries[i] = unpack(keys[i], line, tables)
-    return {"numWords": num_words, "perBlock": per_block, "blocks": num_blocks, "keysHash": keys_hash,
-            "tables": tables, "entries": entries}
+                entries[i] = unpack(keys[i], {kind: lines[j] for kind, lines in block.items()}, core["tables"])
+    tables = {k: v for k, v in core["tables"].items() if k != "kind"}
+    return {"numWords": core["numWords"], "perBlock": per_block, "blocks": core["blocks"],
+            "keysHash": core["keysHash"], "tables": tables, "entries": entries}

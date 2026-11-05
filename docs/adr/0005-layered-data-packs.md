@@ -1,6 +1,7 @@
 # ADR-0005: Word ids as the spine; data in layers; a language is a pack
 
-- **Status:** Proposed (each step lands only after its measurement gate, below)
+- **Status:** Proposed; step 1 (the split) accepted and built, 2026-11-05. Each other step
+  lands only after its measurement gate, below.
 - **Date:** 2026-11-03
 - **Deciders:** project owner
 - **Builds on:** [ADR-0003](0003-filters-from-word-columns.md) (word columns),
@@ -129,15 +130,47 @@ open question.
 Each step lands only when its numbers are measured on a full build (bench scripts beside
 `bench/definitions_packing.py`), and recorded here:
 
-| Step | Gate |
-|---|---|
-| Split content into core / examples / etymology / pronunciation | sizes per file; core ≤ 35 MB |
-| Links and "plural of" as ids | core shrinks; unpack time per block no worse than +20% |
-| Gloss words as ids (tried, kept only if it wins) | ≥ 10% smaller core after brotli |
-| Blocks read one at a time | peak worker memory ≤ index + 2 blocks |
+| Step | Gate | Measured |
+|---|---|---|
+| Split content into core / examples / etymology / pronunciation | sizes per file; core ≤ 35 MB | ✅ core 33.8 MB; examples 13.3, etymology 8.5, pronunciation 1.1; 56.9 MB in all, as one file was. Word page median 61 ms (was 58). Built: version 3 of the format |
+| Links and "plural of" as ids | core shrinks; unpack time per block no worse than +20% | |
+| Gloss words as ids (tried, kept only if it wins) | ≥ 10% smaller core after brotli | |
+| Blocks read one at a time | peak memory ≤ index + 2 blocks (the whole app's, not only the worker's) | ❌ not yet: see *Evidence* |
 | Rank tables and hot list rebuilt at open | ≤ 150 ms with the CPU slowed 4× |
 | One-byte frequency, packed display forms | index smaller; results unchanged on the golden queries, or each change in order reviewed |
 | Merged search over two indexes | first page ≤ 2× one index's time |
+
+## Evidence
+
+Measured 2026-11-05 on the released data (v0.5.1's `data-…`: 1,357,380 words), Chromium,
+phone viewport; memory is resident memory summed over Chromium's processes after opening
+three words; word page time is Enter to its meanings shown, median of eight words.
+
+- **Split** (`bench/layer_split.py` on the real file; then `scripts/upgrade_definitions.py`,
+  which writes through the builder's own writer and matches a fresh build byte for byte
+  on the fixture): sizes in the table above. Old and new readers agree on 3,000 random
+  words. Splitting costs nothing in size: each kind compresses as well on its own.
+- **Blob slices don't save memory.** Keeping each file as a `Blob` and reading a block
+  with `blob.slice()` took 57 MB out of the worker's process but put 55 MB into the
+  browser's (where Chromium keeps Blobs): 579 → 576 MB in all. Word pages went from
+  58 to 135 ms. Not adopted; the reader keeps the seam (`ByteSource`) a real ranged
+  source plugs into.
+- **Range requests can't do it in the Android app yet.** Capacitor's local server
+  (`WebViewLocalServer.handleLocalRequest`) answers a Range request with 206 and the
+  asked-for `Content-Range`, but sends the file from its first byte. A ranged source
+  needs that fixed (upstream, or our own path handler) or a small native reader of
+  asset ranges (with the definitions files stored uncompressed in the APK). The web
+  (GitHub Pages) serves ranges.
+- **The decoder's window.** The JavaScript brotli decoder sets aside the window a block
+  declares for every block it unpacks (10 unpacks of a 110 KB block: 10.7 MB at the old
+  4 MB window, 3.3 MB at one sized to the block). Blocks declared 4 MB (`lgwin=22`)
+  whatever their size; each now declares a window just over its own size. Sizes unchanged.
+- **Open: about 30 MB more resident in Chromium.** With the split, Chromium's worker process
+  holds about 30 MB more than with one file (after forced garbage collection: 570 → 603
+  and 564 → 598 MB in all), not explained by the decoder's window, by downloading the
+  files at once, or by the data held: in Node, the new reader holds less live memory
+  than the old (27.9 against 34.5 MB after six words). To measure on a phone
+  (`adb shell dumpsys meminfo`) before calling the step done on memory.
 
 ## Consequences
 

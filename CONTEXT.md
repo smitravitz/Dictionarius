@@ -40,7 +40,7 @@ decision or module makes it load-bearing.
   plain ("tion", "ough", "ere"), in two lanes drifting slowly opposite ways,
   shuffled each start, each tile a little bigger the more words it finds.
   Tapping one opens its words around the middle of the list (**landing**,
-  `src/landing.ts`: 35–65% of the way down, at random). Typing brings back the
+  `src/landing.ts`: 43–57% of the way down, at random), drawn already in place: the worker counts the list first, and counts the suggestions ahead while idle. Typing brings back the
   usual header.
 - **Position slider** — hold a blank spot in the results and slide sideways to
   jump to a position. Its **active range** is the middle 80% of the screen; the
@@ -51,9 +51,10 @@ decision or module makes it load-bearing.
   left to right.
 - **Scroller gestures** — what a press on the results means, decided in one
   place (`web/scroller-gestures.ts`): a **tap** opens a word (on a touch screen
-  while typing, it only puts the keyboard away); a **hold** (300 ms) on a
-  blank spot shows the position slider, and the finger's first clear move
-  decides: sideways scrubs, up or down lets it go and scrolls the list; a hold on a word is reserved; a moving finger
+  while typing, it only puts the keyboard away); a **hold** (380 ms) on a
+  blank spot beside the words shows the position slider, and the finger's first clear move
+  (16 px) decides: sideways scrubs, up or down lets it go and scrolls the list; a hold
+  (300 ms) anywhere up or down a row, across its word, **peeks** that word's definition; a moving finger
   scrolls; the mouse drags the list or a row.
 - **Edge strips** — in the Android app, a strip down each side of the results,
   centred on their lower half, where the phone's own edge swipe (Back) is
@@ -69,7 +70,10 @@ decision or module makes it load-bearing.
   **word columns** in the index (`LEN`, `NAME`, `SHAPE`); a choice compiles to
   one **WordFilter** that every list and count goes through (ADR-0003).
 - **Definitions file** — every word's definitions, beside the index, read by
-  word id (`src/definitions.ts`, `docs/definitions-format.md`; ADR-0004): per
+  word id (`src/definitions.ts`, `docs/definitions-format.md`; ADR-0004), as a
+  **core** (`headwords.definitions.bin`) and a **layer** file each for
+  examples, etymology and pronunciation, any of which may be left out
+  (ADR-0005; one container layout, `LayerFile`): per
   written form, a **word class** (Wiktionary's part of speech) with numbered
   **meanings** (gloss, usage **labels**, a safe-search flag), the words a
   plural or spelling is **of**, **links** inside the gloss (as on Wiktionary),

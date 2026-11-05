@@ -23,14 +23,14 @@ npm run dev
 
 The build checks itself against brute force and also writes:
 
-- `headwords.definitions.bin`: every word's definitions, by word id ([format](definitions-format.md)). Only a build from the dump has them; the app reads the file beside the index.
+- `headwords.definitions.bin`: every word's meanings, by word id, and beside it one **layer** each for examples, etymology and pronunciation (`headwords.examples.bin`, `headwords.etymology.bin`, `headwords.pronunciation.bin`; [format](definitions-format.md), [ADR-0005](adr/0005-layered-data-packs.md)). Only a build from the dump has them; the app reads the files beside the index, and shows what there is when a layer is left out. A version-2 file (everything in one, before v0.6) upgrades without the dump: `python scripts/upgrade_definitions.py dist/headwords.definitions.bin`.
 - `headwords.golden.json`: answers the tests compare against
 - `headwords.safe-review.tsv`: every word safe search hides, and visible words worth a look, most common first, with why. Corrections go in the hand-picked list, `data/safe-search.list` (encoded; `python scripts/safe_search_list.py show`, `add`, `remove`; quote phrases). See the [rule](index-format.md#safe-search). To check an outside bad-word list (such as cuss) against what safe search shows: `npx vite-node scripts/safe-search-candidates.ts list.txt`
 - `headwords.labels.jsonl.gz`: the labels safe search reads, and which words are names (proper nouns). With it and a list of the headwords, a rule change rebuilds without re-reading the dump: `python scripts/build_fm_index.py words.json --labels headwords.labels.jsonl.gz`. A cache from before names were kept has no parts of speech; an index rebuilt from it has no `NAME` column, so the app doesn't offer *Disable names* until the next build from the dump. Definitions aren't in the cache: a rebuild from it writes none.
 
-To measure how the definitions pack, without the whole dump: `python scripts/sample_definitions.py raw-wiktextract-data.jsonl` (every 20th word, a few MB), then `python bench/definitions_packing.py definitions-sample.jsonl.gz` ([ADR-0004](adr/0004-all-definitions-bundled.md)).
+To measure how the definitions pack, without the whole dump: `python scripts/sample_definitions.py raw-wiktextract-data.jsonl` (every 20th word, a few MB), then `python bench/definitions_packing.py definitions-sample.jsonl.gz` ([ADR-0004](adr/0004-all-definitions-bundled.md)). What each kind of content costs on its own, on a real version-2 file: `python bench/layer_split.py headwords.definitions.bin` (ADR-0005).
 
-**Releasing new data:** put both checksums in `data/headwords.sha256` (`shasum -a 256 headwords.bin headwords.definitions.bin > data/headwords.sha256`), commit, then `bash scripts/setup-release.sh headwords.bin` uploads both as a `data-…` release that app releases are built with.
+**Releasing new data:** `data/headwords.sha256` lists every data file an app release bundles, with its checksum; the upload and the release workflow both go by it. From the build's folder: `shasum -a 256 headwords.bin headwords.definitions.bin headwords.examples.bin headwords.etymology.bin headwords.pronunciation.bin > data/headwords.sha256`, commit and push, then `bash scripts/setup-release.sh dist/headwords.bin` uploads them all as a `data-…` release that app releases are built with. The release workflow checks the data opens with the tagged code before building (`DICTIONARIUS_RELEASE_DATA`).
 
 ## Android
 

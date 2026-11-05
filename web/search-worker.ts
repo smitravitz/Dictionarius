@@ -9,7 +9,7 @@ import { Completer, type Matches } from "../src/complete";
 import { normalize } from "../src/normalize";
 import { SAFE_SEARCH_OVERRIDES } from "../src/safe-search-overrides";
 import { defaultFilters, filterKey, type FilterState } from "../src/filters";
-import { DefinitionsFile } from "../src/definitions";
+import { DefinitionsFile, LAYERS, bytesSource, layerUrl, type ByteSource, type Layer } from "../src/definitions";
 import { landingRow } from "../src/landing";
 import { PAGE_SIZE, type Counts, type FromWorker, type ToWorker } from "./protocol";
 import { PIECES } from "./examples";
@@ -37,7 +37,8 @@ const ahead = new Map<string, Matches>();
 let aheadFilters = "";
 let aheadTimer: ReturnType<typeof setTimeout> | undefined;
 const AHEAD_PAUSE_MS = 4; // between slices: a search's own counting comes first
-// The definitions file, loaded after the index; null when there is none (or it doesn't fit the index).
+// The definitions, loaded after the index: the core file and whichever layers are
+// there (examples, etymology, pronunciation); null when there's no core (or it doesn't fit the index).
 let found: (file: DefinitionsFile | null) => void = () => {};
 const definitions = new Promise<DefinitionsFile | null>((resolve) => (found = resolve));
 const DEFINITIONS_AFTER_MS = 1500;
@@ -110,11 +111,32 @@ async function load(url: string, definitionsUrl: string, definitionsNow: boolean
   }
 }
 
-/** The definitions file for `index`, or null (none there, or built for another word list). */
+/** The definitions for `index` (the core file at `url`, its layers beside it), or
+ *  null when there's no core or it was built for another word list. A layer that's
+ *  missing or doesn't fit is left out: the page shows what there is. */
 async function loadDefinitions(url: string, index: HeadwordIndex) {
+  const fetched = async (at: string) => {
+    try {
+      const response = await fetch(at);
+      return response.ok ? bytesSource(new Uint8Array(await response.arrayBuffer())) : null;
+    } catch {
+      return null;
+    }
+  };
+  const [core, ...layers] = await Promise.all([fetched(url), ...LAYERS.map((kind) => fetched(layerUrl(url, kind)))]);
   try {
-    const response = await fetch(url);
-    found(response.ok ? DefinitionsFile.fromBytes(new Uint8Array(await response.arrayBuffer()), index) : null);
+    if (!core) throw new Error(`no ${url}`);
+    const kept: Partial<Record<Layer, ByteSource>> = {};
+    for (const [i, kind] of LAYERS.entries()) {
+      if (!layers[i]) continue;
+      try {
+        await DefinitionsFile.open(core, index, { [kind]: layers[i] }); // fits this core? (reads headers only)
+        kept[kind] = layers[i];
+      } catch (error) {
+        console.warn(`left out ${kind}:`, error instanceof Error ? error.message : error);
+      }
+    }
+    found(await DefinitionsFile.open(core, index, kept));
   } catch (error) {
     console.warn("no definitions:", error instanceof Error ? error.message : error);
     found(null);

@@ -196,6 +196,30 @@ class Packing(unittest.TestCase):
         self.assertLess(len(line), len(encode_plain(self.defs)) * 0.7)
 
 
+def window_of(stream):
+    """The window a brotli stream declares (its WBITS, RFC 7932 section 9.1), in bytes, less 16."""
+    first = stream[0]
+    if first & 1 == 0:
+        bits = 16
+    elif (first >> 1) & 7:
+        bits = 17 + ((first >> 1) & 7)
+    elif (first >> 4) & 7:
+        bits = 8 + ((first >> 4) & 7)
+    else:
+        bits = 17
+    return (1 << bits) - 16
+
+
+def brotli_text(file_bytes):
+    """Every block of a layer file, unpacked and joined: the text it holds."""
+    import brotli
+    import struct
+    from definitions import HEADER
+    _, _, _, _, _, num_blocks, tables_length, _ = HEADER.unpack_from(file_bytes)
+    offsets = struct.unpack_from(f"<{num_blocks + 1}I", file_bytes, HEADER.size + tables_length)
+    return b"\n".join(brotli.decompress(file_bytes[offsets[b]:offsets[b + 1]]) for b in range(num_blocks))
+
+
 def encode_plain(value):
     import json
     return json.dumps(value, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
@@ -214,7 +238,7 @@ class File(unittest.TestCase):
                 6: [{"form": "zorbles", "pos": "noun", "meanings": [{"gloss": "plural of zorble", "of": ["zorble"]}]}]}
         tables = packing_tables(defs.values(), min_uses=1)
         with tempfile.TemporaryDirectory() as tmp:
-            path = os.path.join(tmp, "d.bin")
+            path = os.path.join(tmp, "d.definitions.bin")
             write_definitions(path, keys, sorted(defs.items()), b"k" * 32, tables, per_block=3)
             back = read_definitions(path, keys)
             only = read_definitions(path, keys, ids=[6])
@@ -222,6 +246,51 @@ class File(unittest.TestCase):
         self.assertEqual(back["tables"], tables)
         self.assertEqual(back["entries"], defs)
         self.assertEqual(only["entries"], {6: defs[6]})
+
+    def test_each_kind_of_content_in_its_own_file_beside_the_core(self):
+        # ADR-0005: the core (meanings) and, beside it, one file each for examples,
+        # etymology and pronunciation, so a smaller app can leave any of them out.
+        import tempfile
+        keys = ["a", "zorble", "zorbles"]
+        defs = {1: [{"form": "zorble", "pos": "verb", "etymology": "From Zorbish.", "ipa": ["/ˈzɔː.bəl/"],
+                     "meanings": [{"gloss": "To wobble.", "example": "It zorbled."}, {"gloss": "To sway."}]}],
+                2: [{"form": "zorbles", "pos": "noun", "meanings": [{"gloss": "plural of zorble", "of": ["zorble"]}]}]}
+        tables = packing_tables(defs.values(), min_uses=1)
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "w.definitions.bin")
+            write_definitions(path, keys, sorted(defs.items()), b"k" * 32, tables, per_block=2)
+            self.assertEqual(sorted(os.listdir(tmp)),
+                             ["w.definitions.bin", "w.etymology.bin", "w.examples.bin", "w.pronunciation.bin"])
+            with open(path, "rb") as f:
+                core = f.read()
+            back = read_definitions(path, keys)
+        self.assertNotIn("Zorbish".encode(), brotli_text(core))
+        self.assertNotIn("zorbled".encode(), brotli_text(core))
+        self.assertNotIn("ˈzɔː".encode(), brotli_text(core))
+        self.assertEqual(back["entries"], defs)
+
+    def test_a_missing_layer_leaves_only_its_own_content_out(self):
+        import tempfile
+        keys = ["zorble"]
+        defs = {0: [{"form": "zorble", "pos": "verb", "etymology": "From Zorbish.", "ipa": ["/ˈzɔː.bəl/"],
+                     "meanings": [{"gloss": "To wobble.", "example": "It zorbled."}]}]}
+        tables = packing_tables(defs.values(), min_uses=1)
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "w.definitions.bin")
+            write_definitions(path, keys, sorted(defs.items()), b"k" * 32, tables)
+            os.remove(os.path.join(tmp, "w.examples.bin"))
+            os.remove(os.path.join(tmp, "w.etymology.bin"))
+            back = read_definitions(path, keys)
+        self.assertEqual(back["entries"], {0: [{"form": "zorble", "pos": "verb", "ipa": ["/ˈzɔː.bəl/"],
+                                                "meanings": [{"gloss": "To wobble."}]}]})
+
+    def test_a_block_asks_the_reader_for_no_bigger_a_window_than_it_needs(self):
+        # The app's decoder sets aside the window a block declares, for every block it unpacks.
+        from definitions import compress_block
+        for size in (1, 5_000, 110_000, 700_000):
+            raw = os.urandom(size // 2).hex().encode()[:size]
+            self.assertGreaterEqual(window_of(compress_block(raw)), size, size)
+            self.assertLess(window_of(compress_block(raw)), max(2 * size + 32, 1 << 10) * 2, size)
 
     def test_the_same_file_however_many_cores_compress_it(self):
         # Blocks are compressed in parallel; the file mustn't depend on how many
@@ -234,10 +303,15 @@ class File(unittest.TestCase):
         files = []
         with tempfile.TemporaryDirectory() as tmp:
             for workers in (1, 3, 8):
-                path = os.path.join(tmp, f"d{workers}.bin")
+                folder = os.path.join(tmp, str(workers))
+                os.mkdir(folder)
+                path = os.path.join(folder, "d.definitions.bin")
                 blocks = write_definitions(path, keys, iter(defs), b"k" * 32, tables, per_block=4, workers=workers)
-                with open(path, "rb") as f:
-                    files.append(f.read())
+                contents = {}
+                for name in sorted(os.listdir(folder)):
+                    with open(os.path.join(folder, name), "rb") as f:
+                        contents[name] = f.read()
+                files.append(contents)
             back = read_definitions(path, keys)
         self.assertEqual(blocks, 10)
         self.assertEqual(files[1], files[0])

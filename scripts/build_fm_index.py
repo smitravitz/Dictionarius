@@ -945,7 +945,8 @@ def main():
         log(f"  labels from {args.labels}: {len(labels.main):,} words")
     # Definitions need the entries themselves: only a dump (or JSON with
     # "senses") has them, not a word list rebuilt with --labels.
-    from definitions import DefinitionSpool, cpu_cores, packing_tables, read_definitions, write_definitions
+    from definitions import (LAYERS, DefinitionSpool, cpu_cores, layer_path, packing_tables, read_definitions,
+                             write_definitions)
     spool = None if args.labels else DefinitionSpool(tempfile.TemporaryFile())
     collect = None if args.labels else Collectors(labels, spool)
     if fmt == "kaikki":
@@ -1083,8 +1084,10 @@ def main():
         tables = packing_tables(found for _, found in spool.by_key(keys, forms_by_key, display_forms))
         blocks = write_definitions(definitions_path, keys, note(spool.by_key(keys, forms_by_key, display_forms)),
                                    keys_hash, tables)
-        log(f"  definitions: {len(with_definitions):,} of {k:,} words, {blocks:,} blocks, "
-            f"{human(os.path.getsize(definitions_path))} (compressed on {cpu_cores()} cores)")
+        log(f"  definitions: {len(with_definitions):,} of {k:,} words, {blocks:,} blocks a file, "
+            f"compressed on {cpu_cores()} cores")
+        for path in [definitions_path] + [layer_path(definitions_path, kind) for kind in LAYERS]:
+            log(f"    {os.path.basename(path):<34}{human(os.path.getsize(path)):>12}")
 
     golden_path = args.out + ".golden.json"
     data = golden(reader, text, encoded, keys, forms_by_key, freq, shape, explicit_ids,
@@ -1129,7 +1132,7 @@ def main():
     log(f"wrote {bin_path}")
     log(f"wrote {golden_path}")
     if definitions_path:
-        log(f"wrote {definitions_path} (definitions by word id)")
+        log(f"wrote {definitions_path} and its layers (definitions by word id)")
     if review_path:
         log(f"wrote {review_path} (what safe search hides, and words to look at; most common first)")
     if labels_path:
