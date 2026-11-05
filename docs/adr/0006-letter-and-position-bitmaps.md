@@ -12,8 +12,8 @@
 ## Context and problem statement
 
 People asked for searches the FM-index can't answer by itself: words that contain `eat`
-and also an `m` or an `n`; words with no `e`; Wordle-style patterns such as `_a_e_`
-(a letter at a given place). In general: any boolean combination of letter and position
+and also an `m` or an `n`; words with no `e`; words with exactly two `e`s; Wordle-style
+patterns such as `_a_e_` (a letter at a given place). In general: any boolean combination of letter and position
 conditions, with an exact count, and the app no slower for it.
 
 Two things about Dictionarius are not up for trade (the brand): **it opens instantly,
@@ -81,17 +81,26 @@ when the condition changes, never per keystroke.
 With no piece typed, a condition alone defines the list: its count is a popcount of the
 compiled bitmap, and its words are listed in id order (alphabetical; see open questions).
 
-### 3. Letters: a mask column, bitmaps built from it
+### 3. Letters and their counts: columns, bitmaps built from them
 
 - **`LTRS` column** (layer 1, beside `LEN`, `NAME`, …): one mask per word saying which of
-  the pack's letters it contains. 32 bits by default (a–z plus 6 flags: hyphen, space,
-  apostrophe, digit, a letter outside the alphabet, a double letter); 64 bits for packs
-  whose alphabet needs it (Cyrillic has 33 letters).
+  the pack's letters it contains. 32 bits by default: a–z plus 6 flags (hyphen, space,
+  apostrophe, digit, a letter outside the alphabet; one spare). 64 bits for packs whose
+  alphabet needs it (Cyrillic has 33 letters). A double letter needs no flag: the counts
+  below hold it.
 - **Alphabet table** in the pack: which characters map to which bit (French folds `é` to
   `e`, or gives it its own bit: the pack decides), so one engine serves every language.
 - **Per-letter bitmaps** (letter → words) are built from the column when a letter is first
   used in a condition (one pass, cached; about 170 KB each), so memory goes only to letters
   in use.
+- **Letter counts, as "at least n" sets.** For each letter and each n ≥ 2, the words with at
+  least n of it, stored as sorted id lists, delta-coded, in a `LCNT` column (layer 1). "At
+  least 1" is `LTRS` itself. Every count question is then bitwise over these sets:
+  *at least n* `= ≥n`; *exactly n* `= ≥n ∧ ¬≥(n+1)`; *at most n* `= ¬≥(n+1)`; *no more than
+  one of any letter* `= ¬(≥2 for any letter)`. A word holds two of a letter far more often
+  than three, and three far more than four, so the lists shrink fast with n: a fraction of
+  a fixed 4 bits per letter per word (13 bytes a word, about 17.6 MB), estimated 2–3 MB
+  (to be measured). The sets turn into bitmaps when first used, as letters do.
 
 ### 4. Positions: an optional bit-sliced layer
 
@@ -107,7 +116,8 @@ compiled bitmap, and its words are listed in id order (alphabetical; see open qu
 ### 5. What the user sees
 
 A three-state letter keyboard in the filter sheet (each key: *any* → *must have* → *must
-not have*), one "at least one of" group, and a pattern field (`_a_e_`). These compile to
+not have*), where holding a key sets how many (*at least* / *exactly* n), one "at least
+one of" group, and a pattern field (`_a_e_`). These compile to
 the expression of section 2. Arbitrary nesting is supported by the engine; the first UI
 doesn't expose it. Counts stay exact and immediate, as for every filter now.
 
@@ -124,6 +134,7 @@ Bench scripts beside `bench/definitions_packing.py`, on a full build; results re
 | Step | Gate |
 |---|---|
 | `LTRS` column | index grows ≤ 3.5 MB compressed; open time +≤ 5% |
+| `LCNT` letter counts | ≤ 3 MB compressed; *exactly n* of a letter compiles in ≤ 15 ms on CPU slowed 4× |
 | Keystroke speed with a letter condition on | first page p95 within 5% of no condition (golden queries, CPU slowed 4×) |
 | Compiling a letter condition | ≤ 15 ms on CPU slowed 4× |
 | Positions layer | file ≤ 12 MB compressed; a pattern compiles in ≤ 30 ms on CPU slowed 4×; adds nothing to the time to first search |
@@ -131,7 +142,7 @@ Bench scripts beside `bench/definitions_packing.py`, on a full build; results re
 
 ## Consequences
 
-- Letter and pattern searches with exact counts; the instant start and any-size search
+- Letter, letter-count and pattern searches with exact counts; the instant start and any-size search
   stay as they are, because nothing reaches the keystroke path except one bit test that
   already happens.
 - One more column and one optional file per pack. A pack without the positions file still
@@ -149,8 +160,6 @@ Bench scripts beside `bench/definitions_packing.py`, on a full build; results re
 
 - Order of a condition-only list (no piece typed): alphabetical by id is free; by rank
   needs a sort of the set (or a rank-ordered id permutation, about 5 MB).
-- Letter counts ("two e's"): 4 bits per letter per word, roughly three times the size of
-  `LTRS`; worth it only if asked for.
-- Whether the "double letter" flag earns its bit, or another flag does more.
+- What the spare flag bit holds.
 - Whether the positions file ships in every APK or as part of an optional pack (ADR-0005's
   flavour question).
