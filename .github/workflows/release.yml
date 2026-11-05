@@ -54,6 +54,13 @@ jobs:
         with:
           token: ${{ github.token }}
 
+      # The APK must never ship data its own code can't open (a format it doesn't
+      # read, another word list, a layer left behind): its word pages would be empty.
+      - name: Check the data opens with this version's code
+        run: npx vitest run test/definitions.test.ts
+        env:
+          DICTIONARIUS_RELEASE_DATA: release-data
+
       - name: Build the web app
         run: npm run build
         env:
