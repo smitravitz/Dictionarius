@@ -3,7 +3,7 @@
 Read this first in a new chat, then `.claude/CLAUDE.md`. Update it at the end of any
 session that changes what's below (newest state only; history lives in git).
 
-_Last updated: 2026-11-04, at v0.5.1._
+_Last updated: 2026-11-05, at v0.5.1._
 
 ## What it is
 
@@ -13,7 +13,8 @@ Search is an FM-index in a Web Worker; definitions are a brotli-blocked file. Da
 built from the English Wiktionary dump by `scripts/build_fm_index.py`.
 
 - Data formats: `docs/index-format.md`, `docs/definitions-format.md`
-- Decisions: `docs/adr/` (ADR-0005, layered data packs, is **Proposed**)
+- Decisions: `docs/adr/` (ADR-0005, layered data packs, and ADR-0006, letter and position
+  conditions as bitmaps, are **Proposed**)
 - Build, test, release: `docs/development.md`
 
 ## Where things are
@@ -60,3 +61,5 @@ built from the English Wiktionary dump by `scripts/build_fm_index.py`.
 3. Whether the Android app should also wait behind the loading screen (currently no).
 4. Start-screen copy "Or pick one from the bag below" may need updating for the two lanes.
 5. Check the newer suggestion pieces in `web/examples.ts` against real word counts.
+6. ADR-0006 gates: the `LTRS` letter column first, then the positions layer and the
+   letter keyboard / pattern field.
