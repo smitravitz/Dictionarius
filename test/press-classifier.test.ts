@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { HOLD_MS, PressClassifier, type PressStart } from "../web/scroller-gestures";
+import { ARM_MS, DECIDE, HOLD_MS, PressClassifier, type PressStart } from "../web/scroller-gestures";
 
 // What a press on the results list means. The classifier hears the press start,
 // moves, the hold timer and the release, says what to do at each step, and
@@ -50,6 +50,19 @@ describe("PressClassifier", () => {
     expect(HOLD_MS).toBeGreaterThanOrEqual(250); // still a hold, not a slow tap
   });
 
+  it("opens the slider a beat after a peek would, still before the phone's long-press", () => {
+    expect(ARM_MS).toBeGreaterThan(HOLD_MS);
+    expect(ARM_MS).toBeLessThan(400);
+  });
+
+  it("needs a clear sideways move after the hold to start scrubbing, not a resting finger's drift", () => {
+    const c = new PressClassifier();
+    c.down(press({ onWord: false, x: 100, y: 200 }));
+    c.hold();
+    expect(c.move(1, 100 + DECIDE - 2, 200)).toBeNull();
+    expect(c.move(1, 100 + DECIDE, 200)).toEqual({ type: "slide", x: 100 + DECIDE });
+  });
+
   it("after a hold on a blank spot, a sideways swipe scrubs: the slider follows the finger until it lifts", () => {
     const c = new PressClassifier();
     c.down(press({ onWord: false, x: 40, y: 200 }));
@@ -66,7 +79,7 @@ describe("PressClassifier", () => {
     const c = new PressClassifier();
     c.down(press({ onWord: false, x: 100, y: 200 }));
     c.hold();
-    expect(c.move(1, 103, 214)).toEqual({ type: "unhold", dx: 3, dy: 14 }); // mostly down
+    expect(c.move(1, 103, 220)).toEqual({ type: "unhold", dx: 3, dy: 20 }); // mostly down
     expect(c.move(1, 104, 260)).toEqual({ type: "drag", axis: "list", dx: 4, dy: 60 });
     expect(c.move(1, 160, 262)).toEqual({ type: "drag", axis: "list", dx: 60, dy: 62 }); // stays a scroll
     expect(c.up(1)).toEqual({ type: "drop", axis: "list" });
@@ -77,7 +90,7 @@ describe("PressClassifier", () => {
     const diagonal = new PressClassifier();
     diagonal.down(press({ onWord: false, x: 100, y: 200 }));
     diagonal.hold();
-    expect(diagonal.move(1, 110, 209)).toEqual({ type: "slide", x: 110 }); // as far sideways as down: scrub
+    expect(diagonal.move(1, 115, 213)).toEqual({ type: "slide", x: 115 }); // as far sideways as down: scrub
 
     const lifted = new PressClassifier();
     lifted.down(press({ onWord: false }));

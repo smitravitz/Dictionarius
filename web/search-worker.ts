@@ -10,7 +10,9 @@ import { normalize } from "../src/normalize";
 import { SAFE_SEARCH_OVERRIDES } from "../src/safe-search-overrides";
 import { defaultFilters, filterKey, type FilterState } from "../src/filters";
 import { DefinitionsFile } from "../src/definitions";
+import { landingRow } from "../src/landing";
 import { PAGE_SIZE, type Counts, type FromWorker, type ToWorker } from "./protocol";
+import { PIECES } from "./examples";
 
 /** Background counting runs in slices this long, so requests aren't held up. */
 const COUNT_SLICE_MS = 12;
@@ -28,6 +30,13 @@ let matchesSeq = -1;
 let countTimer: ReturnType<typeof setTimeout> | undefined;
 let filters: FilterState = defaultFilters(); // the page sends the saved settings before loading
 let matchesFilters = filterKey(filters);
+// The start screen's suggestions, counted ahead while the worker is idle, so tapping one
+// opens its list at once (landOn has nothing left to count). About 2.5 MB of word ids
+// for all of them. Kept for the filters they were counted with; new settings start over.
+const ahead = new Map<string, Matches>();
+let aheadFilters = "";
+let aheadTimer: ReturnType<typeof setTimeout> | undefined;
+const AHEAD_PAUSE_MS = 4; // between slices: a search's own counting comes first
 // The definitions file, loaded after the index; null when there is none (or it doesn't fit the index).
 let found: (file: DefinitionsFile | null) => void = () => {};
 const definitions = new Promise<DefinitionsFile | null>((resolve) => (found = resolve));
@@ -55,6 +64,7 @@ scope.onmessage = ({ data }) => {
     case "settings":
       filters = data.filters;
       setTimeout(() => completer?.prepare(filters), 0);
+      countAhead();
       break;
     case "search":
       if (completer) search(data);
@@ -85,6 +95,7 @@ async function load(url: string, definitionsUrl: string, definitionsNow: boolean
     waiting = null;
     // Work out the filters' words now, before the first search needs them.
     setTimeout(() => completer?.prepare(filters), 0);
+    countAhead();
     // The definitions (the bigger file) once the start screen has settled, or
     // as soon as a word's are asked for.
     startDefinitions = () => {
@@ -111,18 +122,48 @@ async function loadDefinitions(url: string, index: HeadwordIndex) {
   scope.postMessage({ type: "loaded" });
 }
 
-function search({ seq, query }: { seq: number; query: string }) {
+function search({ seq, query, land }: Extract<ToWorker, { type: "search" }>) {
   // Re-asking for the same query (a setting unchanged) keeps the work done.
   if (!matches || matches.query !== normalize(query) || matchesFilters !== filterKey(filters)) {
-    matches = completer!.search(query, { filters });
+    const counted = aheadFilters === filterKey(filters) ? ahead.get(normalize(query)) : undefined;
+    matches = counted ?? completer!.search(query, { filters });
     matchesFilters = filterKey(filters);
   }
   matchesSeq = seq;
-  sendRows(0, PAGE_SIZE);
-  countInBackground(matches);
+  if (land) landOn(matches);
+  else {
+    sendRows(0, PAGE_SIZE);
+    countInBackground(matches);
+  }
 }
 
-function sendRows(from: number, to: number, seek?: { offset: number; row: number }) {
+/** Rows sent around a landing: the screen's worth below it (a tall one), and the
+ *  results list's overscan above, so its first paint has every word it shows. */
+const LAND_ABOVE = 8;
+const LAND_BELOW = 60;
+
+/** A suggestion's search: count every word (in slices, so a newer search can take
+ *  over), pick the row its list opens at, and send the rows there in one answer. The
+ *  page shows nothing of it until then, so it never paints the top and then jumps. */
+function landOn(m: Matches) {
+  clearTimeout(countTimer);
+  const slice = () => {
+    if (m !== matches) return; // a newer search took over
+    const started = performance.now();
+    while (!m.complete && performance.now() - started < COUNT_SLICE_MS) m.count(20_000);
+    if (!m.complete) {
+      countTimer = setTimeout(slice, 0);
+      return;
+    }
+    const row = landingRow(m.byOffset.reduce((a, b) => a + b, 0)) ?? 0;
+    const from = Math.max(0, Math.floor((row - LAND_ABOVE) / PAGE_SIZE) * PAGE_SIZE);
+    const to = Math.ceil((row + LAND_BELOW) / PAGE_SIZE) * PAGE_SIZE;
+    sendRows(from, to, undefined, row);
+  };
+  slice();
+}
+
+function sendRows(from: number, to: number, seek?: { offset: number; row: number }, landAt?: number) {
   const m = matches!;
   const items = m.rows(from, to);
   scope.postMessage({
@@ -135,7 +176,33 @@ function sendRows(from: number, to: number, seek?: { offset: number; row: number
     complete: m.complete,
     counts: countsOf(m),
     seek,
+    landAt,
   });
+}
+
+/** Count the start screen's suggestions ahead, one slice at a time, in the gaps between
+ *  everything else the worker does. */
+function countAhead() {
+  clearTimeout(aheadTimer);
+  if (!completer) return; // starts once the index is in
+  const key = filterKey(filters);
+  if (key !== aheadFilters) {
+    ahead.clear();
+    aheadFilters = key;
+  }
+  const slice = () => {
+    const piece = PIECES.map(([p]) => normalize(p)).find((q) => !ahead.get(q)?.complete);
+    if (piece === undefined || !completer || aheadFilters !== filterKey(filters)) return;
+    let m = ahead.get(piece);
+    if (!m) {
+      m = completer.search(piece, { filters });
+      ahead.set(piece, m);
+    }
+    const started = performance.now();
+    while (!m.complete && performance.now() - started < COUNT_SLICE_MS) m.count(20_000);
+    aheadTimer = setTimeout(slice, AHEAD_PAUSE_MS);
+  };
+  aheadTimer = setTimeout(slice, AHEAD_PAUSE_MS);
 }
 
 function countInBackground(m: Matches) {

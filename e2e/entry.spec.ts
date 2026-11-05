@@ -9,6 +9,7 @@ import { test, expect, type Page } from "@playwright/test";
 async function open(page: Page) {
   await page.goto("/?index=headwords-sample.bin");
   await expect(page.locator("#status")).toHaveText(/^[\d,]+ words$/);
+  await expect(page.locator("#loader")).toHaveCount(0); // a browser shows the app once all is in
 }
 
 /** Search for `query` and tap the row showing `word`. */
@@ -181,6 +182,24 @@ test("holding a word peeks at its first meanings until it's let go, without open
   await page.mouse.up();
   await expect(peek).toBeHidden();
   await expect(entry(page)).toBeHidden();
+});
+
+test("holding between two rows peeks the nearer word, not the position slider", async ({ page }) => {
+  await open(page);
+  await page.locator("#q").fill("ingot");
+  await page.locator("#q").blur();
+  const row = page.locator('li.word[aria-label="ingot"]');
+  const letters = (await row.locator(".frag").boundingBox())!;
+  const box = (await row.boundingBox())!;
+  // The row's bottom edge: well below its letters, in the gap before the next row.
+  await page.mouse.move(letters.x + letters.width / 2, box.y + box.height - 3);
+  await page.mouse.down();
+  const peek = page.locator("#peek");
+  await expect(peek).toBeVisible();
+  await expect(peek.locator(".word-class-name")).toHaveText("noun"); // ingot's
+  await expect(page.locator(".slider")).not.toHaveClass(/\bon\b/);
+  await page.mouse.up();
+  await expect(peek).toBeHidden();
 });
 
 /** A quick flick across the middle of the screen: "right" steps back, "left" forward. */

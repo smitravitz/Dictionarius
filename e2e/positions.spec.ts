@@ -4,6 +4,7 @@ import { test, expect, type Page, type Locator } from "@playwright/test";
 async function open(page: Page) {
   await page.goto("/?index=headwords-sample.bin");
   await expect(page.locator("#status")).toHaveText(/^[\d,]+ words$/);
+  await expect(page.locator("#loader")).toHaveCount(0); // a browser shows the app once all is in
 }
 
 /** Letters before the fragment in each rendered row, top to bottom. */

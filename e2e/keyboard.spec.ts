@@ -4,6 +4,7 @@ import { test, expect, type Page } from "@playwright/test";
 async function open(page: Page) {
   await page.goto("/?index=headwords-sample.bin");
   await expect(page.locator("#status")).toHaveText(/^[\d,]+ words$/);
+  await expect(page.locator("#loader")).toHaveCount(0); // a browser shows the app once all is in
 }
 
 test("with the keyboard open, a tap on a word only closes the keyboard", async ({ page, isMobile }) => {

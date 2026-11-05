@@ -7,6 +7,7 @@ import { test, expect, type Page, type Locator } from "@playwright/test";
 async function open(page: Page) {
   await page.goto("/?index=headwords-sample.bin");
   await expect(page.locator("#status")).toHaveText(/^[\d,]+ words$/);
+  await expect(page.locator("#loader")).toHaveCount(0); // a browser shows the app once all is in
 }
 
 /** Words shown in the list (rendered rows), in order. */
@@ -67,6 +68,7 @@ test("the funnel under the cog opens word-length wheels that filter the list, an
 
   await page.reload();
   await expect(page.locator("#status")).toHaveText(/^[\d,]+ words$/);
+  await expect(page.locator("#loader")).toHaveCount(0); // a browser shows the app once all is in
   await expect(funnel).toHaveAttribute("data-active", "");
   await funnel.click();
   await expect(min).toHaveAttribute("aria-valuetext", "4");
@@ -106,6 +108,7 @@ test("a set filter is named under the totals, and its cross clears it", async ({
   await expect(page.getByRole("spinbutton", { name: "Minimum word length" })).toHaveAttribute("aria-valuetext", "Any");
   await page.reload();
   await expect(page.locator("#status")).toHaveText(/^[\d,]+ words$/);
+  await expect(page.locator("#loader")).toHaveCount(0); // a browser shows the app once all is in
   await expect(funnel).not.toHaveAttribute("data-active", ""); // and it stays cleared
 });
 

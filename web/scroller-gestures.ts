@@ -4,10 +4,13 @@
  * - A tap opens the word under it. On a touch screen while typing, it only
  *   puts the keyboard away: the keyboard closing moves the list under the
  *   finger, so the tap would land on a word nobody aimed at.
- * - A hold on a blank spot shows the position slider. The finger's first
- *   clear move then decides: sideways scrubs (the slider follows the finger
- *   until it lifts); up or down lets the slider go and scrolls the list. A
- *   hold on a word peeks at its definition until the finger lifts.
+ * - A hold on a word peeks at its definition until the finger lifts. "On a
+ *   word" is anywhere up or down its row across the word's width, so a hold
+ *   between two rows peeks the nearer word (the rows meet halfway).
+ * - A hold on a blank spot (beside the words, not between them) shows the
+ *   position slider, a little later than a peek. The finger's first clear
+ *   move then decides: sideways scrubs (the slider follows the finger until
+ *   it lifts); up or down lets the slider go and scrolls the list.
  * - A finger that moves is scrolling, which the browser does itself.
  * - The mouse drags the list up and down (with momentum on release) and a
  *   row sideways, as a finger would.
@@ -17,9 +20,28 @@
  * carries out the scrolling.
  */
 
-export const HOLD_MS = 300; // well under Android's long-press (400 ms), so ours comes first
+export const HOLD_MS = 300; // a hold on a word: well under Android's long-press (400 ms), so ours comes first
+export const ARM_MS = 380; // a hold on a blank spot: a beat longer, so a resting finger doesn't open the slider (still under 400)
 const SLOP = 8; // moving further than this means scrolling or dragging, not a tap or hold
-const DECIDE = 10; // after a hold, moving this far says which way: sideways scrubs, up or down scrolls
+export const DECIDE = 16; // after a hold, moving this far says which way: sideways scrubs, up or down scrolls
+/** How far either side of a word's letters a press still counts as on it (a fingertip's width, about). */
+export const WORD_REACH = 16;
+
+/** Whether screen x falls on the word of the row holding `target`: across its letters
+ *  (give or take WORD_REACH), anywhere up or down the row. */
+export function onWordAt(target: Element, x: number): boolean {
+  const row = target.closest("li.word:not(.pending)");
+  if (!row) return false;
+  let left = Infinity;
+  let right = -Infinity;
+  for (const part of row.querySelectorAll(".before, .frag, .after")) {
+    const box = part.getBoundingClientRect();
+    if (box.width === 0) continue; // nothing before the fragment, say
+    left = Math.min(left, box.left);
+    right = Math.max(right, box.right);
+  }
+  return x >= left - WORD_REACH && x <= right + WORD_REACH;
+}
 
 export interface PressStart {
   pointerId: number;
@@ -231,6 +253,7 @@ export class ScrollerGestures {
 
   private down(e: PointerEvent) {
     const target = e.target as Element;
+    const onWord = onWordAt(target, e.clientX);
     this.classifier.down({
       pointerId: e.pointerId,
       pointerType: e.pointerType,
@@ -238,7 +261,7 @@ export class ScrollerGestures {
       button: e.button,
       x: e.clientX,
       y: e.clientY,
-      onWord: !!target.closest(".before, .frag, .after"),
+      onWord,
       onRow: !!target.closest(".track"),
       typing: this.events.typing(),
     });
@@ -253,7 +276,7 @@ export class ScrollerGestures {
     this.startTop = this.scroller.scrollTop;
     this.startLeft = this.row?.scrollLeft ?? 0;
     this.samples = [{ t: e.timeStamp, y: e.clientY }];
-    this.timer = setTimeout(() => this.hold(), HOLD_MS);
+    this.timer = setTimeout(() => this.hold(), onWord ? HOLD_MS : ARM_MS);
   }
 
   private hold() {

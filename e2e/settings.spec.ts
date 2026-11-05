@@ -4,6 +4,7 @@ import { test, expect, type Page } from "@playwright/test";
 async function open(page: Page) {
   await page.goto("/?index=headwords-sample.bin");
   await expect(page.locator("#status")).toHaveText(/^[\d,]+ words$/);
+  await expect(page.locator("#loader")).toHaveCount(0); // a browser shows the app once all is in
 }
 
 /** Words shown in the list (rendered rows), in order. */
@@ -48,6 +49,7 @@ test("safe search hides explicit words; turning it off shows them, and is rememb
 
   await page.reload();
   await expect(page.locator("#status")).toHaveText(/^[\d,]+ words$/);
+  await expect(page.locator("#loader")).toHaveCount(0); // a browser shows the app once all is in
   await page.locator("#q").fill("rude");
   await expect.poll(() => shown(page)).toContain("rudeword"); // still off after a reload
   await page.getByRole("button", { name: "Settings" }).click();
@@ -113,6 +115,7 @@ test("only common words by default: phrases and names start hidden, and come bac
 
   await page.reload();
   await expect(page.locator("#status")).toHaveText(/^[\d,]+ words$/);
+  await expect(page.locator("#loader")).toHaveCount(0); // a browser shows the app once all is in
   await page.locator("#q").fill("zorble");
   await expect.poll(() => shown(page)).toEqual(["zorble", "zorbles", "Zorbleton"]); // still off after a reload
 });

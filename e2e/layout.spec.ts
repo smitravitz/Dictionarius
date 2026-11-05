@@ -10,6 +10,7 @@ const GESTURE_BAR = 24; // a phone's gesture navigation bar, in CSS px
 async function openUnderBars(page: Page) {
   await page.goto("/?index=headwords-sample.bin");
   await expect(page.locator("#status")).toHaveText(/^[\d,]+ words$/);
+  await expect(page.locator("#loader")).toHaveCount(0); // a browser shows the app once all is in
   // What the SystemBars plugin sets once the app is running (and again when the bars change).
   await page.evaluate((bottom) => {
     document.documentElement.style.setProperty("--safe-area-inset-bottom", `${bottom}px`);

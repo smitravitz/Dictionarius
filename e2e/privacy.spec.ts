@@ -21,6 +21,7 @@ test("the page refuses to contact other servers", async ({ page }) => {
   await recordViolations(page);
   await open(page);
   await expect(page.locator("#status")).toHaveText(/^[\d,]+ words$/);
+  await expect(page.locator("#loader")).toHaveCount(0); // a browser shows the app once all is in
   await page.evaluate(async () => {
     await fetch("https://example.com/collect").catch(() => {});
     const img = new Image();
@@ -41,6 +42,7 @@ test("searching, opening a word and the settings break none of the page's rules"
   });
   await open(page);
   await expect(page.locator("#status")).toHaveText(/^[\d,]+ words$/);
+  await expect(page.locator("#loader")).toHaveCount(0); // a browser shows the app once all is in
   await page.locator("#q").fill("ate");
   await expect(page.locator("#summary")).toHaveText(/in all$/);
   await page.locator("#q").blur();

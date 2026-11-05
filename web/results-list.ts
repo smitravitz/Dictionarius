@@ -100,6 +100,25 @@ export class ResultsList {
     this.schedule();
   }
 
+  /**
+   * Show a list that arrived whole, opened at row `at`: `items` from row `from` (whole
+   * pages), the list exactly `length` long. One render, with every row in view already
+   * there, so the first frame drawn is the final one: no placeholders, no jump.
+   */
+  openAt(from: number, items: Suggestion[], length: number, at: number) {
+    items.forEach((s, i) => this.rows.set(from + i, s));
+    this.length = length;
+    this.complete = true;
+    // The pages that came: asked for, as far as fetching goes. Nothing else is.
+    this.requested.clear();
+    const end = from + items.length;
+    for (let page = Math.floor(from / PAGE_SIZE); page * PAGE_SIZE < end; page++) {
+      const covered = page * PAGE_SIZE >= from && Math.min((page + 1) * PAGE_SIZE, length) <= end;
+      if (covered) this.requested.add(page);
+    }
+    this.scrollToRow(at);
+  }
+
   /** Scroll so row `i` is at the top. */
   scrollToRow(i: number) {
     // Tall enough first: rows just learned of aren't drawn yet, and the

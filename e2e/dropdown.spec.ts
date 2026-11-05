@@ -7,6 +7,7 @@ const PAGE = 50; // PAGE_SIZE in web/protocol.ts
 async function open(page: Page) {
   await page.goto("/?index=headwords-sample.bin");
   await expect(page.locator("#status")).toHaveText(/^[\d,]+ words$/);
+  await expect(page.locator("#loader")).toHaveCount(0); // a browser shows the app once all is in
 }
 
 /** How long the list is (rows loaded or not): its height in rows, minus the footer. */
@@ -257,6 +258,25 @@ test("tapping a suggestion opens its words around the middle of the list, a litt
   const tile = page.locator("#examples button[data-query='ing']").first();
   const landings: number[] = [];
   for (let i = 0; i < 4; i++) {
+    // Every frame drawn from the tap on: once the list shows, it must already be where it
+    // lands, with every row in view filled in (never the top first, then a jump).
+    await page.evaluate(() => {
+      const w = window as unknown as { frames: { shown: boolean; top: number; pending: number }[]; watching: boolean };
+      w.frames = [];
+      w.watching = true;
+      const look = () => {
+        const frame = document.querySelector<HTMLElement>("#frame")!;
+        const scroller = document.querySelector<HTMLElement>("#scroller")!;
+        const view = scroller.getBoundingClientRect();
+        const pending = [...scroller.querySelectorAll("li.word.pending")].filter((row) => {
+          const box = row.getBoundingClientRect();
+          return box.bottom > view.top && box.top < view.bottom;
+        }).length;
+        w.frames.push({ shown: !frame.hidden, top: scroller.scrollTop, pending });
+        if (w.watching) requestAnimationFrame(look);
+      };
+      requestAnimationFrame(look);
+    });
     await tile.click();
     await expect(page.locator("#summary")).toHaveText(/ [\d,]+ in all$/);
     const total = Number((await page.locator("#summary").textContent())!.match(/([\d,]+) in all$/)![1].replace(/,/g, ""));
@@ -271,9 +291,19 @@ test("tapping a suggestion opens its words around the middle of the list, a litt
       return rows.length && scroller.scrollTop > 0 ? Number(rows[0].getAttribute("aria-posinset")) - 1 : null;
     });
     const row = (await top.jsonValue())!;
-    expect(row).toBeGreaterThanOrEqual(Math.round((total - 1) * 0.35) - 1); // the top row, give or take one
-    expect(row).toBeLessThanOrEqual(Math.round((total - 1) * 0.65) + 1);
+    expect(row).toBeGreaterThanOrEqual(Math.round((total - 1) * 0.43) - 1); // the top row, give or take one
+    expect(row).toBeLessThanOrEqual(Math.round((total - 1) * 0.57) + 1);
     landings.push(row);
+    const frames = await page.evaluate(() => {
+      const w = window as unknown as { frames: { shown: boolean; top: number; pending: number }[]; watching: boolean };
+      w.watching = false;
+      return w.frames.filter((f) => f.shown);
+    });
+    expect(frames.length).toBeGreaterThan(0);
+    for (const f of frames) {
+      expect(f.top).toBeGreaterThan(0); // never painted at the top
+      expect(f.pending).toBe(0); // nor with empty rows in view
+    }
     await page.locator("#q").fill(""); // back to the start screen
   }
   expect(new Set(landings).size).toBeGreaterThan(1);

@@ -12,7 +12,6 @@ import { OffsetSlider } from "./offset-slider";
 import { ScrollerGestures } from "./scroller-gestures";
 import { setUpNativeShell } from "./native";
 import { LANES, PIECES, lanesOf, tileWeight } from "./examples";
-import { landingRow } from "../src/landing";
 import { FILTERS, describeRange, filterKey, type FilterInfo, type Range } from "../src/filters";
 import { loadFilters, saveFilter } from "./saved-filters";
 import { FiltersPanel } from "./filters-panel";
@@ -51,7 +50,7 @@ let ready = false;
 let query = ""; // the normalized query on screen
 let counts: Counts | null = null; // for `query`
 let seeking = -1; // the position a seek is on its way to
-let landing: string | null = null; // a suggestion's query: open its list around the middle once counted
+let landing: string | null = null; // a suggestion's query: its list shows once it can open at its landing row
 
 const list = new ResultsList(scroller, $("results"), {
   needRows: (from, to) => send({ type: "rows", seq, from, to }),
@@ -73,8 +72,6 @@ const slider = new OffsetSlider(frame, {
 // In the Android app, the phone's edge swipe mustn't take a thumb holding the slider's ends.
 guardEdges(frame);
 
-// A finger or wheel on the list before a suggestion's landing: it stays where they put it.
-for (const type of ["pointerdown", "wheel"]) scroller.addEventListener(type, () => (landing = null), { passive: true });
 
 // Taps, holds and drags on the list (scroller-gestures.ts): a tap opens a word,
 // unless it's a finger putting the keyboard away; a hold on a blank spot opens
@@ -221,6 +218,10 @@ worker.onmessage = ({ data }: MessageEvent<FromWorker>) => {
       break;
     case "rows":
       if (data.seq !== seq) return; // an answer to an older search
+      if (data.landAt !== undefined) {
+        reveal(data);
+        break;
+      }
       counts = mergeCounts(counts, data.counts);
       list.receive(data.from, data.items, data.known, data.complete);
       if (data.seek && data.seek.offset === seeking) {
@@ -228,7 +229,6 @@ worker.onmessage = ({ data }: MessageEvent<FromWorker>) => {
         seeking = -1;
       }
       describe();
-      land();
       break;
     case "definitions":
     case "word":
@@ -240,7 +240,6 @@ worker.onmessage = ({ data }: MessageEvent<FromWorker>) => {
       counts = data.counts;
       list.grow(sum(counts.byOffset), counts.total !== null);
       describe();
-      land();
       break;
   }
 };
@@ -265,12 +264,22 @@ clear.addEventListener("click", () => {
   input.dispatchEvent(new Event("input"));
 });
 
-/** A suggestion's list, once every word is counted: open it around the middle (src/landing.ts). */
-function land() {
-  if (landing === null || landing !== query || !counts || counts.total === null) return;
+/**
+ * A suggestion's list arrived: every word counted, and the rows around where it opens
+ * (src/landing.ts). Until now the start screen stayed up; the switch to the list, its
+ * position, its words and the summary all happen here, before the next frame is drawn,
+ * so the list is never seen at its top first and then jumping.
+ */
+function reveal(data: Extract<FromWorker, { type: "rows" }>) {
+  if (landing !== query) return; // typed over meanwhile
   landing = null;
-  const row = landingRow(sum(counts.byOffset));
-  if (row !== null) list.scrollToRow(row);
+  intro.hidden = true;
+  frame.hidden = false;
+  input.setAttribute("aria-expanded", "true");
+  list.reset(query);
+  counts = data.counts;
+  list.openAt(data.from, data.items, data.known, data.landAt!);
+  describe();
 }
 
 function search(text: string) {
@@ -294,10 +303,15 @@ function search(text: string) {
     input.removeAttribute("aria-activedescendant");
     return;
   }
+  input.removeAttribute("aria-activedescendant");
+  if (landing === query) {
+    // A suggestion: the start screen stays until its list can open where it lands (reveal()).
+    send({ type: "search", seq, query: text, land: true });
+    return;
+  }
   intro.hidden = true;
   frame.hidden = false;
   input.setAttribute("aria-expanded", "true");
-  input.removeAttribute("aria-activedescendant");
   if (!ready) summary.textContent = "Loading the word list…";
   list.reset(query);
   send({ type: "search", seq, query: text });

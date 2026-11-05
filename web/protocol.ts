@@ -35,7 +35,9 @@ export type ToWorker =
   /** Which words to leave out (src/filters.ts); the next search uses them. */
   | { type: "settings"; filters: FilterState }
   /** A new search: answered with its first page of rows. */
-  | { type: "search"; seq: number; query: string }
+  /** `land`: a suggestion's search. Count every word first, then answer with the rows
+   *  around where its list opens (src/landing.ts) instead of the first page. */
+  | { type: "search"; seq: number; query: string; land?: boolean }
   /** Rows [from, to) of the current search. */
   | { type: "rows"; seq: number; from: number; to: number }
   /** Where words with `offset` letters before the query start, with a page of rows from there. */
@@ -63,6 +65,8 @@ export type FromWorker =
       counts: Counts;
       /** set when answering a seek */
       seek?: { offset: number; row: number };
+      /** set when answering a suggestion's search: the row its list opens at (counts are complete) */
+      landAt?: number;
     }
   /** Counting finished in the background (for the query in `query`). */
   | { type: "counts"; query: string; counts: Counts }
