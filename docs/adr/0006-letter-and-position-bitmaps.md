@@ -115,11 +115,12 @@ compiled bitmap, and its words are listed in id order (alphabetical; see open qu
 
 ### 5. What the user sees
 
-A three-state letter keyboard in the filter sheet (each key: *any* → *must have* → *must
-not have*), where holding a key sets how many (*at least* / *exactly* n), one "at least
-one of" group, and a pattern field (`_a_e_`). These compile to
-the expression of section 2. Arbitrary nesting is supported by the engine; the first UI
-doesn't expose it. Counts stay exact and immediate, as for every filter now.
+The conditions live in the filter menu, beside the existing filters: which letters a word
+must have, must not have, or has at least one of; how many of a letter (*at least* /
+*exactly* n); and a pattern (`_a_e_`). The controls' design isn't decided (open
+questions); whatever it is, it compiles to the expression of section 2. Arbitrary nesting
+is supported by the engine; the first UI doesn't expose it. Counts stay exact and
+immediate, as for every filter now.
 
 ### 6. Packs
 
@@ -161,5 +162,7 @@ Bench scripts beside `bench/definitions_packing.py`, on a full build; results re
 - Order of a condition-only list (no piece typed): alphabetical by id is free; by rank
   needs a sort of the set (or a rank-ordered id permutation, about 5 MB).
 - What the spare flag bit holds.
+- The filter menu's controls for letters, counts and patterns (a letter grid, chips, a
+  typed pattern…); no gesture or shortcut on the results list for them.
 - Whether the positions file ships in every APK or as part of an optional pack (ADR-0005's
   flavour question).
