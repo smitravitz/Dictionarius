@@ -57,4 +57,5 @@ jobs:
           target: google_apis
           disable-animations: true
           working-directory: android
-          script: ./gradlew connectedDebugAndroidTest --no-daemon
+          # Only the app's tests: Capacitor's own modules don't build theirs here.
+          script: ./gradlew :app:connectedDebugAndroidTest --no-daemon
