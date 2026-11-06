@@ -162,6 +162,27 @@ describe("reading in place, with Range requests (ADR-0005)", () => {
     }
   });
 
+  it("reads the whole file instead if ranges stop working after it opened", async () => {
+    // Whatever goes wrong on the way (the app's server losing its file, say), a word's
+    // page costs memory, never its definitions.
+    let served = 0;
+    const flaky: Server = (range) => (++served <= 2 ? honest(range) : { status: 206, body: core, contentRange: honest(range).contentRange });
+    const asked: string[] = [];
+    const fetchFn = (async (url: string, init?: RequestInit) => {
+      const range = new Headers(init?.headers).get("Range");
+      asked.push(range ?? "whole");
+      if (!range) return new Response(core as BodyInit, { status: 200 });
+      const [, a, b] = /^bytes=(\d+)-(\d+)$/.exec(range)!;
+      const { status, body, contentRange } = flaky([Number(a), Number(b) + 1]);
+      return new Response(body as BodyInit, { status, headers: contentRange ? { "Content-Range": contentRange } : {} });
+    }) as typeof fetch;
+    const definitions = await DefinitionsFile.open((await rangeSource("/d.definitions.bin", fetchFn))!, index);
+    const { id, definitions: expected } = golden.definitions!.ids.find((d) => d.definitions)!;
+    const meanings = (await definitions.of(id))?.map((d) => d.meanings.map((m) => m.gloss));
+    expect(meanings).toEqual(expected!.map((d) => d.meanings.map((m) => m.gloss)));
+    expect(asked.filter((a) => a === "whole")).toHaveLength(1); // fetched whole once, then read from memory
+  });
+
   it("won't read in place from a server that says 206 but sends the whole file", async () => {
     const { fetchFn } = fetcher(([a, b]) => ({ status: 206, body: core, contentRange: `bytes ${a}-${b - 1}/${core.byteLength}` }));
     expect(await rangeSource("/d.definitions.bin", fetchFn)).toBeNull();

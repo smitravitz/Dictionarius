@@ -87,6 +87,8 @@ export function bytesSource(bytes: Uint8Array): ByteSource {
  * A file read in place with HTTP Range requests, one block at a time; null when the
  * server doesn't send exactly the range asked for (Capacitor's own server says 206
  * but sends the whole file; the Android app answers ranges itself, RangedAssets.java).
+ * If ranges stop working after that, it fetches the whole file once and reads from
+ * memory: a fault in reading in place costs memory, never a word's definitions.
  */
 export async function rangeSource(url: string, fetchFn: typeof fetch = fetch): Promise<ByteSource | null> {
   const ranged = async (start: number, end: number) => {
@@ -99,12 +101,24 @@ export async function rangeSource(url: string, fetchFn: typeof fetch = fetch): P
   try {
     const probe = await ranged(0, HEADER_SIZE);
     if (!probe) return null;
+    let whole: Promise<Uint8Array> | null = null;
+    const wholeFile = async () => {
+      const response = await fetchFn(url);
+      const bytes = new Uint8Array(await response.arrayBuffer());
+      if (!response.ok || bytes.byteLength !== probe.size) throw new Error(`${url}: couldn't read it whole either`);
+      return bytes;
+    };
     return {
       size: probe.size,
       read: async (start, end) => {
-        const got = await ranged(start, end);
-        if (!got) throw new Error(`${url}: the server didn't send bytes ${start}-${end - 1}`);
-        return got.body;
+        if (!whole) {
+          const got = await ranged(start, end).catch(() => null);
+          if (got) return got.body;
+          console.warn(`${url}: bytes ${start}-${end - 1} didn't come as asked; reading the file whole`);
+          whole = wholeFile();
+          whole.catch(() => (whole = null)); // a failed fetch is tried again next time
+        }
+        return (await whole).subarray(start, end);
       },
     };
   } catch {

@@ -37,11 +37,16 @@ final class RangedAssets extends BridgeWebViewClient {
     private final Map<String, Open> open = new ConcurrentHashMap<>();
 
     private static final class Open {
+        /** Kept for as long as the channel is used: when it's collected, Android closes
+         *  the file under the channel (ParcelFileDescriptor's finalizer), and every read
+         *  after that fails. Losing it was v0.6.0's missing definitions. */
+        final AssetFileDescriptor descriptor;
         final FileChannel channel;
         final long base;
         final long size;
 
         Open(AssetFileDescriptor fd) {
+            this.descriptor = fd;
             this.channel = new FileInputStream(fd.getFileDescriptor()).getChannel();
             this.base = fd.getStartOffset();
             this.size = fd.getLength();
