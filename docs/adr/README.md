@@ -16,6 +16,7 @@ Consequences · Evidence · Open questions.
 | [0004](0004-all-definitions-bundled.md) | Every definition ships inside the app, packed with brotli | Accepted; amended: one short example per meaning |
 | [0005](0005-layered-data-packs.md) | Word ids as the spine; data in layers; a language is a pack | Proposed |
 | [0006](0006-letter-and-position-bitmaps.md) | FM-index stays the engine; letters and positions as bitmaps beside it | Proposed |
+| [0007](0007-derived-pronunciations.md) | Pronunciations for the words Wiktionary gives none, worked out from their parts | Proposed (planning only) |
 
 ## Decisions anticipated (not yet recorded)
 

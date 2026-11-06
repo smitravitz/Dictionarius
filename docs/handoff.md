@@ -87,3 +87,6 @@ Then tag (v0.6.0: a data format change).
 5. Check the newer suggestion pieces in `web/examples.ts` against real word counts.
 6. ADR-0006 gates: the `LTRS` letter column first, then the positions layer and the
    letter keyboard / pattern field.
+7. ADR-0007 (planning only, nothing started): pronunciations for the 92.7% of words
+   without one, worked out from their parts where measured safe; first step would be
+   keeping the accent labels the builder drops.
