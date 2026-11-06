@@ -196,8 +196,10 @@ three words; word page time is Enter to its meanings shown, median of eight word
 
 ## Open questions
 
-- Which APK flavours to publish (English core only; core plus examples; per language), and
-  whether IzzyOnDroid's 30 MB guideline makes "core only" the default there.
+- Which APK flavours to publish (English core only; core plus examples; per language).
+  Every flavour bundles its data in full: no store's size guideline decides what ships
+  (IzzyOnDroid's 30 MB rule of thumb included; it allows exceptions, and Obtainium and
+  GitHub releases carry any size).
 - The 102 MB installed figure against the 73.3 MB APK: Android's storage breakdown (app, data,
   cache) will say what the rest is.
 - Where translations come from in bulk (English Wiktionary's translation tables, per sense) and
