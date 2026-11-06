@@ -61,6 +61,16 @@ jobs:
         env:
           DICTIONARIUS_RELEASE_DATA: release-data
 
+      # Words picked at random from the real data, each opened in a real browser, must
+      # show every part of their page, in a browser and as the app reads them (in place).
+      - name: Install a browser for the word page check
+        run: npx playwright install --with-deps chromium
+      - name: Check randomly picked words show their whole page
+        run: npx playwright test e2e/word-page-sample.spec.ts --project phone
+        env:
+          DICTIONARIUS_SAMPLE_DATA: release-data
+          SAMPLE_SIZE: "40"
+
       - name: Build the web app
         run: npm run build
         env:

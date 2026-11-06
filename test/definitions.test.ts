@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { existsSync, readFileSync } from "node:fs";
 import { HeadwordIndex } from "../src/headword-index";
-import { DefinitionsFile, LAYERS, rangeSource, unpack, type Definition, type Layer } from "../src/definitions";
+import { DefinitionsFile, LAYERS, openSource, rangeSource, unpack, type ByteSource, type Definition, type Layer } from "../src/definitions";
 
 // The definitions (docs/definitions-format.md): every word's meanings by the
 // index's word id, in compressed blocks, with examples, etymology and
@@ -191,6 +191,80 @@ describe("reading in place, with Range requests (ADR-0005)", () => {
   it("won't read in place from a server that ignores ranges", async () => {
     const { fetchFn } = fetcher(() => ({ status: 200, body: core }));
     expect(await rangeSource("/d.definitions.bin", fetchFn)).toBeNull();
+  });
+});
+
+describe("reading in place: every word, whatever the server does", () => {
+  // Every word the fixture has (17,082 ids, not only the golden ones), opened the way the
+  // app opens its files (openSource), must read exactly as from the files held whole.
+  const index = HeadwordIndex.fromBytes(new Uint8Array(readFileSync(`${FIXTURE}.bin`)));
+  const names = ["definitions", ...LAYERS] as const;
+  const files = Object.fromEntries(names.map((n) => [n, new Uint8Array(readFileSync(`${FIXTURE}.${n}.bin`))]));
+  const whole = DefinitionsFile.fromBytes(files.definitions, index, Object.fromEntries(LAYERS.map((k) => [k, files[k]])));
+  const ids = Array.from({ length: index.size }, (_, i) => i);
+  const nameOf = (url: string) => /\.(\w+)\.bin$/.exec(url)![1];
+
+  /** A server for the five files; `answer` decides each request (n counts requests per file). */
+  type Answer = (file: Uint8Array, range: [number, number] | null, n: number) => Response | Promise<Response>;
+  const serve = (answer: Answer) => {
+    const count = new Map<string, number>();
+    return (async (url: string, init?: RequestInit) => {
+      const name = nameOf(url);
+      const n = (count.get(name) ?? 0) + 1;
+      count.set(name, n);
+      const header = new Headers(init?.headers).get("Range");
+      const m = header ? /^bytes=(\d+)-(\d+)$/.exec(header)! : null;
+      return answer(files[name], m ? [Number(m[1]), Number(m[2]) + 1] : null, n);
+    }) as typeof fetch;
+  };
+  const partial = (file: Uint8Array, [a, b]: [number, number]) =>
+    new Response(file.slice(a, b) as BodyInit, { status: 206, headers: { "Content-Range": `bytes ${a}-${b - 1}/${file.byteLength}` } });
+  const full = (file: Uint8Array) => new Response(file as BodyInit, { status: 200 });
+  const honest: Answer = (file, range) => (range ? partial(file, range) : full(file));
+
+  const open = async (fetchFn: typeof fetch) => {
+    const url = (n: string) => `/headwords-sample.${n}.bin`;
+    const core = await openSource(url("definitions"), { inPlace: true, fetchFn });
+    const layers: Partial<Record<Layer, ByteSource>> = {};
+    for (const k of LAYERS) {
+      const source = await openSource(url(k), { inPlace: true, fetchFn });
+      if (source) layers[k] = source;
+    }
+    return DefinitionsFile.open(core!, index, layers);
+  };
+  const sameAsWhole = async (fetchFn: typeof fetch, expected = (id: number) => whole.of(id)) => {
+    const read = await open(fetchFn);
+    for (const id of ids) expect(await read.of(id), index.key(id)).toEqual(await expected(id));
+  };
+
+  it("when the server sends ranges", () => sameAsWhole(serve(honest)));
+  it("when it says 206 but sends the whole file (Capacitor's)", () =>
+    sameAsWhole(serve((file, range) => (range ? new Response(file as BodyInit, { status: 206, headers: { "Content-Range": `bytes ${range[0]}-${range[1] - 1}/${file.byteLength}` } }) : full(file)))));
+  it("when it ignores ranges", () => sameAsWhole(serve((file) => full(file))));
+  it("when it stops sending ranges after the files opened", () =>
+    sameAsWhole(serve((file, range, n) => (range && n <= 2 ? partial(file, range) : full(file)))));
+  it("when some requests fail after the files opened", () =>
+    sameAsWhole(serve((file, range, n) => {
+      if (n > 2 && n % 3 === 0) throw new TypeError("Failed to fetch");
+      return honest(file, range, n);
+    })));
+  it("when a layer file isn't there: everything else still reads", () => {
+    const fetchFn = serve((file, range, n) => (file === files.examples ? new Response(null, { status: 404 }) : honest(file, range, n)));
+    const withoutExamples = async (id: number) =>
+      (await whole.of(id))?.map((d) => ({ ...d, meanings: d.meanings.map(({ example: _, ...m }) => m) })) ?? null;
+    return sameAsWhole(fetchFn, withoutExamples);
+  });
+  it("when every word is asked for at once", async () => {
+    const read = await open(serve(honest));
+    const all = await Promise.all(ids.map((id) => read.of(id)));
+    for (const id of ids) expect(all[id], index.key(id)).toEqual(await whole.of(id));
+  });
+  it("holds a file whole when not reading in place (a browser)", async () => {
+    const asked: (string | null)[] = [];
+    const fetchFn = (async (url: string, init?: RequestInit) => (asked.push(new Headers(init?.headers).get("Range")), full(files[nameOf(url)]))) as typeof fetch;
+    const source = await openSource("/headwords-sample.definitions.bin", { inPlace: false, fetchFn });
+    expect(source?.size).toBe(files.definitions.byteLength);
+    expect(asked).toEqual([null]); // one plain request, no ranges
   });
 });
 

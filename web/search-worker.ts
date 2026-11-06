@@ -9,7 +9,7 @@ import { Completer, type Matches } from "../src/complete";
 import { normalize } from "../src/normalize";
 import { SAFE_SEARCH_OVERRIDES } from "../src/safe-search-overrides";
 import { defaultFilters, filterKey, type FilterState } from "../src/filters";
-import { DefinitionsFile, LAYERS, bytesSource, layerUrl, rangeSource, type ByteSource, type Layer } from "../src/definitions";
+import { DefinitionsFile, LAYERS, layerUrl, openSource, type ByteSource, type Layer } from "../src/definitions";
 import { landingRow } from "../src/landing";
 import { PAGE_SIZE, type Counts, type FromWorker, type ToWorker } from "./protocol";
 import { PIECES } from "./examples";
@@ -117,16 +117,7 @@ async function load(url: string, definitionsUrl: string, where: "browser" | "app
  *  each file a block at a time with Range requests, where the server sends exact
  *  ranges (the app's does: RangedAssets.java), else hold it whole. */
 async function loadDefinitions(url: string, index: HeadwordIndex, inPlace: boolean) {
-  const fetched = async (at: string) => {
-    try {
-      const ranged = inPlace ? await rangeSource(at) : null;
-      if (ranged) return ranged;
-      const response = await fetch(at);
-      return response.ok ? bytesSource(new Uint8Array(await response.arrayBuffer())) : null;
-    } catch {
-      return null;
-    }
-  };
+  const fetched = (at: string) => openSource(at, { inPlace });
   const [core, ...layers] = await Promise.all([fetched(url), ...LAYERS.map((kind) => fetched(layerUrl(url, kind)))]);
   try {
     if (!core) throw new Error(`no ${url}`);

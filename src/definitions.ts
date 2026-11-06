@@ -127,6 +127,21 @@ export async function rangeSource(url: string, fetchFn: typeof fetch = fetch): P
 }
 
 /**
+ * One of the files at `url`, as the app reads it: `inPlace`, a block at a time if the
+ * server sends exact ranges (rangeSource), else held whole; null when it isn't there.
+ */
+export async function openSource(url: string, { inPlace, fetchFn = fetch }: { inPlace: boolean; fetchFn?: typeof fetch }): Promise<ByteSource | null> {
+  try {
+    const ranged = inPlace ? await rangeSource(url, fetchFn) : null;
+    if (ranged) return ranged;
+    const response = await fetchFn(url);
+    return response.ok ? bytesSource(new Uint8Array(await response.arrayBuffer())) : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * One file of the container (ADR-0005): a header tying it to an index, a JSON
  * table saying what kind it is and what its lines share, and blocks of lines, one
  * line per word id, compressed separately. Read through a ByteSource, a block at a time.

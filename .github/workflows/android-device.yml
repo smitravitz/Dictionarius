@@ -1,0 +1,60 @@
+name: Android device tests
+
+# The Java that only runs on a phone (RangedAssets and AssetRanges, which read the
+# definitions in place), run on an Android emulator: every range the file's own bytes,
+# from many threads, with garbage collection between reads. An emulator takes minutes,
+# so this runs when that code (or the reader it serves) changes, and by hand.
+on:
+  push:
+    branches: [main]
+    paths: &device
+      - android/**
+      - src/definitions.ts
+      - .github/workflows/android-device.yml
+  pull_request:
+    paths: *device
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-device-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  device:
+    name: Reading in place, on an emulator
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: gradle
+      - run: npm ci
+      - name: Build the web app (with the small sample word list)
+        run: npm run build
+        env:
+          DICTIONARIUS_PUBLIC: ../test/fixtures
+      - run: npx cap sync android
+      - name: Let the emulator use the processor's virtualization
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Run the device tests
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          target: google_apis
+          disable-animations: true
+          working-directory: android
+          script: ./gradlew connectedDebugAndroidTest --no-daemon

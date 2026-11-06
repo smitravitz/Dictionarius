@@ -1,3 +1,4 @@
+import { resolve } from "node:path";
 import { defineConfig, devices } from "@playwright/test";
 
 // End-to-end tests run the real app (Vite dev server, Web Worker, virtual list)
@@ -20,6 +21,7 @@ export default defineConfig({
     command: "npx vite --port 4173 --strictPort",
     url: "http://localhost:4173",
     reuseExistingServer: !process.env.CI,
-    env: { DICTIONARIUS_PUBLIC: "../test/fixtures" },
+    // The fixture, or the folder of a real word list for e2e/word-page-sample.spec.ts.
+    env: { DICTIONARIUS_PUBLIC: resolve(process.env.DICTIONARIUS_SAMPLE_DATA ?? "test/fixtures") },
   },
 });
