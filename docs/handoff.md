@@ -3,7 +3,7 @@
 Read this first in a new chat, then `.claude/CLAUDE.md`. Update it at the end of any
 session that changes what's below (newest state only; history lives in git).
 
-_Last updated: 2026-11-05, at v0.5.1._
+_Last updated: 2026-11-06, at v0.6.0 (v0.6.1 pending: the missing-definitions fix)._
 
 ## What it is
 
@@ -34,6 +34,10 @@ built from the English Wiktionary dump by `scripts/build_fm_index.py`.
   sessions can't). Builds the signed APK, publishes the GitHub release, then starts
   `pages.yml` on main to put that version at https://smitravitz.github.io/Dictionarius/.
 - Republish Pages without a release: Actions → Pages → Run workflow.
+- Before a release publishes, it checks the data opens with the tagged code and that 40
+  randomly picked real words show their whole page, in a browser and in the app's mode
+  (`e2e/word-page-sample.spec.ts`). The Java that reads definitions in place runs on an
+  Android emulator whenever it changes (`android-device.yml`).
 - Data changes: rebuild with the pipeline, then `bash scripts/setup-release.sh …` uploads
   the files as a `data-<sum>` release and updates `data/headwords.sha256`; commit that.
 
