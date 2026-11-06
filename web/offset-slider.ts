@@ -38,7 +38,7 @@ export interface SliderEvents {
   state(): SliderState | null;
   /** The position changed while sliding. */
   change(value: number): void;
-  /** The slider was used (to retire the hint). */
+  /** The slider was used (the first-run tour's third step). */
   used(): void;
 }
 

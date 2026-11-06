@@ -157,7 +157,6 @@ test("holding a blank spot opens the scrubber; the screen's width spans every po
   await expect.poll(() => topLetters(page)).toBe(0);
   await expect(page.locator("#opt-0 mark.frag")).toHaveText("ate");
   await expect(page.locator("#entry")).toBeHidden(); // no word opened
-  await expect(page.locator("#hint")).toBeHidden(); // the tip has done its job
 });
 
 test("a hold alone changes nothing; swiping up or down after it lets the slider go and scrolls the list", async ({

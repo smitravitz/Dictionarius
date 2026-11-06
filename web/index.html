@@ -36,6 +36,13 @@
         <h1 class="wordmark">Dictionarius</h1>
         <div class="masthead-end">
           <p class="status" id="status">Loading the word list…</p>
+          <button class="cog" id="help-open" type="button" aria-label="How it works" aria-haspopup="dialog" aria-controls="help">
+            <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="9.25" />
+              <path d="M9.4 9.35a2.7 2.7 0 0 1 5.2.95c0 1.8-2.6 2.3-2.6 4" />
+              <circle cx="12" cy="17.1" r="0.6" fill="currentColor" stroke="none" />
+            </svg>
+          </button>
           <button class="cog" id="settings-open" type="button" aria-label="Settings" aria-haspopup="dialog" aria-controls="settings">
             <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round">
               <path d="M10.3 2.75h3.4l.55 2.6c.68.25 1.31.61 1.87 1.07l2.52-.84 1.7 2.94-1.98 1.77a7.2 7.2 0 0 1 0 2.16l1.98 1.77-1.7 2.94-2.52-.84a7.2 7.2 0 0 1-1.87 1.07l-.55 2.6h-3.4l-.55-2.6a7.2 7.2 0 0 1-1.87-1.07l-2.52.84-1.7-2.94 1.98-1.77a7.2 7.2 0 0 1 0-2.16L3.86 8.52l1.7-2.94 2.52.84a7.2 7.2 0 0 1 1.87-1.07z" />
@@ -94,7 +101,6 @@
       <p class="summary" id="summary" aria-live="polite"></p>
       <!-- Each range filter that's set (word length), so it isn't forgotten, with a cross to clear it. -->
       <div class="active-filters" id="active-filters" hidden></div>
-      <p class="hint" id="hint" hidden>Hold a blank spot in the list, then slide sideways to choose how many letters come before.</p>
 
       <section class="intro" id="intro" aria-labelledby="examples-label">
         <div class="bag-wrap">
@@ -134,6 +140,24 @@
         <button class="settings-done" value="done">Done</button>
       </form>
     </dialog>
+    <dialog class="settings" id="help" aria-labelledby="help-title">
+      <form method="dialog">
+        <h2 class="settings-title" id="help-title">How it works</h2>
+        <!-- Every control, in web/guide.ts's words (the tour uses the same). -->
+        <dl class="guide" id="guide"></dl>
+        <div class="help-actions">
+          <button class="help-tour" id="help-tour" type="button">Show me again</button>
+          <button class="settings-done" value="done">Done</button>
+        </div>
+      </form>
+    </dialog>
+    <!-- The first-run tour (web/coach.ts): a note saying what to do, and a ghost finger doing it. -->
+    <div class="coach" id="coach" role="status" aria-live="polite" hidden>
+      <p class="coach-count" id="coach-count"></p>
+      <button class="coach-skip" id="coach-skip" type="button">Skip</button>
+      <p class="coach-text" id="coach-text"></p>
+    </div>
+    <div class="coach-finger" id="coach-finger" aria-hidden="true" hidden></div>
     <!-- The peek: a held word's first meanings (web/peek.ts). -->
     <div class="peek" id="peek" hidden aria-live="polite"></div>
     <dialog class="settings" id="filters" aria-labelledby="filters-title">

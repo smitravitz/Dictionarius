@@ -52,6 +52,8 @@ built from the English Wiktionary dump by `scripts/build_fm_index.py`.
 ## State
 
 - **v0.5.1** released (APK 73.3 MB at v0.5.0: definitions 56.8 MB, index 12.9 MB).
+- A first-run tour (3 steps, done for real) and How it works behind the "?" (`web/guide.ts`,
+  `web/coach.ts`); unreleased until the next tag.
 - Web app on Pages: a browser shows a loading screen (book turning pages) until the index
   and all definitions are in; the Android app skips it and loads definitions after start.
 - `/dictionarius/` (lowercase) needs the owner's user-site repo `smitravitz.github.io` with

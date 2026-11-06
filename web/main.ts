@@ -25,6 +25,8 @@ import { Trail } from "../src/trail";
 import { Swipes, type SwipeDirection } from "./swipe";
 import { guardEdges } from "./edge-gestures";
 import { setUpLoader } from "./loader";
+import { CONTROLS, Tour } from "./guide";
+import { Coach, type Screen } from "./coach";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const input = $<HTMLInputElement>("q");
@@ -36,10 +38,10 @@ const intro = $("intro");
 const frame = $("frame");
 const scroller = $("scroller");
 const entry = $("entry");
-const hint = $("hint");
 const settings = $<HTMLDialogElement>("settings");
 const switches = $("switches");
-const panels = [settings, $<HTMLDialogElement>("filters")];
+const help = $<HTMLDialogElement>("help");
+const panels = [settings, $<HTMLDialogElement>("filters"), help];
 
 const worker = new Worker(new URL("./search-worker.ts", import.meta.url), { type: "module" });
 const send = (message: ToWorker) => worker.postMessage(message);
@@ -63,10 +65,7 @@ const slider = new OffsetSlider(frame, {
       ? { query, byOffset: counts.byOffset, complete: counts.total !== null, current: list.topOffset() }
       : null,
   change: (value) => seek(value),
-  used: () => {
-    hint.hidden = true;
-    remember(HINT_SEEN);
-  },
+  used: () => coach.did("scrubbed"),
 });
 
 // In the Android app, the phone's edge swipe mustn't take a thumb holding the slider's ends.
@@ -297,7 +296,6 @@ function search(text: string) {
   if (!query) {
     frame.hidden = true;
     intro.hidden = false;
-    hint.hidden = true;
     summary.textContent = "";
     input.setAttribute("aria-expanded", "false");
     input.removeAttribute("aria-activedescendant");
@@ -343,12 +341,10 @@ function describe() {
   const q = `“${query}”`;
   if (counts.occurrences === 0) {
     summary.textContent = `No word contains ${q}. Try a shorter piece.`;
-    hint.hidden = true;
     return;
   }
   if (counts.total === 0) {
     summary.textContent = `Settings or filters hide every word with ${q}.`;
-    hint.hidden = true;
     return;
   }
   // Unknown counts: the occurrences are close to the total without filters,
@@ -359,7 +355,6 @@ function describe() {
   summary.textContent =
     `${fmt(starts)} ${starts === 1 ? "starts" : "start"} with ${q} · ` +
     `${ends === null ? "…" : fmt(ends)} ${ends === 1 ? "ends" : "end"} with it · ${total} in all`;
-  hint.hidden = seen(HINT_SEEN);
 }
 
 input.addEventListener("keydown", (event) => {
@@ -478,7 +473,6 @@ function paintEntry(seq: number, s: Suggestion, content: EntryContent, from: Swi
   input.value = s.display;
   frame.hidden = true;
   intro.hidden = true;
-  hint.hidden = true; // the slider's tip belongs to the results
   input.setAttribute("aria-expanded", "false");
   input.removeAttribute("aria-activedescendant");
   summary.textContent = "";
@@ -515,6 +509,7 @@ function peekAt(target: Element) {
     const view = definitions ? entryView(definitions, { safe: safe() }) : null;
     const why = view ? "Its meanings are hidden by safe search." : "No definition for this word in the app yet.";
     peek.show(row, s.display, view ? peekView(view) : null, why);
+    coach.did("peeked");
   });
 }
 
@@ -640,9 +635,8 @@ examples.addEventListener("click", (event) => {
   search(input.value);
 });
 
-// Browser storage for settings and one-time hints. It can be missing or
-// blocked; then settings fall back to their defaults and hints show again.
-const HINT_SEEN = "dictionarius.slider-hint-seen";
+// Browser storage for settings and the tour. It can be missing or blocked; then
+// settings fall back to their defaults and the tour shows again.
 function read(key: string): string | null {
   try {
     return localStorage.getItem(key);
@@ -657,8 +651,13 @@ function write(key: string, value: string) {
     // not stored; harmless
   }
 }
-const seen = (key: string) => read(key) === "1";
-const remember = (key: string) => write(key, "1");
+function forget(key: string) {
+  try {
+    localStorage.removeItem(key);
+  } catch {
+    // nothing to forget
+  }
+}
 
 // The seam sits a fixed share of the row width from the left edge.
 const placeSeam = () => {
@@ -669,3 +668,62 @@ const placeSeam = () => {
 };
 new ResizeObserver(placeSeam).observe(document.body);
 placeSeam();
+
+// How it works: the "?" beside the cog lists every control (web/guide.ts), and can start
+// the tour again. The tour itself: three things to do on a first run, each by doing it.
+const guide = $("guide");
+for (const c of CONTROLS) {
+  const how = document.createElement("dt");
+  how.textContent = c.how;
+  const does = document.createElement("dd");
+  does.textContent = c.does;
+  guide.append(how, does);
+}
+$("help-open").addEventListener("click", () => help.showModal());
+
+const TOUR_KEY = "dictionarius.tour";
+const coach = new Coach(
+  new Tour(read(TOUR_KEY)),
+  { card: $("coach"), count: $("coach-count"), text: $("coach-text"), skip: $<HTMLButtonElement>("coach-skip"), finger: $("coach-finger") },
+  tourTarget,
+  (value) => (value === null ? forget(TOUR_KEY) : write(TOUR_KEY, value)),
+);
+$("help-tour").addEventListener("click", () => {
+  help.close();
+  coach.restart();
+});
+
+/** Where the ghost finger acts a step out: the middle of the pieces; a word's letters,
+ *  high in the list; the space beside a short word. */
+function tourTarget(event: "searched" | "peeked" | "scrubbed") {
+  if (event === "searched") {
+    const lane = examples.querySelector(".lane")?.getBoundingClientRect();
+    const bag = examples.getBoundingClientRect();
+    return lane && lane.width ? { x: lane.left + lane.width / 2, y: lane.top + lane.height / 2, top: bag.top, bottom: bag.bottom } : null;
+  }
+  const view = scroller.getBoundingClientRect();
+  for (const row of scroller.querySelectorAll<HTMLElement>("li.word:not(.pending)")) {
+    const box = row.getBoundingClientRect();
+    if (box.top < view.top + 4 || box.bottom > view.top + view.height * 0.6) continue;
+    const letters = row.querySelector(".frag")?.getBoundingClientRect();
+    if (!letters) continue;
+    const middle = box.top + box.height / 2;
+    const area = { top: box.top, bottom: box.bottom };
+    if (event === "peeked") return { x: letters.left + letters.width / 2, y: middle, ...area };
+    const after = row.querySelector(".after")?.getBoundingClientRect();
+    const end = Math.max(letters.right, after?.right ?? 0);
+    if (end < view.right - 96) return { x: view.right - 40, y: middle, ...area };
+  }
+  return null;
+}
+
+const screenNow = (): Screen => (!intro.hidden ? "start" : !frame.hidden ? "results" : "elsewhere");
+const watchScreens = () => {
+  const screen = screenNow();
+  if (screen === "results") coach.did("searched"); // a suggestion or a typed search: the list is up
+  coach.on(screen);
+};
+new MutationObserver(watchScreens).observe(document.getElementById("app")!, { attributes: true, attributeFilter: ["hidden"], subtree: true });
+scroller.addEventListener("scroll", () => coach.follow(), { passive: true });
+window.addEventListener("resize", () => coach.follow());
+watchScreens(); // the start screen's first frame has the tour's note in place, if it's showing

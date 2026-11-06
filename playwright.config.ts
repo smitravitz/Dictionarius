@@ -11,6 +11,8 @@ export default defineConfig({
   reporter: process.env.CI ? [["list"], ["html", { open: "never" }]] : "list",
   use: {
     baseURL: "http://localhost:4173",
+    // Every test starts past the first-run tour, except e2e/tour.spec.ts, which is about it.
+    storageState: "e2e/tour-done.json",
     trace: "retain-on-failure",
   },
   projects: [

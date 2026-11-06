@@ -1,0 +1,4 @@
+{
+  "cookies": [],
+  "origins": [{ "origin": "http://localhost:4173", "localStorage": [{ "name": "dictionarius.tour", "value": "done" }] }]
+}
