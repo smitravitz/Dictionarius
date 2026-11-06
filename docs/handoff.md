@@ -72,15 +72,13 @@ Then tag (v0.6.0: a data format change).
 
 ## Open items
 
-1. ADR-0005: blocks read from storage (gate not met: Blobs only move memory; Capacitor's
-   Range handling is broken; needs a native asset-range reader or a fixed path handler),
-   then links and "plural of" as ids, then translations (French first). A core-only
-   APK flavour is now possible (33.8 MB of definitions instead of 56.9).
+1. ADR-0005: next, links and "plural of" as ids, then translations (French first). A
+   core-only APK flavour is now possible (33.8 MB of definitions instead of 56.9).
 2. The 102 MB installed vs 73.3 MB APK gap: get Android's storage breakdown (app/data/cache).
 3. Whether the Android app should also wait behind the loading screen (currently no).
-   On the phone, also measure memory with format 3 (`adb shell dumpsys meminfo
-   io.github.smitravitz.dictionarius`): desktop Chromium shows about 30 MB more than
-   format 2, unexplained (ADR-0005, Evidence).
+   On the phone, confirm reading in place (ADR-0005): `adb shell dumpsys meminfo
+   io.github.smitravitz.dictionarius` should show about 57 MB less than v0.5.x, and a
+   word page should still feel instant (Chromium: 85–97 ms for an uncached block).
 4. Start-screen copy "Or pick one from the bag below" may need updating for the two lanes.
 5. Check the newer suggestion pieces in `web/examples.ts` against real word counts.
 6. ADR-0006 gates: the `LTRS` letter column first, then the positions layer and the

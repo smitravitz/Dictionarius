@@ -73,7 +73,9 @@ decision or module makes it load-bearing.
   word id (`src/definitions.ts`, `docs/definitions-format.md`; ADR-0004), as a
   **core** (`headwords.definitions.bin`) and a **layer** file each for
   examples, etymology and pronunciation, any of which may be left out
-  (ADR-0005; one container layout, `LayerFile`): per
+  (ADR-0005; one container layout, `LayerFile`). The Android app **reads them in
+  place**, a block at a time by Range request (`RangedAssets.java` answers them);
+  a browser holds them whole: per
   written form, a **word class** (Wiktionary's part of speech) with numbered
   **meanings** (gloss, usage **labels**, a safe-search flag), the words a
   plural or spelling is **of**, **links** inside the gloss (as on Wiktionary),

@@ -70,10 +70,9 @@ const utf8 = new TextDecoder("utf-8", { fatal: true });
  *  gate: a file in memory is its header and two blocks, never the whole of it). */
 const CACHED_BLOCKS = 2;
 
-/** Where a file's bytes come from, a range at a time. Today: bytes in memory. A source
- *  that reads ranges from storage (so a file is never all in memory) plugs in here;
- *  a Blob doesn't do it (measured: the browser keeps the Blob in memory instead,
- *  and word pages took twice as long; ADR-0005). */
+/** Where a file's bytes come from, a range at a time: Range requests, so a file is
+ *  never all in memory (rangeSource), or bytes already in memory. (A Blob's slices
+ *  don't save memory: the browser keeps the Blob in memory instead; ADR-0005.) */
 export interface ByteSource {
   readonly size: number;
   read(start: number, end: number): Promise<Uint8Array>;
@@ -82,6 +81,35 @@ export interface ByteSource {
 /** Bytes already in memory, as a source. */
 export function bytesSource(bytes: Uint8Array): ByteSource {
   return { size: bytes.byteLength, read: async (start, end) => bytes.subarray(start, end) };
+}
+
+/**
+ * A file read in place with HTTP Range requests, one block at a time; null when the
+ * server doesn't send exactly the range asked for (Capacitor's own server says 206
+ * but sends the whole file; the Android app answers ranges itself, RangedAssets.java).
+ */
+export async function rangeSource(url: string, fetchFn: typeof fetch = fetch): Promise<ByteSource | null> {
+  const ranged = async (start: number, end: number) => {
+    const response = await fetchFn(url, { headers: { Range: `bytes=${start}-${end - 1}` } });
+    const body = new Uint8Array(await response.arrayBuffer());
+    const total = /^bytes (\d+)-(\d+)\/(\d+)$/.exec(response.headers.get("Content-Range") ?? "");
+    const exact = response.status === 206 && body.byteLength === end - start && total && Number(total[1]) === start;
+    return exact ? { body, size: Number(total[3]) } : null;
+  };
+  try {
+    const probe = await ranged(0, HEADER_SIZE);
+    if (!probe) return null;
+    return {
+      size: probe.size,
+      read: async (start, end) => {
+        const got = await ranged(start, end);
+        if (!got) throw new Error(`${url}: the server didn't send bytes ${start}-${end - 1}`);
+        return got.body;
+      },
+    };
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -227,13 +255,12 @@ export class DefinitionsFile {
   /** A word's definitions, most common written form first; null when it has none. */
   async of(id: number): Promise<Definition[] | null> {
     if (!Number.isInteger(id) || id < 0 || id >= this.index.size) return null;
-    const core = await this.core.line(id);
+    const kinds = LAYERS.filter((kind) => this.layers[kind]);
+    // Every file's block at once: read in place, each is a request of its own.
+    const [core, ...layers] = await Promise.all([this.core.line(id), ...kinds.map((kind) => this.layers[kind]!.line(id))]);
     if (!core) return null;
     const lines: Lines = { core };
-    for (const kind of LAYERS) {
-      const file = this.layers[kind];
-      if (file) lines[kind] = await file.line(id);
-    }
+    kinds.forEach((kind, i) => (lines[kind] = layers[i]));
     return unpack(this.index.key(id), lines, this.core.tables as unknown as PackingTables);
   }
 }

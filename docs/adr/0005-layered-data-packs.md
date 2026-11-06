@@ -1,7 +1,7 @@
 # ADR-0005: Word ids as the spine; data in layers; a language is a pack
 
-- **Status:** Proposed; step 1 (the split) accepted and built, 2026-11-05. Each other step
-  lands only after its measurement gate, below.
+- **Status:** Proposed; step 1 (the split) and reading in place built, 2026-11-05/06.
+  Each other step lands only after its measurement gate, below.
 - **Date:** 2026-11-03
 - **Deciders:** project owner
 - **Builds on:** [ADR-0003](0003-filters-from-word-columns.md) (word columns),
@@ -135,7 +135,7 @@ Each step lands only when its numbers are measured on a full build (bench script
 | Split content into core / examples / etymology / pronunciation | sizes per file; core ≤ 35 MB | ✅ core 33.8 MB; examples 13.3, etymology 8.5, pronunciation 1.1; 56.9 MB in all, as one file was. Word page median 61 ms (was 58). Built: version 3 of the format |
 | Links and "plural of" as ids | core shrinks; unpack time per block no worse than +20% | |
 | Gloss words as ids (tried, kept only if it wins) | ≥ 10% smaller core after brotli | |
-| Blocks read one at a time | peak memory ≤ index + 2 blocks (the whole app's, not only the worker's) | ❌ not yet: see *Evidence* |
+| Blocks read one at a time | peak memory ≤ index + 2 blocks (the whole app's, not only the worker's) | ✅ in the app: the worker holds 46.4 MB of buffers instead of 103.1 (the index, no definitions); 512 MB in all instead of 593. A word whose blocks aren't cached opens in 85–97 ms instead of 48–68 (Chromium; to confirm on a phone) |
 | Rank tables and hot list rebuilt at open | ≤ 150 ms with the CPU slowed 4× |
 | One-byte frequency, packed display forms | index smaller; results unchanged on the golden queries, or each change in order reviewed |
 | Merged search over two indexes | first page ≤ 2× one index's time |
@@ -153,24 +153,30 @@ three words; word page time is Enter to its meanings shown, median of eight word
 - **Blob slices don't save memory.** Keeping each file as a `Blob` and reading a block
   with `blob.slice()` took 57 MB out of the worker's process but put 55 MB into the
   browser's (where Chromium keeps Blobs): 579 → 576 MB in all. Word pages went from
-  58 to 135 ms. Not adopted; the reader keeps the seam (`ByteSource`) a real ranged
-  source plugs into.
-- **Range requests can't do it in the Android app yet.** Capacitor's local server
-  (`WebViewLocalServer.handleLocalRequest`) answers a Range request with 206 and the
-  asked-for `Content-Range`, but sends the file from its first byte. A ranged source
-  needs that fixed (upstream, or our own path handler) or a small native reader of
-  asset ranges (with the definitions files stored uncompressed in the APK). The web
-  (GitHub Pages) serves ranges.
+  58 to 135 ms. Not adopted.
+- **Capacitor's local server breaks Range requests.** It answers one with 206 and the
+  asked-for `Content-Range`, but sends the file from its first byte
+  (`WebViewLocalServer.handleLocalRequest`).
+- **Reading in place** (built). In the app, the reader fetches each block with a Range
+  request (`rangeSource`), after checking with the first 64 bytes that the server sends
+  exactly the range asked for (else it holds the file whole). The app answers those
+  requests itself (`RangedAssets.java`, ahead of Capacitor), reading the bytes where they
+  lie in the APK: the definitions files are stored uncompressed there (`noCompress`;
+  they're brotli already, so no bigger), which CI checks. Measured in Chromium with a
+  server that answers ranges (Vite's) and the real data: the worker's buffers 103.1 →
+  46.4 MB; every process together 593 → 512 MB after garbage collection; a word page
+  whose blocks aren't cached 48–68 → 85–97 ms (median, two runs of eight words). A
+  browser still holds the files whole: its loading screen promises nothing is fetched
+  after it.
 - **The decoder's window.** The JavaScript brotli decoder sets aside the window a block
   declares for every block it unpacks (10 unpacks of a 110 KB block: 10.7 MB at the old
   4 MB window, 3.3 MB at one sized to the block). Blocks declared 4 MB (`lgwin=22`)
   whatever their size; each now declares a window just over its own size. Sizes unchanged.
-- **Open: about 30 MB more resident in Chromium.** With the split, Chromium's worker process
-  holds about 30 MB more than with one file (after forced garbage collection: 570 → 603
-  and 564 → 598 MB in all), not explained by the decoder's window, by downloading the
-  files at once, or by the data held: in Node, the new reader holds less live memory
-  than the old (27.9 against 34.5 MB after six words). To measure on a phone
-  (`adb shell dumpsys meminfo`) before calling the step done on memory.
+- **Holding four files whole showed about 30 MB more resident memory than one** (after
+  garbage collection: 570 → 603 and 564 → 598 MB), but nothing the app keeps: Chrome's
+  own accounting gives the worker the same buffers either way (104.0 and 103.1 MB) and
+  the same heap (3.3 and 3.4 MB). It's memory used while loading and freed, which Chrome
+  keeps rather than returning; reading in place never allocates it (512 MB above).
 
 ## Consequences
 

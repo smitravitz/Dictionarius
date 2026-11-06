@@ -177,7 +177,7 @@ requestAnimationFrame(() =>
         type: "load",
         url: indexUrl.href,
         definitions: indexUrl.href.replace(/\.bin$/, ".definitions.bin"),
-        definitionsNow: loader.waits, // a browser shows the app only once they're in too
+        where: loader.waits ? "browser" : "app", // a browser shows the app only once all is in
       })),
   ),
 );

@@ -9,7 +9,7 @@ import { Completer, type Matches } from "../src/complete";
 import { normalize } from "../src/normalize";
 import { SAFE_SEARCH_OVERRIDES } from "../src/safe-search-overrides";
 import { defaultFilters, filterKey, type FilterState } from "../src/filters";
-import { DefinitionsFile, LAYERS, bytesSource, layerUrl, type ByteSource, type Layer } from "../src/definitions";
+import { DefinitionsFile, LAYERS, bytesSource, layerUrl, rangeSource, type ByteSource, type Layer } from "../src/definitions";
 import { landingRow } from "../src/landing";
 import { PAGE_SIZE, type Counts, type FromWorker, type ToWorker } from "./protocol";
 import { PIECES } from "./examples";
@@ -48,7 +48,7 @@ let definitionsTimer: ReturnType<typeof setTimeout> | undefined;
 scope.onmessage = ({ data }) => {
   switch (data.type) {
     case "load":
-      void load(data.url, data.definitions, data.definitionsNow === true);
+      void load(data.url, data.definitions, data.where);
       break;
     case "definitions": {
       startDefinitions(); // wanted now: no more waiting
@@ -83,7 +83,7 @@ scope.onmessage = ({ data }) => {
   }
 };
 
-async function load(url: string, definitionsUrl: string, definitionsNow: boolean) {
+async function load(url: string, definitionsUrl: string, where: "browser" | "app") {
   const started = performance.now();
   try {
     const response = await fetch(url);
@@ -102,9 +102,9 @@ async function load(url: string, definitionsUrl: string, definitionsNow: boolean
     startDefinitions = () => {
       startDefinitions = () => {};
       clearTimeout(definitionsTimer);
-      void loadDefinitions(definitionsUrl, index);
+      void loadDefinitions(definitionsUrl, index, where === "app");
     };
-    if (definitionsNow) startDefinitions();
+    if (where === "browser") startDefinitions();
     else definitionsTimer = setTimeout(() => startDefinitions(), DEFINITIONS_AFTER_MS);
   } catch (error) {
     scope.postMessage({ type: "failed", message: error instanceof Error ? error.message : String(error) });
@@ -113,10 +113,14 @@ async function load(url: string, definitionsUrl: string, definitionsNow: boolean
 
 /** The definitions for `index` (the core file at `url`, its layers beside it), or
  *  null when there's no core or it was built for another word list. A layer that's
- *  missing or doesn't fit is left out: the page shows what there is. */
-async function loadDefinitions(url: string, index: HeadwordIndex) {
+ *  missing or doesn't fit is left out: the page shows what there is. `inPlace`: read
+ *  each file a block at a time with Range requests, where the server sends exact
+ *  ranges (the app's does: RangedAssets.java), else hold it whole. */
+async function loadDefinitions(url: string, index: HeadwordIndex, inPlace: boolean) {
   const fetched = async (at: string) => {
     try {
+      const ranged = inPlace ? await rangeSource(at) : null;
+      if (ranged) return ranged;
       const response = await fetch(at);
       return response.ok ? bytesSource(new Uint8Array(await response.arrayBuffer())) : null;
     } catch {

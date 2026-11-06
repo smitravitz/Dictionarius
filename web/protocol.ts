@@ -25,9 +25,11 @@ export interface Counts {
 
 /** Messages from the page to the search worker. */
 export type ToWorker =
-  /** Load the index from `url`, then its definitions file: straight after it when
-   *  `definitionsNow`, otherwise in the background once the start screen has settled. */
-  | { type: "load"; url: string; definitions: string; definitionsNow?: boolean }
+  /** Load the index from `url`, then the definitions. In a `browser`: straight after it,
+   *  each file whole (the page shows nothing until all is in, then never waits). In the
+   *  `app`: once the start screen has settled, read in place a block at a time (the
+   *  files are on the phone; none is ever all in memory). */
+  | { type: "load"; url: string; definitions: string; where: "browser" | "app" }
   /** A word's definitions, by word id (answered by "definitions" with the same `ask`). */
   | { type: "definitions"; ask: number; id: number }
   /** The word a text names exactly, for a link (answered by "word" with the same `ask`). */

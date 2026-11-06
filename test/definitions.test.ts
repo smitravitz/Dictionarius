@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { existsSync, readFileSync } from "node:fs";
 import { HeadwordIndex } from "../src/headword-index";
-import { DefinitionsFile, LAYERS, unpack, type Definition, type Layer } from "../src/definitions";
+import { DefinitionsFile, LAYERS, rangeSource, unpack, type Definition, type Layer } from "../src/definitions";
 
 // The definitions (docs/definitions-format.md): every word's meanings by the
 // index's word id, in compressed blocks, with examples, etymology and
@@ -105,6 +105,71 @@ describe("reading a block at a time (ADR-0005)", () => {
     const { id, definitions: expected } = golden.definitions!.ids.find((d) => d.definitions)!;
     expect(await definitions.of(id)).toEqual(expected);
     for (const [kind, s] of Object.entries(sources)) expect(s.reads.length, kind).toBe(1);
+  });
+});
+
+describe("reading in place, with Range requests (ADR-0005)", () => {
+  // In the Android app, each block is fetched by itself from the file in the APK, so a
+  // file is never all in memory. Only a server that sends exactly the range asked for
+  // counts: Capacitor's own says 206 but sends the whole file.
+  const index = HeadwordIndex.fromBytes(new Uint8Array(readFileSync(`${FIXTURE}.bin`)));
+  const golden = JSON.parse(readFileSync(`${FIXTURE}.golden.json`, "utf8")) as Golden;
+  const core = new Uint8Array(readFileSync(`${FIXTURE}.definitions.bin`));
+  type Server = (range: [number, number]) => { status: number; body: Uint8Array; contentRange?: string };
+  const fetcher = (server: Server) => {
+    const asked: string[] = [];
+    const fetchFn = async (_url: string, init?: RequestInit) => {
+      const range = new Headers(init?.headers).get("Range") ?? "";
+      asked.push(range);
+      const [, a, b] = /^bytes=(\d+)-(\d+)$/.exec(range)!;
+      const { status, body, contentRange } = server([Number(a), Number(b) + 1]);
+      return new Response(body as BodyInit, { status, headers: contentRange ? { "Content-Range": contentRange } : {} });
+    };
+    return { asked, fetchFn: fetchFn as typeof fetch };
+  };
+  const honest: Server = ([a, b]) => ({ status: 206, body: core.slice(a, b), contentRange: `bytes ${a}-${b - 1}/${core.byteLength}` });
+
+  it("reads a word's definitions a block at a time from a server that sends ranges", async () => {
+    const { asked, fetchFn } = fetcher(honest);
+    const source = await rangeSource("/d.definitions.bin", fetchFn);
+    expect(source?.size).toBe(core.byteLength);
+    const definitions = await DefinitionsFile.open(source!, index);
+    asked.length = 0;
+    const { id, definitions: expected } = golden.definitions!.ids.find((d) => d.definitions)!;
+    const meanings = (await definitions.of(id))?.map((d) => d.meanings.map((m) => m.gloss));
+    expect(meanings).toEqual(expected!.map((d) => d.meanings.map((m) => m.gloss)));
+    expect(asked).toHaveLength(1); // one block
+  });
+
+  it("reads in place over real HTTP, from a server whose ranges this project didn't write (Vite's)", async () => {
+    const { preview } = await import("vite");
+    const server = await preview({
+      configFile: false,
+      logLevel: "silent",
+      build: { outDir: "test/fixtures" },
+      preview: { port: 0, host: "127.0.0.1" },
+    });
+    try {
+      const { port } = server.httpServer.address() as { port: number };
+      const url = (name: string) => `http://127.0.0.1:${port}/headwords-sample.${name}.bin`;
+      const layers = Object.fromEntries(await Promise.all(LAYERS.map(async (k) => [k, (await rangeSource(url(k)))!])));
+      const definitions = await DefinitionsFile.open((await rangeSource(url("definitions")))!, index, layers);
+      for (const { id, definitions: expected } of golden.definitions!.ids) {
+        expect(await definitions.of(id), index.key(id)).toEqual(expected ?? null);
+      }
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("won't read in place from a server that says 206 but sends the whole file", async () => {
+    const { fetchFn } = fetcher(([a, b]) => ({ status: 206, body: core, contentRange: `bytes ${a}-${b - 1}/${core.byteLength}` }));
+    expect(await rangeSource("/d.definitions.bin", fetchFn)).toBeNull();
+  });
+
+  it("won't read in place from a server that ignores ranges", async () => {
+    const { fetchFn } = fetcher(() => ({ status: 200, body: core }));
+    expect(await rangeSource("/d.definitions.bin", fetchFn)).toBeNull();
   });
 });
 
