@@ -71,6 +71,13 @@ jobs:
           DICTIONARIUS_SAMPLE_DATA: release-data
           SAMPLE_SIZE: "40"
 
+      # The first-run tour on the real word list: each step shown and asked for, in order,
+      # and nothing the tour acts out left behind (e2e/tour.spec.ts, its @release tests).
+      - name: Check the first-run tour on the real word list
+        run: npx playwright test e2e/tour.spec.ts --project phone --grep @release
+        env:
+          DICTIONARIUS_SAMPLE_DATA: release-data
+
       - name: Build the web app
         run: npm run build
         env:

@@ -31,16 +31,26 @@ export const WORD_REACH = 16;
  *  (give or take WORD_REACH), anywhere up or down the row. */
 export function onWordAt(target: Element, x: number): boolean {
   const row = target.closest("li.word:not(.pending)");
-  if (!row) return false;
+  const word = row ? wordLetters(row) : null;
+  return !!word && x >= word.left - WORD_REACH && x <= word.right + WORD_REACH;
+}
+
+/** Where a row's word is on screen: all of its letters, before the fragment, the
+ *  fragment and after it (some may be scrolled out of the row's view). */
+export function wordLetters(row: Element): { left: number; right: number; top: number; bottom: number } | null {
   let left = Infinity;
   let right = -Infinity;
+  let top = Infinity;
+  let bottom = -Infinity;
   for (const part of row.querySelectorAll(".before, .frag, .after")) {
     const box = part.getBoundingClientRect();
     if (box.width === 0) continue; // nothing before the fragment, say
     left = Math.min(left, box.left);
     right = Math.max(right, box.right);
+    top = Math.min(top, box.top);
+    bottom = Math.max(bottom, box.bottom);
   }
-  return x >= left - WORD_REACH && x <= right + WORD_REACH;
+  return left < right ? { left, right, top, bottom } : null;
 }
 
 export interface PressStart {

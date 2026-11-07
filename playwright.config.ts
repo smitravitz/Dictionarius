@@ -18,6 +18,13 @@ export default defineConfig({
   projects: [
     { name: "desktop", use: { ...devices["Desktop Chrome"] } },
     { name: "phone", use: { ...devices["Pixel 7"] } },
+    // Everything again, on a first run: the tour on, acting its steps out on the same screens.
+    // It must change nothing any other test relies on (e2e/tour.spec.ts tests the tour itself).
+    {
+      name: "first-run",
+      testIgnore: ["**/tour.spec.ts", "**/word-page-sample.spec.ts"],
+      use: { ...devices["Pixel 7"], storageState: { cookies: [], origins: [] } },
+    },
   ],
   webServer: {
     command: "npx vite --port 4173 --strictPort",

@@ -38,8 +38,6 @@ export interface SliderEvents {
   state(): SliderState | null;
   /** The position changed while sliding. */
   change(value: number): void;
-  /** The slider was used (the first-run tour's third step). */
-  used(): void;
 }
 
 export class OffsetSlider {
@@ -57,6 +55,7 @@ export class OffsetSlider {
   private rangeX = 0; // where the active range starts inside the window
   private range = 1; // its width in pixels
   private mirrored = false; // held from the right: the thumb's direction flips
+  private quiet = false; // no pulse or ticks: the first-run tour acting it out
 
   constructor(
     frame: HTMLElement,
@@ -79,14 +78,15 @@ export class OffsetSlider {
   }
 
   /** Show it, held by a finger at screen x, on the position the list is at:
-   *  nothing changes until the finger slides. False when there's nothing to slide. */
-  open(x: number): boolean {
+   *  nothing changes until the finger slides. False when there's nothing to slide.
+   *  `quiet`: no pulse or ticks (the tour showing how, with nobody's finger on it). */
+  open(x: number, quiet = false): boolean {
     const state = this.events.state();
     if (!state) return false;
     const box = this.window.getBoundingClientRect();
     this.mirrored = x > box.left + box.width / 2;
-    pulse();
-    this.events.used();
+    this.quiet = quiet;
+    if (!quiet) pulse();
     this.el.classList.add("on");
     this.value = state.current ?? -1; // unknown: the first slide applies without a tick
     this.layout(state);
@@ -115,7 +115,7 @@ export class OffsetSlider {
     if (value === this.value) return;
     const first = this.value < 0;
     this.value = value;
-    if (!first) tick();
+    if (!first && !this.quiet) tick();
     this.events.change(value);
     const state = this.events.state();
     if (state) this.layout(state);

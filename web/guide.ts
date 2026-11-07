@@ -1,54 +1,47 @@
-// How Dictionarius is used, said once: the help sheet (the "?" by the cog) lists every
-// control, and the first-run tour asks for three of them, in the same words. No DOM here:
-// web/coach.ts draws the tour; main.ts tells it what the person did.
+// How Dictionarius is used, in words: the help sheet (How It Works, the "?" by the cog)
+// lists the controls; the first-run tour asks for four things, one at a time, in order.
+// No DOM here: web/coach.ts draws the tour, web/tour-shows.ts acts each step out, and
+// main.ts tells it what the person did.
 
 /** A control: what to do (`how`), and what it does. */
 export interface Control {
-  key: string;
   how: string;
   does: string;
 }
 
+/** How It Works: the help sheet's list. */
 export const CONTROLS: readonly Control[] = [
-  { key: "search", how: "Type any piece of a word", does: "to find every word that has it, wherever it sits: first the words that start with it." },
-  { key: "suggestion", how: "Tap a piece on the start screen", does: "to search for it and open its words around the middle." },
-  { key: "open", how: "Tap a word", does: "for its page: meanings, examples, pronunciation and origin." },
-  { key: "peek", how: "Hold a word", does: "to peek at what it means. Let go to close it." },
-  { key: "scrub", how: "Hold the space beside the words, then slide sideways", does: "to choose how many letters come before the piece. Up or down scrolls instead." },
-  { key: "swipe", how: "On a word's page, swipe left or right", does: "for the next or the previous word in the list." },
-  { key: "back", how: "Back", does: "returns to the list, where you left it." },
-  { key: "filters", how: "The funnel", does: "sets how long the words are." },
-  { key: "settings", how: "The cog", does: "chooses what the list shows, such as safe search." },
+  { how: "Tap a piece at the bottom of the start screen", does: "to search for it and open its word list" },
+  { how: "Tap a word", does: "for its dictionary result page" },
+  { how: "Hold a word", does: "to peek at what it means" },
+  { how: "Press & Hold beside a word to see the frequency graph", does: "then drag Left or Right to move where the piece goes" },
+  { how: "Back", does: "returns to the word list, where you left it" },
 ];
 
 /** What the person did that a step asks for (main.ts reports these). */
-export type TourEvent = "searched" | "peeked" | "scrubbed";
+export type TourEvent = "searched" | "scrubbed" | "peeked" | "filtered";
 
 export interface TourStep {
   event: TourEvent;
-  /** The control it teaches (its words come from CONTROLS). */
-  control: string;
   /** Where it can be done: the start screen or the results. */
   screen: "start" | "results";
+  /** What to do (in bold on the note), then what it does. */
+  how: string;
+  does: string;
 }
 
-/** The first-run tour: three things to do, the essentials, done in any order. */
+/** The first-run tour: each step shown, then asked for; the next only once it's done. */
 export const TOUR: readonly TourStep[] = [
-  { event: "searched", control: "suggestion", screen: "start" },
-  { event: "peeked", control: "peek", screen: "results" },
-  { event: "scrubbed", control: "scrub", screen: "results" },
+  { event: "searched", screen: "start", how: "Tap a piece below", does: "to search for it and open every word with it inside:" },
+  { event: "scrubbed", screen: "results", how: "Press & Hold beside a word,", does: "then drag Left or Right to move where the piece goes:" },
+  { event: "peeked", screen: "results", how: "Press & Hold a word", does: "to peek at what it means:" },
+  { event: "filtered", screen: "results", how: "Tap the funnel", does: "to choose how long the words can be:" },
 ];
 
-export function control(key: string): Control {
-  const found = CONTROLS.find((c) => c.key === key);
-  if (!found) throw new Error(`no control ${key}`);
-  return found;
-}
-
-/** Where the tour is: what's been done, and what to ask for next. Remembered on the
- *  device as `stored()` (read back with the constructor); "done" once finished or skipped. */
+/** Where the tour is: which step it asks for. Remembered on the device as `stored()`
+ *  (read back with the constructor): "done" once finished or skipped. */
 export class Tour {
-  private readonly did = new Set<TourEvent>();
+  private step = 0; // TOUR's index of the step asked for
   private over: boolean;
 
   constructor(stored: string | null) {
@@ -60,26 +53,26 @@ export class Tour {
     return !this.over;
   }
 
-  /** The first step not yet done; null when there's none. */
+  /** The step asked for now; null when there's none. */
   get current(): TourStep | null {
-    if (this.over) return null;
-    return TOUR.find((step) => !this.did.has(step.event)) ?? null;
+    return this.over ? null : (TOUR[this.step] ?? null);
   }
 
-  /** Which step this is, counting the ones done: "2 of 3". */
+  /** Which step this is: "2 of 4". */
   get number(): number {
-    return this.did.size + 1;
+    return this.step + 1;
   }
 
   /** Every step done (not skipped). */
   get finished(): boolean {
-    return this.did.size === TOUR.length;
+    return this.step === TOUR.length;
   }
 
-  /** The person did `event`: true when that completes a step not done before. */
+  /** The person did `event`: true when it's the step asked for, which is then done.
+   *  Anything else, early or again, doesn't count. */
   done(event: TourEvent): boolean {
-    if (this.over || this.did.has(event) || !TOUR.some((step) => step.event === event)) return false;
-    this.did.add(event);
+    if (this.current?.event !== event) return false;
+    this.step++;
     if (this.finished) this.over = true;
     return true;
   }
@@ -89,12 +82,35 @@ export class Tour {
   }
 
   restart() {
-    this.did.clear();
+    this.step = 0;
     this.over = false;
   }
 
   /** What to remember on the device. */
   stored(): string | null {
     return this.over ? "done" : null;
+  }
+}
+
+/** Picks from what's on offer in no particular order, each once before any comes round
+ *  again, and never the same twice running (when there's another to pick). What's on
+ *  offer may change between picks: the words on screen, as the list scrolls. */
+export class ShuffleBag<T> {
+  private readonly had = new Set<T>();
+  private last: T | null = null;
+
+  constructor(private readonly random: () => number = Math.random) {}
+
+  next(offered: readonly T[]): T | null {
+    if (offered.length === 0) return null;
+    let fresh = offered.filter((item) => !this.had.has(item));
+    if (fresh.length === 0) {
+      this.had.clear(); // every one has had its turn: a new round
+      fresh = offered.length > 1 ? offered.filter((item) => item !== this.last) : [...offered];
+    }
+    const pick = fresh[Math.min(fresh.length - 1, Math.floor(this.random() * fresh.length))];
+    this.had.add(pick);
+    this.last = pick;
+    return pick;
   }
 }

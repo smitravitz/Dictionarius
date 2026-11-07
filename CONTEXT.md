@@ -69,12 +69,16 @@ decision or module makes it load-bearing.
   chosen minimum, and a new minimum puts Max back on Any). Filters read
   **word columns** in the index (`LEN`, `NAME`, `SHAPE`); a choice compiles to
   one **WordFilter** that every list and count goes through (ADR-0003).
-- **Tour** — what a first run is shown (`web/guide.ts`, drawn by `web/coach.ts`): three
-  things to do, each by doing it, in any order: search (tap a piece), **peek** (hold a word),
-  scrub (hold the space beside the words and slide). A note at the foot says which ("2 of 3"),
-  never covering what it's about; a ghost finger acts it out in place. Done or skipped, it's
-  remembered on the device (`dictionarius.tour`); **How it works** (the "?" by the cog) lists
-  every control in the same words, and can show the tour again.
+- **Tour** — what a first run is shown (`web/guide.ts`, drawn by `web/coach.ts`): four
+  things to do, in order, each moving on only when the person does it: search (tap a piece),
+  scrub (hold beside a word and drag), **peek** (hold a word), filters (the funnel). A note at
+  the foot says which ("2 of 4"), never covering what it's about. Each step's **show**
+  (`web/tour-shows.ts`) acts it out once on the real screen, then asks: a ghost finger taps
+  or slides; the scrubber's show moves the real slider by itself and puts the list back; the
+  peek's lights whole words in turn, in no particular order, until one is held. A show never
+  counts as the person's go, starts only on an idle screen and gives way to any touch. Done
+  or skipped, it's remembered on the device (`dictionarius.tour`). **How It Works** (the "?"
+  by the cog) lists the controls, and can show the tour again.
 - **Definitions file** — every word's definitions, beside the index, read by
   word id (`src/definitions.ts`, `docs/definitions-format.md`; ADR-0004), as a
   **core** (`headwords.definitions.bin`) and a **layer** file each for

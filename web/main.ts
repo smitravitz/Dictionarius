@@ -27,6 +27,7 @@ import { guardEdges } from "./edge-gestures";
 import { setUpLoader } from "./loader";
 import { CONTROLS, Tour } from "./guide";
 import { Coach, type Screen } from "./coach";
+import { tourShows } from "./tour-shows";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const input = $<HTMLInputElement>("q");
@@ -65,11 +66,11 @@ const slider = new OffsetSlider(frame, {
       ? { query, byOffset: counts.byOffset, complete: counts.total !== null, current: list.topOffset() }
       : null,
   change: (value) => seek(value),
-  used: () => coach.did("scrubbed"),
 });
 
 // In the Android app, the phone's edge swipe mustn't take a thumb holding the slider's ends.
 guardEdges(frame);
+let slid = false; // the finger holding the slider has dragged it
 
 
 // Taps, holds and drags on the list (scroller-gestures.ts): a tap opens a word,
@@ -78,9 +79,18 @@ guardEdges(frame);
 new ScrollerGestures(scroller, {
   typing: () => document.activeElement === input,
   dismissKeyboard: () => input.blur(),
-  holdStart: (x) => slider.open(x),
-  holdMove: (x) => slider.slideTo(x),
-  holdEnd: () => slider.close(),
+  holdStart: (x) => {
+    slid = false;
+    return slider.open(x);
+  },
+  holdMove: (x) => {
+    slid = true;
+    slider.slideTo(x);
+  },
+  holdEnd: () => {
+    slider.close();
+    if (slid) coach.did("scrubbed"); // held and dragged: the tour's second step
+  },
   peek: (target) => peekAt(target),
   unpeek: () => {
     peekSeq++; // an answer still on its way is for a peek that's over
@@ -366,6 +376,7 @@ input.addEventListener("keydown", (event) => {
     const here = list.topOffset() ?? 0;
     const last = counts ? counts.byOffset.length - (counts.total !== null ? 1 : 0) : here + 1;
     seek(Math.min(last, Math.max(0, here + (event.key === "ArrowRight" ? 1 : -1))));
+    coach.did("scrubbed"); // the slider's way from the keyboard does the tour's step too
   } else if (event.key === "ArrowDown" || event.key === "ArrowUp") {
     event.preventDefault();
     const id = list.move(event.key === "ArrowDown" ? 1 : -1);
@@ -669,8 +680,9 @@ const placeSeam = () => {
 new ResizeObserver(placeSeam).observe(document.body);
 placeSeam();
 
-// How it works: the "?" beside the cog lists every control (web/guide.ts), and can start
-// the tour again. The tour itself: three things to do on a first run, each by doing it.
+// How It Works: the "?" beside the cog lists the controls (web/guide.ts), and can start the
+// tour again. The tour itself: four things to do on a first run, each shown, then asked for
+// (web/coach.ts, web/tour-shows.ts). Only the person's own actions are reported to it.
 const guide = $("guide");
 for (const c of CONTROLS) {
   const how = document.createElement("dt");
@@ -684,46 +696,36 @@ $("help-open").addEventListener("click", () => help.showModal());
 const TOUR_KEY = "dictionarius.tour";
 const coach = new Coach(
   new Tour(read(TOUR_KEY)),
-  { card: $("coach"), count: $("coach-count"), text: $("coach-text"), skip: $<HTMLButtonElement>("coach-skip"), finger: $("coach-finger") },
-  tourTarget,
+  { card: $("coach"), count: $("coach-count"), text: $("coach-text"), skip: $<HTMLButtonElement>("coach-skip") },
+  tourShows({
+    ring: $("coach-finger"),
+    glow: $("coach-glow"),
+    pieces: examples,
+    scroller,
+    funnel: $("filters-open"),
+    slider,
+    holdPlace: () => {
+      const top = scroller.scrollTop;
+      return () => {
+        seeking = -1; // a seek still on its way was the show's
+        scroller.scrollTop = top;
+      };
+    },
+  }),
   (value) => (value === null ? forget(TOUR_KEY) : write(TOUR_KEY, value)),
 );
 $("help-tour").addEventListener("click", () => {
   help.close();
   coach.restart();
 });
-
-/** Where the ghost finger acts a step out: the middle of the pieces; a word's letters,
- *  high in the list; the space beside a short word. */
-function tourTarget(event: "searched" | "peeked" | "scrubbed") {
-  if (event === "searched") {
-    const lane = examples.querySelector(".lane")?.getBoundingClientRect();
-    const bag = examples.getBoundingClientRect();
-    return lane && lane.width ? { x: lane.left + lane.width / 2, y: lane.top + lane.height / 2, top: bag.top, bottom: bag.bottom } : null;
-  }
-  const view = scroller.getBoundingClientRect();
-  for (const row of scroller.querySelectorAll<HTMLElement>("li.word:not(.pending)")) {
-    const box = row.getBoundingClientRect();
-    if (box.top < view.top + 4 || box.bottom > view.top + view.height * 0.6) continue;
-    const letters = row.querySelector(".frag")?.getBoundingClientRect();
-    if (!letters) continue;
-    const middle = box.top + box.height / 2;
-    const area = { top: box.top, bottom: box.bottom };
-    if (event === "peeked") return { x: letters.left + letters.width / 2, y: middle, ...area };
-    const after = row.querySelector(".after")?.getBoundingClientRect();
-    const end = Math.max(letters.right, after?.right ?? 0);
-    if (end < view.right - 96) return { x: view.right - 40, y: middle, ...area };
-  }
-  return null;
-}
+// The funnel opened the filters, and they're closed again: back on the list, the last step done.
+$("filters").addEventListener("close", () => coach.did("filtered"));
 
 const screenNow = (): Screen => (!intro.hidden ? "start" : !frame.hidden ? "results" : "elsewhere");
 const watchScreens = () => {
   const screen = screenNow();
-  if (screen === "results") coach.did("searched"); // a suggestion or a typed search: the list is up
+  if (screen === "results") coach.did("searched"); // a piece or a typed search: the list is up
   coach.on(screen);
 };
 new MutationObserver(watchScreens).observe(document.getElementById("app")!, { attributes: true, attributeFilter: ["hidden"], subtree: true });
-scroller.addEventListener("scroll", () => coach.follow(), { passive: true });
-window.addEventListener("resize", () => coach.follow());
 watchScreens(); // the start screen's first frame has the tour's note in place, if it's showing

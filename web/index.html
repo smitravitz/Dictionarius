@@ -36,7 +36,7 @@
         <h1 class="wordmark">Dictionarius</h1>
         <div class="masthead-end">
           <p class="status" id="status">Loading the word list…</p>
-          <button class="cog" id="help-open" type="button" aria-label="How it works" aria-haspopup="dialog" aria-controls="help">
+          <button class="cog" id="help-open" type="button" aria-label="How It Works" aria-haspopup="dialog" aria-controls="help">
             <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
               <circle cx="12" cy="12" r="9.25" />
               <path d="M9.4 9.35a2.7 2.7 0 0 1 5.2.95c0 1.8-2.6 2.3-2.6 4" />
@@ -102,9 +102,9 @@
       <!-- Each range filter that's set (word length), so it isn't forgotten, with a cross to clear it. -->
       <div class="active-filters" id="active-filters" hidden></div>
 
-      <section class="intro" id="intro" aria-labelledby="examples-label">
+      <!-- No words of its own: the first-run tour and How It Works say what the pieces do. -->
+      <section class="intro" id="intro" aria-label="Pieces to search for">
         <div class="bag-wrap">
-          <p class="bag-label" id="examples-label">Or pick one from the bag below</p>
           <!-- Two lanes of pieces drifting slowly (main.ts), sized a little by how many words each finds. -->
           <div class="carousel" id="examples"></div>
         </div>
@@ -142,8 +142,8 @@
     </dialog>
     <dialog class="settings" id="help" aria-labelledby="help-title">
       <form method="dialog">
-        <h2 class="settings-title" id="help-title">How it works</h2>
-        <!-- Every control, in web/guide.ts's words (the tour uses the same). -->
+        <h2 class="settings-title" id="help-title">How It Works</h2>
+        <!-- The controls, in web/guide.ts's words. -->
         <dl class="guide" id="guide"></dl>
         <div class="help-actions">
           <button class="help-tour" id="help-tour" type="button">Show me again</button>
@@ -151,13 +151,15 @@
         </div>
       </form>
     </dialog>
-    <!-- The first-run tour (web/coach.ts): a note saying what to do, and a ghost finger doing it. -->
+    <!-- The first-run tour (web/coach.ts): a note saying what to do; a ghost finger and a
+         highlight acting it out (web/tour-shows.ts). Only the note's Skip takes a touch. -->
     <div class="coach" id="coach" role="status" aria-live="polite" hidden>
       <p class="coach-count" id="coach-count"></p>
       <button class="coach-skip" id="coach-skip" type="button">Skip</button>
       <p class="coach-text" id="coach-text"></p>
     </div>
     <div class="coach-finger" id="coach-finger" aria-hidden="true" hidden></div>
+    <div class="coach-glow" id="coach-glow" aria-hidden="true" hidden></div>
     <!-- The peek: a held word's first meanings (web/peek.ts). -->
     <div class="peek" id="peek" hidden aria-live="polite"></div>
     <dialog class="settings" id="filters" aria-labelledby="filters-title">

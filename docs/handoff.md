@@ -3,7 +3,7 @@
 Read this first in a new chat, then `.claude/CLAUDE.md`. Update it at the end of any
 session that changes what's below (newest state only; history lives in git).
 
-_Last updated: 2026-11-06, at v0.6.0 (v0.6.1 pending: the missing-definitions fix)._
+_Last updated: 2026-11-07, at v0.6.1 (the four-step tour unreleased until the next tag)._
 
 ## What it is
 
@@ -51,9 +51,12 @@ built from the English Wiktionary dump by `scripts/build_fm_index.py`.
 
 ## State
 
-- **v0.5.1** released (APK 73.3 MB at v0.5.0: definitions 56.8 MB, index 12.9 MB).
-- A first-run tour (3 steps, done for real) and How it works behind the "?" (`web/guide.ts`,
-  `web/coach.ts`); unreleased until the next tag.
+- Latest tag **v0.6.1** (APK 73.3 MB at v0.5.0: definitions 56.8 MB, index 12.9 MB).
+- A first-run tour (4 steps, in order: search, scrub, peek, filters; each shown, then asked
+  for) and How It Works behind the "?" (`web/guide.ts`, `web/coach.ts`, `web/tour-shows.ts`);
+  unreleased until the next tag. Guarded by `e2e/tour.spec.ts` and the Playwright project
+  `first-run`, which runs every other e2e test again with the tour on; release.yml runs the
+  tour's `@release` tests on the real word list.
 - Web app on Pages: a browser shows a loading screen (book turning pages) until the index
   and all definitions are in; the Android app skips it and loads definitions after start.
 - `/dictionarius/` (lowercase) needs the owner's user-site repo `smitravitz.github.io` with
@@ -85,10 +88,9 @@ Then tag (v0.6.0: a data format change).
    On the phone, confirm reading in place (ADR-0005): `adb shell dumpsys meminfo
    io.github.smitravitz.dictionarius` should show about 57 MB less than v0.5.x, and a
    word page should still feel instant (Chromium: 85–97 ms for an uncached block).
-4. Start-screen copy "Or pick one from the bag below" may need updating for the two lanes.
-5. Check the newer suggestion pieces in `web/examples.ts` against real word counts.
-6. ADR-0006 gates: the `LTRS` letter column first, then the positions layer and the
+4. Check the newer suggestion pieces in `web/examples.ts` against real word counts.
+5. ADR-0006 gates: the `LTRS` letter column first, then the positions layer and the
    letter keyboard / pattern field.
-7. ADR-0007 (planning only, nothing started): pronunciations for the 92.7% of words
+6. ADR-0007 (planning only, nothing started): pronunciations for the 92.7% of words
    without one, worked out from their parts where measured safe; first step would be
    keeping the accent labels the builder drops.
