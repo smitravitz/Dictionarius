@@ -29,6 +29,7 @@ import { CONTROLS, Tour } from "./guide";
 import { Coach, type Screen } from "./coach";
 import { tourShows } from "./tour-shows";
 import { Hands } from "./hands";
+import { Capacitor } from "@capacitor/core";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const input = $<HTMLInputElement>("q");
@@ -106,23 +107,28 @@ function setFilter(id: string, value: (typeof filters)[string]) {
   else showActiveFilters();
 }
 
-for (const f of FILTERS) {
-  if (f.kind !== "switch") continue;
+/** A switch in Settings: its name, a line on what it does, and what turning it does. */
+function addSwitch(id: string, label: string, help: string, on: boolean, turned: (on: boolean) => void): HTMLElement {
   const row = document.createElement("label");
   row.className = "setting";
-  row.dataset.filter = f.id;
   row.innerHTML = `<span class="setting-text"><span class="setting-name"></span><span class="setting-help"></span></span>
     <input class="switch" type="checkbox" role="switch" />`;
-  row.querySelector(".setting-name")!.textContent = f.label;
-  const help = row.querySelector<HTMLElement>(".setting-help")!;
-  help.textContent = f.help;
-  help.id = `${f.id}-help`;
+  row.querySelector(".setting-name")!.textContent = label;
+  const line = row.querySelector<HTMLElement>(".setting-help")!;
+  line.textContent = help;
+  line.id = `${id}-help`;
   const toggle = row.querySelector<HTMLInputElement>("input")!;
-  toggle.id = f.id;
-  toggle.setAttribute("aria-describedby", help.id);
-  toggle.checked = filters[f.id] === true;
-  toggle.addEventListener("change", () => setFilter(f.id, toggle.checked));
+  toggle.id = id;
+  toggle.setAttribute("aria-describedby", line.id);
+  toggle.checked = on;
+  toggle.addEventListener("change", () => turned(toggle.checked));
   switches.append(row);
+  return row;
+}
+
+for (const f of FILTERS) {
+  if (f.kind !== "switch") continue;
+  addSwitch(f.id, f.label, f.help, filters[f.id] === true, (on) => setFilter(f.id, on)).dataset.filter = f.id;
 }
 
 // The ranges (word length) are wheels in the Filters panel, under the cog.
@@ -145,15 +151,18 @@ function showActiveFilters() {
     clear.className = "clear-filter";
     clear.setAttribute("aria-label", `Clear the ${f.label.toLowerCase()} filter`);
     clear.innerHTML = `<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6.5 6.5l11 11M17.5 6.5l-11 11" /></svg>`;
-    clear.addEventListener("click", () => {
-      setFilter(f.id, [null, null]);
-      filtersPanel.offer(offered); // the wheels back on Any, the funnel's dot gone
-    });
+    clear.addEventListener("click", () => clearRange(f.id));
     line.append(words, clear);
     lines.push(line);
   }
   activeFilters.replaceChildren(...lines);
   activeFilters.hidden = !query || lines.length === 0;
+}
+
+/** A range filter back on Any: the wheels too, and the funnel's dot gone. */
+function clearRange(id: string) {
+  setFilter(id, [null, null]);
+  filtersPanel.offer(offered);
 }
 
 let offered: FilterInfo[] = []; // the filters this index has the data for
@@ -487,6 +496,7 @@ function paintEntry(seq: number, s: Suggestion, content: EntryContent, from: Swi
   entry.classList.add("turning");
   fitClamps(parts.body); // laid out now, before the screen is painted
   window.scrollTo(0, 0);
+  updateNav(); // forward may have gone (a link followed) or come (a step back)
 }
 
 // Folded text that fitted may not after the page narrows (a phone turned), or the reverse.
@@ -536,6 +546,7 @@ window.addEventListener("popstate", (event) => {
   frame.hidden = false;
   scroller.scrollTop = returnTo.scrollTop; // hiding the list reset it
   input.setAttribute("aria-expanded", "true");
+  updateNav();
 });
 
 void setUpNativeShell({
@@ -686,6 +697,34 @@ for (const c of CONTROLS) {
 }
 $("help-open").addEventListener("click", () => help.showModal());
 
+// Back, home and forward, for a mouse: over the top of the list or a word's page. Back and
+// forward step through the words followed, as a swipe does; back from the list, and home,
+// go to the start screen. On by default in a desktop browser, off on a phone and in the app;
+// a switch in Settings, kept on the device.
+const NAV_KEY = "dictionarius.nav";
+const nav = $("nav");
+const navForward = $<HTMLButtonElement>("nav-forward");
+const navByDefault = () => !Capacitor.isNativePlatform() && !matchMedia("(pointer: coarse)").matches;
+let navOn = (read(NAV_KEY) ?? (navByDefault() ? "on" : "off")) === "on";
+function updateNav() {
+  const hide = !navOn || !intro.hidden || (frame.hidden && entry.hidden);
+  // Only when it changes: the screen watcher below hears every "hidden" set inside the app.
+  if (nav.hidden !== hide) nav.hidden = hide;
+  navForward.disabled = !trail.canForward;
+}
+function goToStart() {
+  input.value = "";
+  search("");
+}
+$("nav-back").addEventListener("click", () => (entry.hidden ? goToStart() : step("back")));
+$("nav-home").addEventListener("click", goToStart);
+navForward.addEventListener("click", () => step("forward"));
+addSwitch("nav-buttons", "Navigation buttons", "Back, forward and the start screen, at the top.", navOn, (on) => {
+  navOn = on;
+  write(NAV_KEY, on ? "on" : "off");
+  updateNav();
+});
+
 const TOUR_KEY = "dictionarius.tour";
 const hands = new Hands();
 const coach = new Coach(
@@ -693,6 +732,7 @@ const coach = new Coach(
   { card: $("coach"), count: $("coach-count"), text: $("coach-text"), skip: $<HTMLButtonElement>("coach-skip") },
   tourShows({
     hands,
+    touch: $("coach-touch"),
     pieces: examples,
     scroller,
     funnel: $("filters-open"),
@@ -711,11 +751,15 @@ const coach = new Coach(
   (value) => (value === null ? forget(TOUR_KEY) : write(TOUR_KEY, value)),
   hands,
 );
-// Show me again: the tour from the top, on the start screen where it begins.
+// Show me again: the tour from the top, on the start screen where it begins, every word in
+// play (the funnel's filters cleared).
 $("help-tour").addEventListener("click", () => {
   help.close();
-  input.value = "";
-  search("");
+  goToStart();
+  for (const f of FILTERS) {
+    const range = filters[f.id] as Range;
+    if (f.kind === "range" && (range[0] !== null || range[1] !== null)) clearRange(f.id);
+  }
   coach.restart();
 });
 // A sheet opened from the funnel or the cog, and closed again: back on the list, its step done.
@@ -724,6 +768,7 @@ settings.addEventListener("close", () => coach.did("set"));
 
 const screenNow = (): Screen => (!intro.hidden ? "start" : !frame.hidden ? "results" : "elsewhere");
 const watchScreens = () => {
+  updateNav();
   const screen = screenNow();
   if (screen === "results") coach.did("searched"); // a piece or a typed search: the list is up
   coach.on(screen);

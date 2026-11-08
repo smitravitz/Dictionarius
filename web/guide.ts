@@ -3,7 +3,7 @@
 // No DOM here: web/coach.ts draws the tour, web/tour-shows.ts acts each step out, and
 // main.ts tells it what the person did.
 
-/** A control: what to do (`how`), and what it does. */
+/** A control: what to do (`how`), and what it's for (`does`), which reads on from it. */
 export interface Control {
   how: string;
   does: string;
@@ -11,13 +11,13 @@ export interface Control {
 
 /** How It Works: the help sheet's list. */
 export const CONTROLS: readonly Control[] = [
-  { how: "Tap a piece", does: "See every word with it inside" },
-  { how: "Tap a word", does: "Open its full entry" },
-  { how: "Hold a word", does: "Peek at its meaning" },
-  { how: "Hold beside a word, then slide", does: "Choose how many letters come before the piece" },
-  { how: "Tap the funnel", does: "Filter words by length" },
-  { how: "Tap the cog", does: "Choose what the list shows, like safe search" },
-  { how: "Back", does: "Return to your list, right where you left it" },
+  { how: "Tap a piece", does: "to find every word containing it" },
+  { how: "Tap a word", does: "to open its full entry" },
+  { how: "Hold a word", does: "to peek at its meaning" },
+  { how: "Hold beside a word, then slide", does: "to move where the piece lands mid-word" },
+  { how: "Tap the funnel", does: "to filter words by length" },
+  { how: "Tap the cog", does: "to choose what the list shows, like safe search" },
+  { how: "Back", does: "returns you to your list, right where you left it" },
 ];
 
 /** What the person did that a step asks for (main.ts reports these). */
@@ -35,7 +35,7 @@ export interface TourStep {
 /** The first-run tour: each step shown, then asked for; the next only once it's done. */
 export const TOUR: readonly TourStep[] = [
   { event: "searched", screen: "start", how: "Tap a piece below", does: "to search for it and open every word with it inside:" },
-  { event: "scrubbed", screen: "results", how: "Hold beside a word, then slide", does: "to choose how many letters come before the piece:" },
+  { event: "scrubbed", screen: "results", how: "Hold beside a word, then slide", does: "to move where the piece lands mid-word:" },
   { event: "peeked", screen: "results", how: "Press & Hold a word", does: "to peek at what it means:" },
   { event: "filtered", screen: "results", how: "Tap the funnel", does: "to filter words by length:" },
   { event: "set", screen: "results", how: "Tap the cog", does: "to choose what the list shows, like safe search:" },

@@ -33,7 +33,7 @@ async function turn(page: Page, wheel: Locator, rows: number) {
   await page.mouse.up();
 }
 
-test("the funnel under the cog opens word-length wheels that filter the list, and are remembered", async ({ page }) => {
+test("the funnel under the cog opens word-length wheels that filter the list, until the next start", async ({ page }) => {
   await open(page);
   const funnel = page.getByRole("button", { name: "Filters" });
   await expect(funnel).toBeVisible();
@@ -66,27 +66,40 @@ test("the funnel under the cog opens word-length wheels that filter the list, an
   for (const w of words) expect(chars(w), w).toBeGreaterThanOrEqual(4);
   for (const w of words) expect(chars(w), w).toBeLessThanOrEqual(6);
 
-  await page.reload();
-  await expect(page.locator("#status")).toHaveText(/^[\d,]+ words$/);
-  await expect(page.locator("#loader")).toHaveCount(0); // a browser shows the app once all is in
-  await expect(funnel).toHaveAttribute("data-active", "");
-  await funnel.click();
-  await expect(min).toHaveAttribute("aria-valuetext", "4");
-  await expect(max).toHaveAttribute("aria-valuetext", "6");
-
   // A new minimum puts Max back on Any.
+  await funnel.click();
   await turn(page, min, -1);
   await expect(min).toHaveAttribute("aria-valuetext", "3");
   await expect(max).toHaveAttribute("aria-valuetext", "Any");
+  await dialog.getByRole("button", { name: "Done" }).click();
+
+  // Not kept: the next start is on Any (settings are kept; the funnel's choices aren't).
+  await page.reload();
+  await expect(page.locator("#status")).toHaveText(/^[\d,]+ words$/);
+  await expect(page.locator("#loader")).toHaveCount(0); // a browser shows the app once all is in
+  await expect(funnel).not.toHaveAttribute("data-active", "");
+  await funnel.click();
+  await expect(min).toHaveAttribute("aria-valuetext", "Any");
+  await expect(max).toHaveAttribute("aria-valuetext", "Any");
+  expect(await page.evaluate(() => Object.keys(localStorage).filter((k) => k === "dictionarius.length"))).toEqual([]);
 });
 
+/** Set word length to 4–6 with the funnel's wheels. */
+async function setFourToSix(page: Page) {
+  await page.getByRole("button", { name: "Filters" }).click();
+  const dialog = page.getByRole("dialog", { name: "Filters" });
+  const min = dialog.getByRole("spinbutton", { name: "Minimum word length" });
+  const max = dialog.getByRole("spinbutton", { name: "Maximum word length" });
+  await turn(page, min, 4);
+  await expect(min).toHaveAttribute("aria-valuetext", "4");
+  await turn(page, max, 3);
+  await expect(max).toHaveAttribute("aria-valuetext", "6");
+  await dialog.getByRole("button", { name: "Done" }).click();
+}
+
 test("a set filter is named under the totals, and its cross clears it", async ({ page }) => {
-  await page.addInitScript(() => {
-    if (sessionStorage.getItem("seeded")) return; // once: a reload must find what the app saved
-    sessionStorage.setItem("seeded", "1");
-    localStorage.setItem("dictionarius.length", "4-6");
-  });
   await open(page);
+  await setFourToSix(page);
   const funnel = page.getByRole("button", { name: "Filters" });
   await expect(funnel).toHaveAttribute("data-active", "");
   await page.locator("#q").fill("e");
@@ -106,10 +119,6 @@ test("a set filter is named under the totals, and its cross clears it", async ({
   expect(all).toBeGreaterThan(filtered);
   await funnel.click(); // the wheels say Any again
   await expect(page.getByRole("spinbutton", { name: "Minimum word length" })).toHaveAttribute("aria-valuetext", "Any");
-  await page.reload();
-  await expect(page.locator("#status")).toHaveText(/^[\d,]+ words$/);
-  await expect(page.locator("#loader")).toHaveCount(0); // a browser shows the app once all is in
-  await expect(funnel).not.toHaveAttribute("data-active", ""); // and it stays cleared
 });
 
 test("no filter line on the start screen or while no range is set", async ({ page }) => {

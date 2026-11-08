@@ -3,7 +3,9 @@ import { test, expect, type Page } from "@playwright/test";
 
 // The first-run tour: five things (search, scrub, peek, filters, settings), in order, each
 // shown first and then asked for, by lighting what to touch: a see-through highlight drawn
-// by the thing itself, so it moves with it, and only ever fading or pulsing smoothly.
+// by the thing itself, so it moves with it, and only ever fading or pulsing smoothly. The
+// slider has nothing to light (it's held in the empty space beside a word), so a touch
+// shows it instead, sliding with the histogram, and again after 5 still seconds.
 // Most of what's here is about it staying out of the way: nothing counts but the person's
 // own action, nothing new shows while they're still touching, the list is left where it
 // was, a touch always wins, and nothing is left behind. And the "?" beside the cog: How It
@@ -101,16 +103,42 @@ async function wordOnScreen(page: Page) {
   });
 }
 
-/** The space beside a word is lit (the scrubber's step, asking). */
-async function besideLit(page: Page) {
-  await expect(page.locator('li.word[data-tour-lit="on"]')).toHaveCount(1, { timeout: 10_000 });
+/** The touch that shows the slider: where to hold, sliding with the histogram. */
+const touch = (page: Page) => page.locator("#coach-touch");
+
+/** Where a hold opens the slider: the space beside a short word wholly on screen, clear of
+ *  the note (found here, not from the tour). */
+async function besideAWord(page: Page) {
+  let at: { x: number; y: number } | null = null;
+  await expect.poll(async () => (at = await page.evaluate(() => {
+    const view = document.getElementById("scroller")!.getBoundingClientRect();
+    const note = document.getElementById("coach")!;
+    const floor = Math.min(view.bottom, note.hidden ? Infinity : note.getBoundingClientRect().top);
+    for (const row of document.querySelectorAll("#scroller li.word:not(.pending)")) {
+      const box = row.getBoundingClientRect();
+      const end = Math.max(...[...row.querySelectorAll(".before, .frag, .after")].map((part) => part.getBoundingClientRect().right));
+      if (box.top >= view.top + 60 && box.bottom <= floor && end < view.right - 96) {
+        return { x: view.right - 40, y: box.top + box.height / 2 };
+      }
+    }
+    return null;
+  }))).not.toBeNull();
+  return at!;
+}
+
+/** The scrubber's show, once over (with motion on): the slider opened by itself, then let go. */
+async function afterTheShow(page: Page) {
+  await expect(page.locator(".slider")).toHaveClass(/\bon\b/, { timeout: 5000 });
+  await expect(page.locator(".slider")).not.toHaveClass(/\bon\b/, { timeout: 8000 });
+  await expect(touch(page)).toBeHidden();
 }
 
 /** On to step 3 by doing steps 1 and 2 (after the scrubber's show, if it has one). */
-async function toPeekStep(page: Page) {
+async function toPeekStep(page: Page, motion: Motion = "reduce") {
   await searchByTyping(page);
-  await besideLit(page);
-  await scrubAt(page, await lightMiddle(page));
+  if (motion === "no-preference") await afterTheShow(page);
+  else await expect(touch(page)).toBeVisible({ timeout: 10_000 });
+  await scrubAt(page, await besideAWord(page));
   await expect(count(page)).toHaveText("3 of 5");
 }
 
@@ -120,7 +148,7 @@ const tourAnimations = (page: Page) =>
     document.getAnimations().filter((a) => {
       const effect = a.effect as KeyframeEffect | null;
       const target = effect?.target as Element | null;
-      return !!target && (!!target.closest("#coach") || (!!effect?.pseudoElement && target.hasAttribute("data-tour-lit")));
+      return !!target && (!!target.closest("#coach, #coach-touch") || (!!effect?.pseudoElement && target.hasAttribute("data-tour-lit")));
     }).length,
   );
 
@@ -136,12 +164,15 @@ test("a first run is shown five things, one at a time, and moves on as each is d
   await lit(page).click();
   await expect(page.locator("#frame")).toBeVisible();
   await expect(count(page)).toHaveText("2 of 5");
-  await expect(words(page)).toHaveText("Hold beside a word, then slide to choose how many letters come before the piece:");
+  await expect(words(page)).toHaveText("Hold beside a word, then slide to move where the piece lands mid-word:");
 
-  // 2. Hold the lit space beside a word, and slide: the slider.
-  await besideLit(page);
-  await scrubAt(page, await lightMiddle(page));
+  // 2. Hold where the touch shows, beside a word, and slide: the slider. Nothing lit: an
+  // empty space doesn't say what to do; the touch and the note do.
+  await expect(touch(page)).toBeVisible({ timeout: 10_000 });
+  await expect(lit(page)).toHaveCount(0);
+  await scrubAt(page, await middle(page, "#coach-touch"));
   await expect(count(page)).toHaveText("3 of 5");
+  await expect(touch(page)).toBeHidden();
   await expect(words(page)).toHaveText("Press & Hold a word to peek at what it means:");
 
   // 3. Hold the lit word: its peek.
@@ -198,7 +229,7 @@ test("each step waits for its own action: nothing done early counts", async ({ p
   await expect(count(page)).toHaveText("2 of 5");
 
   // The scrubber: on to the peek; the cog there doesn't skip it.
-  await scrubAt(page, await lightMiddle(page));
+  await scrubAt(page, await middle(page, "#coach-touch"));
   await expect(count(page)).toHaveText("3 of 5");
   await page.locator("#settings-open").click();
   await page.locator("#settings").getByRole("button", { name: "Done" }).click();
@@ -214,13 +245,14 @@ test("typing a search does the first step too", async ({ page }) => {
 test("nothing new shows while the person is still holding: the next step waits for them to let go", async ({ page }) => {
   await firstRun(page);
   await page.locator("#examples button.tile").first().click();
-  await besideLit(page);
+  await expect(touch(page)).toBeVisible({ timeout: 10_000 });
 
   // The scrubber, held on after sliding: step 2 is done, but nothing new yet.
-  await scrubAt(page, await lightMiddle(page), false);
+  await scrubAt(page, await middle(page, "#coach-touch"), false);
   await page.waitForTimeout(1500);
   await expect(count(page)).toHaveText("2 of 5 ✓");
   await expect(lit(page)).toHaveCount(0);
+  await expect(touch(page)).toBeHidden();
   await page.mouse.up();
   await expect(count(page)).toHaveText("3 of 5", { timeout: 3000 });
 
@@ -262,9 +294,19 @@ test("the highlight is smooth: it only fades and pulses, eased, and never jumps"
       for (const el of document.querySelectorAll("[data-tour-lit]")) {
         if (shown(el)) seen.set(el, parseFloat(getComputedStyle(el, "::before").opacity));
       }
+      const hand = document.getElementById("coach-touch");
+      if (hand && shown(hand)) seen.set(hand, parseFloat(getComputedStyle(hand).opacity));
       return seen;
     };
-    const record = { fastest: 0, frames: 0, stop: false };
+    // And the touch glides: no faster than its drag, never a jump while it's showing.
+    let lastAt: { x: number; y: number; o: number } | null = null;
+    const touchAt = () => {
+      const hand = document.getElementById("coach-touch");
+      if (!hand || !shown(hand)) return null;
+      const box = hand.getBoundingClientRect();
+      return { x: box.left + box.width / 2, y: box.top + box.height / 2, o: parseFloat(getComputedStyle(hand).opacity) };
+    };
+    const record = { fastest: 0, frames: 0, stop: false, glide: 0, touchFrames: 0 };
     (window as unknown as { smooth_: typeof record }).smooth_ = record;
     let last = sample(); // what's lit already is where it is
     let lastTime = 0;
@@ -272,6 +314,12 @@ test("the highlight is smooth: it only fades and pulses, eased, and never jumps"
     const watch = (time: number) => {
       if (record.stop) return;
       const seen = sample();
+      const at = touchAt();
+      if (at && lastAt && lastAt.o > 0.05 && at.o > 0.05 && time > lastTime) {
+        record.glide = Math.max(record.glide, Math.hypot(at.x - lastAt.x, at.y - lastAt.y) / (time - lastTime));
+        record.touchFrames++;
+      }
+      lastAt = at;
       if (lastTime && time > lastTime) {
         for (const el of new Set([...seen.keys(), ...last.keys()])) {
           if (!seen.has(el) && !shown(el)) continue; // went with its row or its screen
@@ -289,9 +337,8 @@ test("the highlight is smooth: it only fades and pulses, eased, and never jumps"
   });
   await page.waitForTimeout(4000); // pieces, lit in turn
   await searchByTyping(page);
-  await expect(page.locator(".slider")).toHaveClass(/\bon\b/, { timeout: 5000 }); // the scrubber's show
-  await besideLit(page); // over: asking
-  await scrubAt(page, await lightMiddle(page));
+  await afterTheShow(page); // the scrubber's touch, sliding with the histogram
+  await scrubAt(page, await besideAWord(page));
   await expect(count(page)).toHaveText("3 of 5");
   await expect(page.locator('.line[data-tour-lit="on"]')).toHaveCount(1, { timeout: 5000 });
   await page.waitForTimeout(4500); // words, lit in turn
@@ -315,24 +362,34 @@ test("the highlight is smooth: it only fades and pulses, eased, and never jumps"
   }
 
   const record = await page.evaluate(() => {
-    const r = (window as unknown as { smooth_: { fastest: number; frames: number; stop: boolean } }).smooth_;
+    const r = (window as unknown as { smooth_: { fastest: number; frames: number; stop: boolean; glide: number; touchFrames: number } }).smooth_;
     r.stop = true;
     return r;
   });
   expect(record.frames).toBeGreaterThan(300); // it watched the whole way
   expect(record.fastest).toBeLessThan(0.009); // opacity per ms: a jump of 1 in one 16 ms frame would be 0.06
+  expect(record.touchFrames).toBeGreaterThan(60); // it watched the touch slide
+  expect(record.glide).toBeLessThan(1); // px per ms: its drag peaks near 0.4; a jump of 40 px in a frame would be 2.4
 });
 
-test("the scrubber shows itself: the slider moves the piece with no input, then the list is as it was", { tag: "@release" }, async ({ page }) => {
+test("the scrubber shows itself: a touch slides with the histogram, the list follows, then all is as it was; again after 5 still seconds", { tag: "@release" }, async ({ page }) => {
+  test.setTimeout(60_000 + LOAD_MS);
   await firstRun(page, "no-preference");
-  // Watch every frame from the search on: the slider, where the list is, the step.
+  // Watch every frame from the search on: the slider and its histogram, the touch, where
+  // the list is, the step.
   await page.evaluate(() => {
-    const frames: { on: boolean; top: number; step: string }[] = [];
-    (window as unknown as { frames_: typeof frames }).frames_ = frames;
+    type Frame = { time: number; on: boolean; bar: number; touch: number | null; top: number; step: string };
+    const frames: Frame[] = [];
+    (window as unknown as { frames_: Frame[] }).frames_ = frames;
     const scroller = document.getElementById("scroller")!;
-    const watch = () => {
+    const watch = (time: number) => {
+      const hand = document.getElementById("coach-touch");
+      const box = hand && !hand.hidden ? hand.getBoundingClientRect() : null;
       frames.push({
+        time,
         on: !!document.querySelector(".slider.on"),
+        bar: [...document.querySelectorAll(".slider-track i")].findIndex((bar) => bar.classList.contains("on")),
+        touch: box && box.width ? Math.round(box.left + box.width / 2) : null,
         top: scroller.scrollTop,
         step: document.querySelector(".coach-count")?.textContent ?? "",
       });
@@ -341,21 +398,40 @@ test("the scrubber shows itself: the slider moves the piece with no input, then 
     requestAnimationFrame(watch);
   });
   await searchByTyping(page);
-  await expect(page.locator(".slider")).toHaveClass(/\bon\b/, { timeout: 5000 }); // by itself
-  await besideLit(page); // the show is over: asking
-  await expect(page.locator(".slider")).not.toHaveClass(/\bon\b/);
+  await afterTheShow(page);
 
-  const frames = await page.evaluate(() => (window as unknown as { frames_: { on: boolean; top: number; step: string }[] }).frames_);
+  type Frame = { time: number; on: boolean; bar: number; touch: number | null; top: number; step: string };
+  const frames = await page.evaluate(() => (window as unknown as { frames_: Frame[] }).frames_);
   const first = frames.findIndex((f) => f.on);
   const last = frames.length - 1 - [...frames].reverse().findIndex((f) => f.on);
+  const open = frames.slice(first, last + 1);
   const before = frames[first - 1].top;
-  expect(frames.slice(first, last + 1).some((f) => f.top !== before)).toBe(true); // the piece moved the list
-  expect(frames[frames.length - 1].top).toBe(before); // and it's back where it was
+  // The touch was there, pressing, before the slider opened, and all the while it was open.
+  expect(frames[first - 1].touch).not.toBeNull();
+  expect(open.every((f) => f.touch !== null)).toBe(true);
+  // Back and forth: out to one side, then home again.
+  const start = open[0].touch!;
+  expect(Math.min(...open.map((f) => f.touch!))).toBeLessThan(start - 60);
+  expect(Math.abs(open.at(-1)!.touch! - start)).toBeLessThan(12);
+  // In step with the histogram: its bar only moves on a frame where the touch moved.
+  for (let i = 1; i < open.length; i++) {
+    if (open[i].bar !== open[i - 1].bar) expect(open[i].touch).not.toBe(open[i - 1].touch);
+  }
+  expect(new Set(open.map((f) => f.bar)).size).toBeGreaterThan(1); // the piece moved
+  expect(open.some((f) => f.top !== before)).toBe(true); // and the list with it
+  expect(frames.at(-1)!.top).toBe(before); // and it's back where it was
   expect(frames.slice(first).every((f) => f.step === "2 of 5")).toBe(true); // the show isn't the person's go
-  await expect(count(page)).toHaveText("2 of 5");
+  await expect(lit(page)).toHaveCount(0); // and no box beside a word in between
 
-  // Then it's the person's go.
-  await scrubAt(page, await lightMiddle(page));
+  // Not done within 5 still seconds: it shows again.
+  const ended = frames.at(-1)!.time;
+  await expect(page.locator(".slider")).toHaveClass(/\bon\b/, { timeout: 9000 });
+  const again = await page.evaluate(() => performance.now());
+  expect(again - ended).toBeGreaterThan(4500);
+  await afterTheShow(page);
+
+  // Then the person's go.
+  await scrubAt(page, await besideAWord(page));
   await expect(count(page)).toHaveText("3 of 5");
 });
 
@@ -371,10 +447,10 @@ test("a touch during the scrubber's show stops it at once, the list where it was
   await page.mouse.down();
   await expect(page.locator(".slider")).not.toHaveClass(/\bon\b/);
   expect(await scroller.evaluate((el) => el.scrollTop)).toBe(before);
+  await expect(touch(page)).toBeHidden();
   await page.mouse.up();
-  await besideLit(page); // straight to asking
-  await page.waitForTimeout(1500);
-  await expect(page.locator(".slider")).not.toHaveClass(/\bon\b/); // and it doesn't start again
+  await page.waitForTimeout(3000);
+  await expect(page.locator(".slider")).not.toHaveClass(/\bon\b/); // not again while the person's just been busy
   expect(await scroller.evaluate((el) => el.scrollTop)).toBe(before);
   await expect(count(page)).toHaveText("2 of 5");
 });
@@ -385,26 +461,15 @@ test("a finger already on the list when the scrubber's show is due keeps it: no 
     const seen: string[] = [];
     (window as unknown as { held_: string[] }).held_ = seen;
     const watch = () => {
-      if (document.querySelector('[data-tour-lit="held"]')) seen.push("held"); // the show pressing
+      const hand = document.getElementById("coach-touch");
+      if (hand && !hand.hidden) seen.push("touch"); // the show pressing
       requestAnimationFrame(watch);
     };
     requestAnimationFrame(watch);
   });
   await searchByTyping(page);
   // Straight away, before the show's moment: hold beside a word, and drag slowly, well past it.
-  let at: { x: number; y: number } | null = null;
-  await expect.poll(async () => (at = await page.evaluate(() => {
-    const view = document.getElementById("scroller")!.getBoundingClientRect();
-    for (const row of document.querySelectorAll("#scroller li.word:not(.pending)")) {
-      const box = row.getBoundingClientRect();
-      const end = Math.max(...[...row.querySelectorAll(".before, .frag, .after")].map((part) => part.getBoundingClientRect().right));
-      if (box.top >= view.top && box.bottom <= view.bottom && end < view.right - 96) {
-        return { x: view.right - 40, y: box.top + box.height / 2 };
-      }
-    }
-    return null;
-  }))).not.toBeNull();
-  at = at!;
+  const at = await besideAWord(page);
   const scroller = page.locator("#scroller");
   await page.mouse.move(at.x, at.y);
   await page.mouse.down();
@@ -426,7 +491,7 @@ test("the peek step lights whole words, see-through and borderless, in no partic
   test.setTimeout(120_000 + LOAD_MS);
   await firstRun(page, "no-preference");
   await searchByTyping(page);
-  await besideLit(page);
+  await afterTheShow(page);
 
   // Which word is lit, frame by frame from the very first, and how well its highlight
   // covers it: the whole word (every letter, not only the piece), as much as the row shows.
@@ -476,7 +541,7 @@ test("the peek step lights whole words, see-through and borderless, in no partic
     }
     return { eligible, seen };
   });
-  await scrubAt(page, await lightMiddle(page));
+  await scrubAt(page, await besideAWord(page));
   await expect(count(page)).toHaveText("3 of 5");
 
   const hops = await recording;
@@ -519,7 +584,7 @@ test("the tour stays out of the way: a tap on a lit word opens it, and Back brin
 
 test("Skip ends the tour for good, and leaves nothing behind", async ({ page }) => {
   await firstRun(page, "no-preference");
-  await toPeekStep(page);
+  await toPeekStep(page, "no-preference");
   await expect(lit(page)).toHaveCount(1);
   await card(page).getByRole("button", { name: "Skip" }).click();
   await expect(card(page)).toBeHidden();
@@ -545,11 +610,12 @@ test("the note is never a wall, and never covers what a step is about", async ({
   const pieces = (await page.locator("#examples").boundingBox())!;
   expect((await note()).y + (await note()).height).toBeLessThanOrEqual(pieces.y);
   await page.locator("#examples button.tile").first().click();
-  // 2: the space beside a word.
-  await besideLit(page);
+  // 2: the touch beside a word.
+  await expect(touch(page)).toBeVisible({ timeout: 10_000 });
   expect((await note()).height).toBeLessThan(view.height / 3);
-  expect((await lightBox(page)).bottom).toBeLessThanOrEqual((await note()).y);
-  await scrubAt(page, await lightMiddle(page));
+  const hand = (await touch(page).boundingBox())!;
+  expect(hand.y + hand.height).toBeLessThanOrEqual((await note()).y);
+  await scrubAt(page, await middle(page, "#coach-touch"));
   // 3: the lit word.
   await expect(page.locator('.line[data-tour-lit="on"]')).toHaveCount(1);
   expect((await lightBox(page)).bottom).toBeLessThanOrEqual((await note()).y);
@@ -563,7 +629,7 @@ test("the start screen has no guide text of its own: the tour says it", async ({
   await expect(page.getByRole("region", { name: "Pieces to search for" })).toBeVisible();
 });
 
-test("the ? beside the cog shows How It Works, briefly, and Show me again starts the tour over from anywhere", async ({ page }) => {
+test("the ? beside the cog shows How It Works, and Show me again starts the tour over from anywhere, filters cleared", async ({ page }) => {
   await page.context().addInitScript(() => {
     if (!sessionStorage.getItem("seeded")) localStorage.setItem("dictionarius.tour", "done");
     sessionStorage.setItem("seeded", "1");
@@ -574,10 +640,15 @@ test("the ? beside the cog shows How It Works, briefly, and Show me again starts
   expect((await help.boundingBox())!.x).toBeLessThan((await cog.boundingBox())!.x); // to the left of the cog
   await expect(help).toHaveAccessibleName("How It Works");
 
-  // From the word list, not the start screen.
+  // From the word list, not the start screen, with a word length set.
   await page.locator("#q").fill("ate");
   await page.locator("#q").blur();
   await expect(page.locator("#frame")).toBeVisible();
+  await page.locator("#filters-open").click();
+  await page.getByRole("spinbutton", { name: "Minimum word length" }).focus();
+  for (let i = 0; i < 4; i++) await page.keyboard.press("ArrowUp");
+  await page.locator("#filters").getByRole("button", { name: "Done" }).click();
+  await expect(page.locator("#filters-open")).toHaveAttribute("data-active", "");
   await help.click();
   const sheet = page.locator("#help");
   await expect(sheet.getByRole("heading")).toHaveText("How It Works");
@@ -591,13 +662,13 @@ test("the ? beside the cog shows How It Works, briefly, and Show me again starts
     "Back",
   ]);
   await expect(sheet.locator("dd")).toHaveText([
-    "See every word with it inside",
-    "Open its full entry",
-    "Peek at its meaning",
-    "Choose how many letters come before the piece",
-    "Filter words by length",
-    "Choose what the list shows, like safe search",
-    "Return to your list, right where you left it",
+    "to find every word containing it",
+    "to open its full entry",
+    "to peek at its meaning",
+    "to move where the piece lands mid-word",
+    "to filter words by length",
+    "to choose what the list shows, like safe search",
+    "returns you to your list, right where you left it",
   ]);
   await sheet.getByRole("button", { name: "Show me again" }).click();
   await expect(sheet).toBeHidden();
@@ -606,4 +677,8 @@ test("the ? beside the cog shows How It Works, briefly, and Show me again starts
   await expect(count(page)).toHaveText("1 of 5");
   await expect(page.locator("#examples [data-tour-lit]")).toHaveCount(1);
   await expect(page.locator("#q")).toHaveValue("");
+  // And it starts with no filters: the list it opens is every word.
+  await expect(page.locator("#filters-open")).not.toHaveAttribute("data-active", "");
+  await page.locator("#filters-open").click();
+  await expect(page.getByRole("spinbutton", { name: "Minimum word length" })).toHaveAttribute("aria-valuetext", "Any");
 });

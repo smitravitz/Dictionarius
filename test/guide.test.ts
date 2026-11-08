@@ -5,17 +5,17 @@ import { CONTROLS, ShuffleBag, TOUR, Tour } from "../web/guide";
 // And How It Works, the help sheet behind the "?".
 
 describe("How It Works", () => {
-  it("lists every control, briefly: what to do, then what it does", () => {
+  it("lists every control: what to do, then what it's for, read as one sentence", () => {
     expect(CONTROLS.map((c) => [c.how, c.does])).toEqual([
-      ["Tap a piece", "See every word with it inside"],
-      ["Tap a word", "Open its full entry"],
-      ["Hold a word", "Peek at its meaning"],
-      ["Hold beside a word, then slide", "Choose how many letters come before the piece"],
-      ["Tap the funnel", "Filter words by length"],
-      ["Tap the cog", "Choose what the list shows, like safe search"],
-      ["Back", "Return to your list, right where you left it"],
+      ["Tap a piece", "to find every word containing it"],
+      ["Tap a word", "to open its full entry"],
+      ["Hold a word", "to peek at its meaning"],
+      ["Hold beside a word, then slide", "to move where the piece lands mid-word"],
+      ["Tap the funnel", "to filter words by length"],
+      ["Tap the cog", "to choose what the list shows, like safe search"],
+      ["Back", "returns you to your list, right where you left it"],
     ]);
-    for (const c of CONTROLS) expect(`${c.how} ${c.does}`.split(" ").length).toBeLessThanOrEqual(14); // less words
+    for (const c of CONTROLS) expect(c.does[0]).toBe(c.does[0].toLowerCase()); // it carries on from what to do
   });
 });
 
@@ -23,7 +23,7 @@ describe("the tour", () => {
   it("asks for five things, in this order, in these words", () => {
     expect(TOUR.map((s) => [s.event, s.screen, `${s.how} ${s.does}`])).toEqual([
       ["searched", "start", "Tap a piece below to search for it and open every word with it inside:"],
-      ["scrubbed", "results", "Hold beside a word, then slide to choose how many letters come before the piece:"],
+      ["scrubbed", "results", "Hold beside a word, then slide to move where the piece lands mid-word:"],
       ["peeked", "results", "Press & Hold a word to peek at what it means:"],
       ["filtered", "results", "Tap the funnel to filter words by length:"],
       ["set", "results", "Tap the cog to choose what the list shows, like safe search:"],

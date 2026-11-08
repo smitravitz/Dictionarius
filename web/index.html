@@ -110,6 +110,22 @@
         </div>
       </section>
 
+      <!-- Back, home and forward for a mouse (main.ts): over the top of the list or a word's
+           page; the slider's histogram covers them. Turned on and off in Settings. -->
+      <nav class="nav" id="nav" aria-label="Go to" hidden>
+        <div class="nav-side">
+          <button class="nav-button" id="nav-back" type="button" aria-label="Back">
+            <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" /></svg>
+          </button>
+          <button class="nav-button" id="nav-home" type="button" aria-label="Start screen">
+            <svg viewBox="0 0 24 24" width="21" height="21" aria-hidden="true"><path d="M4 11l8-6.5 8 6.5M6.5 9.5V19h11V9.5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" /></svg>
+          </button>
+        </div>
+        <button class="nav-button" id="nav-forward" type="button" aria-label="Forward">
+          <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" /></svg>
+        </button>
+      </nav>
+
       <div class="frame" id="frame" hidden>
         <div class="seam" aria-hidden="true"></div>
         <div class="scroller" id="scroller">
@@ -158,6 +174,7 @@
       <button class="coach-skip" id="coach-skip" type="button">Skip</button>
       <p class="coach-text" id="coach-text"></p>
     </div>
+    <div class="coach-touch" id="coach-touch" aria-hidden="true" hidden></div>
     <!-- The peek: a held word's first meanings (web/peek.ts). -->
     <div class="peek" id="peek" hidden aria-live="polite"></div>
     <dialog class="settings" id="filters" aria-labelledby="filters-title">

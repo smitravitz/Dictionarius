@@ -52,8 +52,10 @@ built from the English Wiktionary dump by `scripts/build_fm_index.py`.
 ## State
 
 - Latest tag **v0.6.1** (APK 73.3 MB at v0.5.0: definitions 56.8 MB, index 12.9 MB).
+- Navigation buttons (back, home, forward) over the list and word pages, on by default in a
+  desktop browser, a switch in Settings; the funnel's filters are no longer kept between starts.
 - A first-run tour (5 steps, in order: search, scrub, peek, filters, settings; each shown,
-  then asked for, what to touch lit in place) and How It Works behind the "?" (`web/guide.ts`,
+  then asked for, what to touch lit in place, the slider shown by a touch) and How It Works behind the "?" (`web/guide.ts`,
   `web/coach.ts`, `web/tour-shows.ts`, `web/hands.ts`); unreleased until the next tag.
   Guarded by `e2e/tour.spec.ts` (including a frame-by-frame smoothness check), the Playwright
   project `first-run`, which runs every other e2e test again with the tour on, and

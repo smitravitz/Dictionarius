@@ -63,8 +63,9 @@ decision or module makes it load-bearing.
   edge.
 - **Filter** — a rule that leaves words out of every search (`src/filters.ts`):
   a **switch** in Settings (safe search; *Disable phrases*, entries with spaces;
-  *Disable names*, proper nouns; all on by default, so only common words show)
-  or a **range** in the **Filters panel** under the cog (word length, set with
+  *Disable names*, proper nouns; all on by default, so only common words show;
+  kept on the device) or a **range** in the **Filters panel** under the cog (not
+  kept: each start, and the tour's, begins on Any; word length, set with
   two **roller wheels**, Min and Max: each starts on "Any"; Max starts from the
   chosen minimum, and a new minimum puts Max back on Any). Filters read
   **word columns** in the index (`LEN`, `NAME`, `SHAPE`); a choice compiles to
@@ -74,14 +75,21 @@ decision or module makes it load-bearing.
   scrub (hold beside a word and slide), **peek** (hold a word), filters (the funnel),
   settings (the cog). A note at the foot says which ("2 of 5"), never covering what it's
   about; a step done is ticked, and the next waits until the person has let go and been still
-  a moment (`web/hands.ts`). Each step's **show** (`web/tour-shows.ts`) acts it out once,
-  then asks, by **lighting** what to touch: a see-through wash drawn by the thing itself, so
-  it moves with it, fading and breathing (opacity only). Pieces and words are lit in turn, in
-  no particular order; the scrubber's show moves the real slider by itself and puts the list
-  back; a sheet's options are lit in turn once it's open. A show never counts as the
-  person's go, starts only on a still screen and gives way to any touch. Done or skipped,
-  it's remembered on the device (`dictionarius.tour`). **How It Works** (the "?" by the cog)
-  lists the controls; Show me again starts the tour over, on the start screen.
+  a moment (`web/hands.ts`). Each step's **show** (`web/tour-shows.ts`) acts it out, then
+  asks, by **lighting** what to touch: a see-through wash drawn by the thing itself, so it
+  moves with it, fading and breathing (opacity only). Pieces and words are lit in turn, in
+  no particular order; a sheet's options in turn once it's open. The slider is held in empty
+  space, which has nothing to light, so a **touch** shows it: it presses beside a word and
+  slides out and back with the histogram, the real slider and list following, then the list
+  is put back; again after 5 still seconds. A show never counts as the person's go, starts
+  only on a still screen and gives way to any touch. Done or skipped, it's remembered on the
+  device (`dictionarius.tour`). **How It Works** (the "?" by the cog) lists the controls;
+  Show me again starts the tour over on the start screen, the funnel's filters cleared.
+- **Navigation buttons** — back, home (the start screen) and forward over the top corners
+  of the list and of a word's page, in the cog's grey, for a mouse: back and forward step
+  through the words followed, as a swipe does; back from the list goes home. The slider's
+  histogram covers them while it's open. On by default in a desktop browser, off on a phone
+  and in the app; a switch in Settings, kept (`dictionarius.nav`).
 - **Definitions file** — every word's definitions, beside the index, read by
   word id (`src/definitions.ts`, `docs/definitions-format.md`; ADR-0004), as a
   **core** (`headwords.definitions.bin`) and a **layer** file each for

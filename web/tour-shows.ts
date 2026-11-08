@@ -5,9 +5,10 @@
  * in the same frame (a drifting piece, a scrolling row), and only ever fades or pulses.
  *
  * - searched: the pieces on screen lit in turn, in no particular order, as they drift.
- * - scrubbed: the space beside a word is pressed, and the real slider opens by itself and
- *   moves the piece, the list following; then it lets go, the list put back where it was.
- *   Then that space is lit until the person holds it and slides.
+ * - scrubbed: an empty space has nothing to light, so a touch shows it: it presses beside a
+ *   word, the real slider opens by itself, and the touch slides out and back, the histogram
+ *   and the list following it frame by frame; then it lets go, the list put back where it
+ *   was. Not done within 5 still seconds: shown again.
  * - peeked: whole words lit in turn, in no particular order, each once before any again
  *   (ShuffleBag), until the person holds one.
  * - filtered, set: the funnel (or the cog) lit; once its sheet is open, its options lit in
@@ -16,7 +17,8 @@
  * None of it is the person's go: main.ts reports only their own actions to the coach. A
  * highlight takes no touch. A demonstration only starts on a still screen (web/hands.ts),
  * a touch, key or wheel stops it at once, and stopping puts back everything a show changed.
- * With reduced motion nothing is acted out, nothing pulses and highlights don't fade.
+ * With reduced motion nothing is acted out, nothing pulses and highlights don't fade: the
+ * touch just stands where to hold.
  */
 import type { Show, Stage } from "./coach";
 import { ShuffleBag, type TourEvent } from "./guide";
@@ -25,6 +27,8 @@ import { wordLetters } from "./scroller-gestures";
 
 export interface ShowParts {
   hands: Hands;
+  /** The touch that shows where to hold for the slider. */
+  touch: HTMLElement;
   /** The pieces on the start screen. */
   pieces: HTMLElement;
   /** The results list's scrolling box. */
@@ -52,12 +56,14 @@ const DWELL_STILL_MS = 2400; // the same, with reduced motion
 const IN_MS = 320; // a highlight fading in
 const BREATH_MS = 900; // and breathing: out to 40% and back, twice this
 const FADE_MS = 260; // and fading out
-const WAIT_MS = 800; // after the list opens, before the scrubber's show: a moment to see it
+const WAIT_MS = 800; // still this long before the scrubber's show: a moment to see the list
+const REPLAY_MS = 5000; // not done this long after it: shown again (once the person is still)
 // The scrubber's show: press, drag out, pause, drag back, let go (ms).
 const PRESS = 450;
 const OUT = 1000;
 const PAUSE = 350;
 const BACK = 800;
+const LIFT = 250; // the touch letting go
 const BESIDE = 40; // where a hold beside the words goes: this far in from the list's right edge
 const ROOM = 96; // a word ending this close to the edge leaves no room beside it
 
@@ -72,7 +78,7 @@ const owners = new WeakMap<HTMLElement, Light>();
 /** A highlight over `el`, or over `part` of it: drawn by the element itself (styles.css), so
  *  it goes wherever the element goes. It fades in, then breathes, and fades out from wherever
  *  the breath is: opacity alone, eased, each started here, so a new one always starts at
- *  nothing and nothing ever jumps. "held" is pressed: stronger, and still. */
+ *  nothing and nothing ever jumps. */
 class Light {
   private readonly position: string | null;
   private motion: Animation[] = [];
@@ -81,7 +87,6 @@ class Light {
   constructor(
     readonly el: HTMLElement,
     part: Part | null,
-    state: "on" | "held" = "on",
   ) {
     owners.get(el)?.gone();
     owners.set(el, this);
@@ -95,15 +100,13 @@ class Light {
       el.style.setProperty("--lit-h", `${Math.round(part.h)}px`);
       if (part.radius !== undefined) el.style.setProperty("--lit-radius", `${part.radius}px`);
     }
-    el.dataset.tourLit = state;
+    el.dataset.tourLit = "on";
     if (still()) return;
     const on = { pseudoElement: "::before" } as const;
     this.motion.push(el.animate([{ opacity: 0 }, { opacity: 1 }], { ...on, duration: IN_MS, easing: "ease-out" }));
-    if (state === "on") {
-      this.motion.push(el.animate([{ opacity: 1 }, { opacity: 0.4 }], {
-        ...on, duration: BREATH_MS, delay: IN_MS, easing: "ease-in-out", iterations: Infinity, direction: "alternate",
-      }));
-    }
+    this.motion.push(el.animate([{ opacity: 1 }, { opacity: 0.4 }], {
+      ...on, duration: BREATH_MS, delay: IN_MS, easing: "ease-in-out", iterations: Infinity, direction: "alternate",
+    }));
   }
 
   /** Fade out from wherever its breath is, then take it all away. */
@@ -131,6 +134,54 @@ class Light {
     delete el.dataset.tourLit;
     for (const name of ["--lit-x", "--lit-y", "--lit-w", "--lit-h", "--lit-radius"]) el.style.removeProperty(name);
     if (this.position !== null) el.style.position = this.position;
+  }
+}
+
+/** The touch: where a finger would be, pressing, sliding and letting go. Placed by
+ *  `translate` (on the compositor), pressed and lifted by opacity and scale. */
+class Touch {
+  private motion: Animation | null = null;
+
+  constructor(private readonly el: HTMLElement) {}
+
+  /** Where it is: the frame's position, set by the same script that moves the slider. */
+  at(x: number, y: number) {
+    this.el.style.translate = `${x.toFixed(1)}px ${y.toFixed(1)}px`;
+  }
+
+  press(x: number, y: number) {
+    this.at(x, y);
+    delete this.el.dataset.still;
+    this.el.hidden = false;
+    this.motion?.cancel();
+    this.motion = this.el.animate([{ opacity: 0, scale: 1.4 }, { opacity: 1, scale: 1 }], { duration: 300, easing: "ease-out" });
+  }
+
+  /** Let go: fades and grows a little from where it is, then gone. */
+  lift() {
+    if (this.el.hidden) return;
+    const opacity = getComputedStyle(this.el).opacity;
+    this.motion?.cancel();
+    const lift = this.el.animate([{ opacity, scale: 1 }, { opacity: 0, scale: 1.3 }], { duration: LIFT, easing: "ease-in", fill: "forwards" });
+    this.motion = lift;
+    lift.finished.then(() => {
+      if (this.motion !== lift) return;
+      this.el.hidden = true;
+      lift.cancel();
+    }, () => {});
+  }
+
+  /** With reduced motion: standing still where to hold. */
+  stand(x: number, y: number) {
+    this.at(x, y);
+    this.el.dataset.still = "";
+    this.el.hidden = false;
+  }
+
+  gone() {
+    this.motion?.cancel();
+    this.motion = null;
+    this.el.hidden = true;
   }
 }
 
@@ -248,14 +299,14 @@ export function tourShows(parts: ShowParts): Record<TourEvent, Show> {
     window.addEventListener("resize", clear, { signal: stage.signal });
   };
 
+  const touch = new Touch(parts.touch);
+
   const scrubbed: Show = (stage) => {
     const { signal } = stage;
-    const shown = performance.now();
-    let acting = false; // the slider's show is on: the list moving is its doing
-    let light: Light | null = null;
+    signal.addEventListener("abort", () => touch.gone());
 
     /** A short word nearest the middle of the list (clear of the slider, which opens at
-     *  the top), and the space beside it: where a hold opens the slider. */
+     *  the top): a hold in the space beside it opens the slider. */
     const spot = () => {
       const view = scroller.getBoundingClientRect();
       const middle = (view.top + Math.min(view.bottom, stage.noteTop())) / 2;
@@ -267,41 +318,42 @@ export function tourShows(parts: ShowParts): Record<TourEvent, Show> {
         const word = wordLetters(row);
         if (!word || word.right > view.right - ROOM) continue;
         const box = row.getBoundingClientRect();
-        const from = word.right + 16 - box.left;
-        const space: Part = { x: from, y: 6, w: view.right - 8 - box.left - from, h: box.height - 12, radius: 12 };
-        return { row, space, x: view.right - BESIDE, y: box.top + box.height / 2 };
+        return { x: view.right - BESIDE, y: box.top + box.height / 2 };
       }
       return null;
     };
-    /** Asking: the space beside a word lit, staying on it while it's on screen. */
-    const ask = () => {
-      if (acting || signal.aborted) return;
-      if (light && light.el.isConnected && rowsInView(stage).includes(light.el) && light.el.dataset.tourLit === "on") return;
-      light?.out();
-      const at = spot();
-      light = at ? new Light(at.row, at.space) : null;
-    };
-    onMove(signal, ask);
-    signal.addEventListener("abort", () => light?.out());
 
-    // Act it out once the rows are in and the person has had a moment to see the list,
-    // unless they've put a hand on it by then: straight to asking.
-    whenThere(signal, spot, () => {
-      if (!stage.demonstrate || still()) return ask();
-      const begin = setTimeout(() => {
+    // Reduced motion: the touch stands where to hold, following the list.
+    if (still()) {
+      const stand = () => {
         const at = spot();
-        if (hands.busy || hands.since(shown) || !at) return ask();
-        act(at);
-      }, WAIT_MS);
-      signal.addEventListener("abort", () => clearTimeout(begin));
-    });
+        if (at) touch.stand(at.x, at.y);
+        else touch.gone();
+      };
+      whenThere(signal, spot, stand);
+      onMove(signal, stand);
+      return;
+    }
 
-    /** Press beside the word, drag out and back, let go: the real slider, with nobody's finger on it. */
-    function act(at: { row: HTMLElement; space: Part; x: number; y: number }) {
-      acting = true;
+    // A moment after the list is in (time to see it), act it out; then again whenever
+    // 5 seconds pass without the person doing it. Either way only once they're still.
+    const after = (ms: number) => {
+      const timer = setTimeout(() => hands.whenStill(WAIT_MS, signal, () => {
+        const at = spot();
+        if (at) act(at);
+        else whenThere(signal, spot, () => after(0));
+      }), ms);
+      signal.addEventListener("abort", () => clearTimeout(timer));
+    };
+    const again = () => after(REPLAY_MS);
+    whenThere(signal, spot, () => after(stage.demonstrate ? WAIT_MS : REPLAY_MS));
+
+    /** Press beside the word, drag out and back, let go: the real slider, with nobody's
+     *  finger on it; the touch and the slider moved together, in the same frame. */
+    function act(at: { x: number; y: number }) {
+      let acting = true;
       const putBack = parts.holdPlace();
       const reach = Math.min(200, scroller.clientWidth * 0.45);
-      const pressed = new Light(at.row, at.space, "held");
       let opened = false;
       let frame = 0;
       // Over at once, everything as it was: on time, on a touch, or when the tour moves on.
@@ -311,27 +363,31 @@ export function tourShows(parts: ShowParts): Record<TourEvent, Show> {
         cancelAnimationFrame(frame);
         quit();
         signal.removeEventListener("abort", end);
-        pressed.gone();
         if (opened) slider.close();
         putBack();
+        touch.lift();
       };
       const over = () => {
         end();
-        ask();
+        again();
       };
       const quit = onHandsOn(signal, over); // heard before anything else: the person's press finds the list as it was
       signal.addEventListener("abort", end);
 
+      touch.press(at.x, at.y);
       const start = performance.now();
       const step = (now: number) => {
         const t = now - start;
         if (t >= PRESS && !opened) {
           opened = slider.open(at.x, true);
-          if (!opened) return over(); // nothing to slide over (yet): just ask
-          pressed.out(); // the list moves now: the row goes with it
+          if (!opened) return over(); // nothing to slide over (yet): later
         }
-        if (t >= PRESS + OUT + PAUSE + BACK) return over(); // done: let go, and ask
-        if (opened) slider.slideTo(at.x - reach * dragged(t - PRESS));
+        if (t >= PRESS + OUT + PAUSE + BACK) return over(); // done: let go
+        if (opened) {
+          const x = at.x - reach * dragged(t - PRESS);
+          slider.slideTo(x);
+          touch.at(x, at.y);
+        }
         frame = requestAnimationFrame(step);
       };
       frame = requestAnimationFrame(step);
