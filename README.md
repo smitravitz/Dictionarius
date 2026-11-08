@@ -1,78 +1,87 @@
 # Dictionarius 📖
 
-[![CI](https://github.com/smitravitz/dictionarius/actions/workflows/ci.yml/badge.svg)](https://github.com/smitravitz/dictionarius/actions/workflows/ci.yml)
+A free, fully offline English dictionary that finds a word from any part of it.
 
-Fully offline, open-source dictionary with **instant mid-word search** — find a word by any fragment, not just its prefix (`eren` → `serene`, `coherent`, `adherence`).
+[![CI](https://github.com/smitravitz/Dictionarius/actions/workflows/ci.yml/badge.svg)](https://github.com/smitravitz/Dictionarius/actions/workflows/ci.yml)
+[![Latest release](https://img.shields.io/github/v/release/smitravitz/Dictionarius?sort=semver&display_name=tag)](https://github.com/smitravitz/Dictionarius/releases/latest)
+[![License: GPL-3.0-or-later](https://img.shields.io/badge/license-GPL--3.0--or--later-blue)](LICENSE)
 
-Powered by an **FM-index** (a compressed self-index where the search index *is* the data), so substring search over 1.3M+ words fits in a tiny footprint and runs with no server. Written in TypeScript; runs as a web app and as an Android app (packaged with [Capacitor](https://capacitorjs.com)), with PWA, iOS and F-Droid builds planned.
+Type `eren` and get *serene*, *coherent*, *adherence*: every word with your letters anywhere inside, not just at the start. All 1,357,380 English words and their definitions from Wiktionary live on your device. No account, no network, no permissions.
 
-> ⚠️ Early development. Search works on the web and Android; definitions arrive with the next data build.
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/app-dark.png">
+  <img src="docs/screenshots/app-light.png" alt="Four phone screens: the start screen with its search field and drifting pieces; a search for 'eren' with the slider's histogram showing 4 letters before the piece; a held word's meanings peeking over the list; the full entry for 'serene' with pronunciations, meanings and examples.">
+</picture>
 
-## Why it's different
+**[Open it in your browser](https://smitravitz.github.io/Dictionarius/)** · **[Get the Android app](#android)**
 
-The open dictionary ecosystem (StarDict, Aard2, ZIM) does prefix/exact lookup over block-compressed data with a separate key index. Dictionarius instead makes **substring search *be* the storage** via an FM-index — measured **~2.3× smaller and faster than SQLite FTS5 trigram** on the same data, and projected smaller still with an engineered succinct index.
+## ✨ Features
 
-## How it stays small
+- 🔎 **Search inside words.** Any piece of a word finds every word containing it, lined up on your letters: the exact word, then words that start with it, then those with one letter before it, two, and so on. A summary counts how many start with, end with and contain it.
+- ↔️ **Slide to move the piece.** Hold the space beside a word and slide to jump to words where your letters land later or earlier; a frequency graph shows how many there are at each place. Alt+←/→ does the same from a keyboard.
+- 👀 **Peek.** Hold a word for its first meanings; let go and they're gone.
+- 📚 **Full entries.** Tap a word for its meanings, an example of each in use, pronunciation and origin. Words inside a definition open their own entries, and a swipe (or the back and forward buttons) steps through the words you followed.
+- 🎚️ **Filters and settings.** Word length with two roller wheels; safe search, phrases and names in Settings (common words only by default).
+- 🧭 **Shows you how.** A five-step tour on first run, and **How It Works** behind the **?** any time.
+- 🔒 **Private by design.** The Android app requests no permissions at all: no network, no storage, no sensors. CI checks every build against [`privacy.toml`](privacy.toml).
 
-- **Every word, offline, from the first run:** the headword index for all 1,357,380 English search keys is 31 MB on disk (~13 MB zipped in the APK), including a hot list that makes mid-word search instant.
-- **Every definition inside the app (43 MB):** meanings, usage labels, links between words, pronunciation and etymology for all ~1.5 million entries (one short example per meaning adds an estimated ~13 MB from the next data build), packed small (link glosses as templates, words and word classes as numbers) and compressed with brotli in blocks of 4,096 words, so opening a word unpacks one block. That is within ~11% of compressing it all as one stream, measured on a 5% sample ([ADR-0004](docs/adr/0004-all-definitions-bundled.md)).
+## 📲 Install
 
-Nothing is downloaded later; the app has no network permission at all.
+### Web
 
-## Status
+**[smitravitz.github.io/Dictionarius](https://smitravitz.github.io/Dictionarius/)** runs the latest release. The first visit downloads the word list and definitions (about 89 MB) once; after that your browser keeps them. The page loads only its own files and sends nothing anywhere, though GitHub, which hosts it, sees your visit as any host does.
 
-**🔎 Search engine**
+### Android
 
-- ✅ FM-index over all 1,357,380 English search keys from Wiktionary ([builder](scripts/build_fm_index.py), [format](docs/index-format.md)), with a zero-copy TypeScript loader
-- ✅ Opens in ~2 ms; exact, prefix and mid-word lookups in microseconds (Node/V8)
-- ✅ Results in concordance order:
-  1. the exact match
-  2. words that start with your text
-  3. words with 1 letter before it, then 2, and so on
-  - at each position: single words, then hyphenated words, then phrases; common words first
-- ✅ First page in ~1–10 ms; every position counted in ~3–90 ms (0.6 s for a single letter)
-- ✅ Benchmarked against SQLite FTS5 trigram ([`bench/`](bench/))
-- ✅ Platform-agnostic core (search, filters, definitions, favorites, history), test-driven: unit tests, plus browser tests on desktop and phone
+Add `https://github.com/smitravitz/Dictionarius` to [Obtainium](https://obtainium.imranr.dev) to install and get updates, or download the APK (about 73 MB) from the [latest release](https://github.com/smitravitz/Dictionarius/releases/latest). Everything is inside it: nothing is downloaded later.
 
-**📱 App**
+## ⚙️ How it works
 
-- ✅ Type-ahead list that loads more as you scroll; every row lines up on your text, and long rows scroll sideways
-- ✅ Summary: how many words start with, end with and contain your text
-- ✅ Position scrubber: hold a blank spot in the list and slide sideways (a haptic tick per step) to jump to words with that many letters before your text; Alt+←/→ on a keyboard
-- ✅ Safe search (⚙️ Settings, on by default): hides vulgar words and slurs, even typed out in full ([rule](docs/index-format.md#safe-search))
-- ✅ Common words only by default: phrases and names (proper nouns) are switched off in ⚙️ Settings
-- ✅ Word length filter: two roller wheels (min, max) in the filter panel under ⚙️; drag to turn ([how filters work](docs/adr/0003-filters-from-word-columns.md))
-- ✅ Definitions: tap a word for its meanings, a short example of each in use, its pronunciation and a brief origin; long pronunciations and origins fold behind *more*; words inside a definition open their own entries, as on Wiktionary ([format](docs/definitions-format.md))
-- ✅ A first-run tour of five steps, each shown on the real screen and then done for real, what to touch lit in place, and a touch sliding with the histogram for the slider (tap a piece, hold beside a word and slide, hold a word to peek, the funnel, the cog), and **How It Works** behind the "?" by the cog
-- ✅ Back, home and forward buttons over the list and word pages for a mouse (on by default in a desktop browser; a switch in Settings)
-- ✅ Swipe sideways to step back and forward through the words you followed; Back goes straight to the results, and a swipe from there takes you down the same trail again
-- ✅ Peek: hold a word in the results to see its first meanings; let go and it's gone
-- ✅ Speed in Chromium on the full index: ready in ~0.3–0.7 s; keystroke to results ~33 ms (~35–135 ms with the CPU slowed 4× to mimic a mid-range phone)
-- ✅ Android app with the full word list inside; signed APKs on GitHub releases
-- ✅ No permissions at all: no network, storage or sensors, and nothing leaves your phone. The haptic tick uses the platform's built-in feedback, which needs none. CI checks every APK against [`privacy.toml`](privacy.toml)
+Search runs on an **FM-index**, a compressed index of all the words that *is* the word list, so finding any piece of a word is as fast as finding its start, with no server and no database. On a 370,105-word benchmark it was about 2.3× smaller than SQLite's FTS5 trigram index, and faster per query ([`bench/`](bench/README.md)).
 
-**⏳ Next**
+Definitions are packed by word id and compressed with brotli in blocks, so opening a word unpacks one small block; the app reads blocks straight from the APK as it needs them ([ADR-0004](docs/adr/0004-all-definitions-bundled.md), [ADR-0005](docs/adr/0005-layered-data-packs.md)).
 
-- Examples in a release: the builder and app are done; the next data build adds them
-- Etymology section: each origin shown with the word classes it belongs to (today only a word with one origin shows it, as a brief)
-- Testing on real phones (the phone timings above are emulated)
+| What's inside (current data) | Size |
+|---|---|
+| Word index: 1,357,380 search keys | 33 MB |
+| Meanings, labels and links | 34 MB |
+| Examples | 13 MB |
+| Origins | 8.5 MB |
+| Pronunciations | 1.1 MB |
+
+The formats are documented in [`docs/index-format.md`](docs/index-format.md) and [`docs/definitions-format.md`](docs/definitions-format.md); every design decision has a record in [`docs/adr/`](docs/adr/).
+
+## 🗺️ Roadmap
+
+Planned, not built yet:
+
 - PWA, iOS and F-Droid builds
+- Translations, French first ([ADR-0005](docs/adr/0005-layered-data-packs.md))
+- Search by letter pattern, such as a letter in a given place ([ADR-0006](docs/adr/0006-letter-and-position-bitmaps.md))
+- Pronunciations for words that don't have one yet, worked out from their parts where that's reliable ([ADR-0007](docs/adr/0007-derived-pronunciations.md))
 
-## Try it in your browser
+## 🛠️ Development
 
-The latest release runs at **[smitravitz.github.io/Dictionarius](https://smitravitz.github.io/Dictionarius/)**, the same app as the Android one. The first visit downloads the word list and definitions (about 90 MB); after that, your browser keeps them.
+Needs Node 22 or later (CI runs 22 and 24). Python is only needed to build the word index.
 
-Privacy on the web version: the page loads only its own files and sends nothing anywhere, but GitHub hosts it, so GitHub sees your visit (your IP address and browser), as any website's host does. The Android app connects to nothing at all.
+```bash
+npm install
+npm test                        # unit tests
+npm run typecheck               # strict TypeScript
+npx playwright install chromium # once, for the browser tests
+npm run test:e2e                # browser tests: desktop, phone, and everything again with the tour on
+```
 
-## Install (Android)
+Run the app on the small sample word list that the tests use, then open <http://localhost:5173/?index=headwords-sample.bin>:
 
-Add `https://github.com/smitravitz/Dictionarius` to [Obtainium](https://obtainium.imranr.dev) to install it and get updates, or download the APK from the latest [release](https://github.com/smitravitz/Dictionarius/releases/latest).
+```bash
+DICTIONARIUS_PUBLIC="$PWD/test/fixtures" npm run dev
+```
 
-## Licensing
+For the full word list, put a `data-…` release's files in a folder and point `DICTIONARIUS_PUBLIC` at it (absolute path), or build them from the Wiktionary dump. [`docs/development.md`](docs/development.md) covers that, the Android app and releasing. New here, or a coding agent? Start with [`docs/handoff.md`](docs/handoff.md); [`CONTEXT.md`](CONTEXT.md) defines the project's terms.
 
-- **Code:** GPL-3.0-or-later ([`LICENSE`](LICENSE))
-- **Dictionary data:** [Wiktionary](https://en.wiktionary.org), **CC-BY-SA 4.0** (+ GFDL). Bundled data is redistributed under the same license with attribution and modification notices — see [`data/README.md`](data/README.md).
+## 📄 License
 
-## Contributing
-
-Test-driven TypeScript: `npm install && npm test`. [`docs/development.md`](docs/development.md) covers browser tests, building the word index, the Android app and releases.
+- **Code:** [GPL-3.0-or-later](LICENSE).
+- **Dictionary data:** from [English Wiktionary](https://en.wiktionary.org) via [wiktextract](https://github.com/tatuylonen/wiktextract), redistributed under [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/) with attribution; see [`data/README.md`](data/README.md).
+- **Fonts:** [Literata](https://www.npmjs.com/package/@fontsource-variable/literata) and [Atkinson Hyperlegible Next](https://www.npmjs.com/package/@fontsource/atkinson-hyperlegible-next), both under the SIL Open Font License 1.1.

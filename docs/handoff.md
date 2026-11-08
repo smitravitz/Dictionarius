@@ -3,7 +3,7 @@
 Read this first in a new chat, then `.claude/CLAUDE.md`. Update it at the end of any
 session that changes what's below (newest state only; history lives in git).
 
-_Last updated: 2026-11-07, at v0.6.1 (the four-step tour unreleased until the next tag)._
+_Last updated: 2026-11-08, at v0.6.2 (the tour, nav buttons and filters change are released)._
 
 ## What it is
 
@@ -51,15 +51,21 @@ built from the English Wiktionary dump by `scripts/build_fm_index.py`.
 
 ## State
 
-- Latest tag **v0.6.1** (APK 73.3 MB at v0.5.0: definitions 56.8 MB, index 12.9 MB).
+- Latest release **v0.6.2** (APK 73.1 MB), on data release `data-b0d819c2` (index 32.8 MB,
+  definitions 33.8 MB, examples 13.3 MB, etymology 8.5 MB, pronunciation 1.1 MB); its release
+  run (including the tour's `@release` tests on the real list) and Pages publish passed.
 - Navigation buttons (back, home, forward) over the list and word pages, on by default in a
   desktop browser, a switch in Settings; the funnel's filters are no longer kept between starts.
 - A first-run tour (5 steps, in order: search, scrub, peek, filters, settings; each shown,
   then asked for, what to touch lit in place, the slider shown by a touch) and How It Works behind the "?" (`web/guide.ts`,
-  `web/coach.ts`, `web/tour-shows.ts`, `web/hands.ts`); unreleased until the next tag.
+  `web/coach.ts`, `web/tour-shows.ts`, `web/hands.ts`).
   Guarded by `e2e/tour.spec.ts` (including a frame-by-frame smoothness check), the Playwright
   project `first-run`, which runs every other e2e test again with the tour on, and
   release.yml, which runs the tour's `@release` tests on the real word list.
+- README (2026-11-08): screenshots of the real app in `docs/screenshots/` (light and dark,
+  taken on the released data); retake them when the look changes. The repo's About should
+  read "A free, fully offline English dictionary that finds a word from any part of it."
+  with the Pages link as its website (settings writes are blocked from agent sessions).
 - Web app on Pages: a browser shows a loading screen (book turning pages) until the index
   and all definitions are in; the Android app skips it and loads definitions after start.
 - `/dictionarius/` (lowercase) needs the owner's user-site repo `smitravitz.github.io` with
