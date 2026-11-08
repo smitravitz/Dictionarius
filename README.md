@@ -43,7 +43,7 @@ Nothing is downloaded later; the app has no network permission at all.
 - ✅ Common words only by default: phrases and names (proper nouns) are switched off in ⚙️ Settings
 - ✅ Word length filter: two roller wheels (min, max) in the filter panel under ⚙️; drag to turn ([how filters work](docs/adr/0003-filters-from-word-columns.md))
 - ✅ Definitions: tap a word for its meanings, a short example of each in use, its pronunciation and a brief origin; long pronunciations and origins fold behind *more*; words inside a definition open their own entries, as on Wiktionary ([format](docs/definitions-format.md))
-- ✅ A first-run tour of four steps, each shown on the real screen and then done for real (tap a piece, hold beside a word and drag to scrub, hold a word to peek, the funnel), and **How It Works** behind the "?" by the cog
+- ✅ A first-run tour of five steps, each shown on the real screen and then done for real, what to touch lit in place (tap a piece, hold beside a word and slide, hold a word to peek, the funnel, the cog), and **How It Works** behind the "?" by the cog
 - ✅ Swipe sideways to step back and forward through the words you followed; Back goes straight to the results, and a swipe from there takes you down the same trail again
 - ✅ Peek: hold a word in the results to see its first meanings; let go and it's gone
 - ✅ Speed in Chromium on the full index: ready in ~0.3–0.7 s; keystroke to results ~33 ms (~35–135 ms with the CPU slowed 4× to mimic a mid-range phone)

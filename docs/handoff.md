@@ -52,11 +52,12 @@ built from the English Wiktionary dump by `scripts/build_fm_index.py`.
 ## State
 
 - Latest tag **v0.6.1** (APK 73.3 MB at v0.5.0: definitions 56.8 MB, index 12.9 MB).
-- A first-run tour (4 steps, in order: search, scrub, peek, filters; each shown, then asked
-  for) and How It Works behind the "?" (`web/guide.ts`, `web/coach.ts`, `web/tour-shows.ts`);
-  unreleased until the next tag. Guarded by `e2e/tour.spec.ts` and the Playwright project
-  `first-run`, which runs every other e2e test again with the tour on; release.yml runs the
-  tour's `@release` tests on the real word list.
+- A first-run tour (5 steps, in order: search, scrub, peek, filters, settings; each shown,
+  then asked for, what to touch lit in place) and How It Works behind the "?" (`web/guide.ts`,
+  `web/coach.ts`, `web/tour-shows.ts`, `web/hands.ts`); unreleased until the next tag.
+  Guarded by `e2e/tour.spec.ts` (including a frame-by-frame smoothness check), the Playwright
+  project `first-run`, which runs every other e2e test again with the tour on, and
+  release.yml, which runs the tour's `@release` tests on the real word list.
 - Web app on Pages: a browser shows a loading screen (book turning pages) until the index
   and all definitions are in; the Android app skips it and loads definitions after start.
 - `/dictionarius/` (lowercase) needs the owner's user-site repo `smitravitz.github.io` with

@@ -151,15 +151,13 @@
         </div>
       </form>
     </dialog>
-    <!-- The first-run tour (web/coach.ts): a note saying what to do; a ghost finger and a
-         highlight acting it out (web/tour-shows.ts). Only the note's Skip takes a touch. -->
+    <!-- The first-run tour (web/coach.ts): a note saying what to do, while what to touch is
+         lit in place (web/tour-shows.ts). Only the note's Skip takes a touch. -->
     <div class="coach" id="coach" role="status" aria-live="polite" hidden>
       <p class="coach-count" id="coach-count"></p>
       <button class="coach-skip" id="coach-skip" type="button">Skip</button>
       <p class="coach-text" id="coach-text"></p>
     </div>
-    <div class="coach-finger" id="coach-finger" aria-hidden="true" hidden></div>
-    <div class="coach-glow" id="coach-glow" aria-hidden="true" hidden></div>
     <!-- The peek: a held word's first meanings (web/peek.ts). -->
     <div class="peek" id="peek" hidden aria-live="polite"></div>
     <dialog class="settings" id="filters" aria-labelledby="filters-title">

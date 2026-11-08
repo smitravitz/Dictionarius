@@ -5,24 +5,28 @@ import { CONTROLS, ShuffleBag, TOUR, Tour } from "../web/guide";
 // And How It Works, the help sheet behind the "?".
 
 describe("How It Works", () => {
-  it("lists the five controls, in the owner's words", () => {
+  it("lists every control, briefly: what to do, then what it does", () => {
     expect(CONTROLS.map((c) => [c.how, c.does])).toEqual([
-      ["Tap a piece at the bottom of the start screen", "to search for it and open its word list"],
-      ["Tap a word", "for its dictionary result page"],
-      ["Hold a word", "to peek at what it means"],
-      ["Press & Hold beside a word to see the frequency graph", "then drag Left or Right to move where the piece goes"],
-      ["Back", "returns to the word list, where you left it"],
+      ["Tap a piece", "See every word with it inside"],
+      ["Tap a word", "Open its full entry"],
+      ["Hold a word", "Peek at its meaning"],
+      ["Hold beside a word, then slide", "Choose how many letters come before the piece"],
+      ["Tap the funnel", "Filter words by length"],
+      ["Tap the cog", "Choose what the list shows, like safe search"],
+      ["Back", "Return to your list, right where you left it"],
     ]);
+    for (const c of CONTROLS) expect(`${c.how} ${c.does}`.split(" ").length).toBeLessThanOrEqual(14); // less words
   });
 });
 
 describe("the tour", () => {
-  it("asks for four things, in this order, in these words", () => {
+  it("asks for five things, in this order, in these words", () => {
     expect(TOUR.map((s) => [s.event, s.screen, `${s.how} ${s.does}`])).toEqual([
       ["searched", "start", "Tap a piece below to search for it and open every word with it inside:"],
-      ["scrubbed", "results", "Press & Hold beside a word, then drag Left or Right to move where the piece goes:"],
+      ["scrubbed", "results", "Hold beside a word, then slide to choose how many letters come before the piece:"],
       ["peeked", "results", "Press & Hold a word to peek at what it means:"],
-      ["filtered", "results", "Tap the funnel to choose how long the words can be:"],
+      ["filtered", "results", "Tap the funnel to filter words by length:"],
+      ["set", "results", "Tap the cog to choose what the list shows, like safe search:"],
     ]);
   });
 
@@ -45,8 +49,11 @@ describe("the tour", () => {
     expect(tour.done("scrubbed")).toBe(true);
     expect(tour.done("peeked")).toBe(true);
     expect(tour.number).toBe(4);
-    expect(tour.finished).toBe(false);
+    expect(tour.done("set")).toBe(false); // the cog before the funnel: not yet
     expect(tour.done("filtered")).toBe(true);
+    expect(tour.number).toBe(5);
+    expect(tour.finished).toBe(false);
+    expect(tour.done("set")).toBe(true);
     expect(tour.finished).toBe(true);
     expect(tour.current).toBeNull();
     expect(tour.stored()).toBe("done");

@@ -1,5 +1,5 @@
 // How Dictionarius is used, in words: the help sheet (How It Works, the "?" by the cog)
-// lists the controls; the first-run tour asks for four things, one at a time, in order.
+// lists the controls; the first-run tour asks for five things, one at a time, in order.
 // No DOM here: web/coach.ts draws the tour, web/tour-shows.ts acts each step out, and
 // main.ts tells it what the person did.
 
@@ -11,15 +11,17 @@ export interface Control {
 
 /** How It Works: the help sheet's list. */
 export const CONTROLS: readonly Control[] = [
-  { how: "Tap a piece at the bottom of the start screen", does: "to search for it and open its word list" },
-  { how: "Tap a word", does: "for its dictionary result page" },
-  { how: "Hold a word", does: "to peek at what it means" },
-  { how: "Press & Hold beside a word to see the frequency graph", does: "then drag Left or Right to move where the piece goes" },
-  { how: "Back", does: "returns to the word list, where you left it" },
+  { how: "Tap a piece", does: "See every word with it inside" },
+  { how: "Tap a word", does: "Open its full entry" },
+  { how: "Hold a word", does: "Peek at its meaning" },
+  { how: "Hold beside a word, then slide", does: "Choose how many letters come before the piece" },
+  { how: "Tap the funnel", does: "Filter words by length" },
+  { how: "Tap the cog", does: "Choose what the list shows, like safe search" },
+  { how: "Back", does: "Return to your list, right where you left it" },
 ];
 
 /** What the person did that a step asks for (main.ts reports these). */
-export type TourEvent = "searched" | "scrubbed" | "peeked" | "filtered";
+export type TourEvent = "searched" | "scrubbed" | "peeked" | "filtered" | "set";
 
 export interface TourStep {
   event: TourEvent;
@@ -33,9 +35,10 @@ export interface TourStep {
 /** The first-run tour: each step shown, then asked for; the next only once it's done. */
 export const TOUR: readonly TourStep[] = [
   { event: "searched", screen: "start", how: "Tap a piece below", does: "to search for it and open every word with it inside:" },
-  { event: "scrubbed", screen: "results", how: "Press & Hold beside a word,", does: "then drag Left or Right to move where the piece goes:" },
+  { event: "scrubbed", screen: "results", how: "Hold beside a word, then slide", does: "to choose how many letters come before the piece:" },
   { event: "peeked", screen: "results", how: "Press & Hold a word", does: "to peek at what it means:" },
-  { event: "filtered", screen: "results", how: "Tap the funnel", does: "to choose how long the words can be:" },
+  { event: "filtered", screen: "results", how: "Tap the funnel", does: "to filter words by length:" },
+  { event: "set", screen: "results", how: "Tap the cog", does: "to choose what the list shows, like safe search:" },
 ];
 
 /** Where the tour is: which step it asks for. Remembered on the device as `stored()`
@@ -58,7 +61,7 @@ export class Tour {
     return this.over ? null : (TOUR[this.step] ?? null);
   }
 
-  /** Which step this is: "2 of 4". */
+  /** Which step this is: "2 of 5". */
   get number(): number {
     return this.step + 1;
   }

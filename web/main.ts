@@ -28,6 +28,7 @@ import { setUpLoader } from "./loader";
 import { CONTROLS, Tour } from "./guide";
 import { Coach, type Screen } from "./coach";
 import { tourShows } from "./tour-shows";
+import { Hands } from "./hands";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const input = $<HTMLInputElement>("q");
@@ -70,8 +71,6 @@ const slider = new OffsetSlider(frame, {
 
 // In the Android app, the phone's edge swipe mustn't take a thumb holding the slider's ends.
 guardEdges(frame);
-let slid = false; // the finger holding the slider has dragged it
-
 
 // Taps, holds and drags on the list (scroller-gestures.ts): a tap opens a word,
 // unless it's a finger putting the keyboard away; a hold on a blank spot opens
@@ -79,18 +78,12 @@ let slid = false; // the finger holding the slider has dragged it
 new ScrollerGestures(scroller, {
   typing: () => document.activeElement === input,
   dismissKeyboard: () => input.blur(),
-  holdStart: (x) => {
-    slid = false;
-    return slider.open(x);
-  },
+  holdStart: (x) => slider.open(x),
   holdMove: (x) => {
-    slid = true;
     slider.slideTo(x);
+    coach.did("scrubbed"); // held and slid: the tour's second step (the next waits for the finger to lift)
   },
-  holdEnd: () => {
-    slider.close();
-    if (slid) coach.did("scrubbed"); // held and dragged: the tour's second step
-  },
+  holdEnd: () => slider.close(),
   peek: (target) => peekAt(target),
   unpeek: () => {
     peekSeq++; // an answer still on its way is for a peek that's over
@@ -694,15 +687,18 @@ for (const c of CONTROLS) {
 $("help-open").addEventListener("click", () => help.showModal());
 
 const TOUR_KEY = "dictionarius.tour";
+const hands = new Hands();
 const coach = new Coach(
   new Tour(read(TOUR_KEY)),
   { card: $("coach"), count: $("coach-count"), text: $("coach-text"), skip: $<HTMLButtonElement>("coach-skip") },
   tourShows({
-    ring: $("coach-finger"),
-    glow: $("coach-glow"),
+    hands,
     pieces: examples,
     scroller,
     funnel: $("filters-open"),
+    filters: $<HTMLDialogElement>("filters"),
+    cog: $("settings-open"),
+    settings,
     slider,
     holdPlace: () => {
       const top = scroller.scrollTop;
@@ -713,13 +709,18 @@ const coach = new Coach(
     },
   }),
   (value) => (value === null ? forget(TOUR_KEY) : write(TOUR_KEY, value)),
+  hands,
 );
+// Show me again: the tour from the top, on the start screen where it begins.
 $("help-tour").addEventListener("click", () => {
   help.close();
+  input.value = "";
+  search("");
   coach.restart();
 });
-// The funnel opened the filters, and they're closed again: back on the list, the last step done.
+// A sheet opened from the funnel or the cog, and closed again: back on the list, its step done.
 $("filters").addEventListener("close", () => coach.did("filtered"));
+settings.addEventListener("close", () => coach.did("set"));
 
 const screenNow = (): Screen => (!intro.hidden ? "start" : !frame.hidden ? "results" : "elsewhere");
 const watchScreens = () => {
