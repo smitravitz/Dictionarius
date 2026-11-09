@@ -38,6 +38,11 @@ docker build -t "$image_name" "$script_folder"
 mkdir -p "$results_folder"
 docker_options=(--rm --device /dev/kvm -v "$results_folder:/results")
 docker_options+=(-e "RAM_SIZES=$ram_sizes" -e "CORES=$core_count" -e "APK_TAG=$release_tag")
+# What it's running on, for the summary: the CPU, its threads, the memory, Docker's version.
+host_cpu="$(sed -n -E 's/^model name\s*:\s*(.*)/\1/p' /proc/cpuinfo | sed -n 1p)"
+host_ram_mb="$(( $(sed -n -E 's/^MemTotal: *([0-9]+).*/\1/p' /proc/meminfo) / 1024 ))"
+docker_options+=(-e "HOST_CPU=$host_cpu" -e "HOST_CORES=$(nproc)" -e "HOST_RAM_MB=$host_ram_mb")
+docker_options+=(-e "DOCKER_VERSION=$(docker version --format '{{.Server.Version}}')")
 if [[ -n "$own_apk" ]]; then
   # Your own APK, readable inside the container at /app.apk.
   apk_path="$(cd "$(dirname "$own_apk")" && pwd)/$(basename "$own_apk")"

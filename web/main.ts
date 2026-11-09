@@ -29,6 +29,7 @@ import { CONTROLS, Tour } from "./guide";
 import { Coach, type Screen } from "./coach";
 import { tourShows } from "./tour-shows";
 import { Hands } from "./hands";
+import { placeToKeep, placeToRestore, type Place } from "./place";
 import { Capacitor } from "@capacitor/core";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -235,6 +236,7 @@ worker.onmessage = ({ data }: MessageEvent<FromWorker>) => {
       }
       counts = mergeCounts(counts, data.counts);
       list.receive(data.from, data.items, data.known, data.complete);
+      restorePlace(data.complete);
       if (data.seek && data.seek.offset === seeking) {
         list.scrollToRow(data.seek.row);
         seeking = -1;
@@ -250,6 +252,7 @@ worker.onmessage = ({ data }: MessageEvent<FromWorker>) => {
       if (data.query !== query || data.counts.filters !== filterKey(filters)) return;
       counts = data.counts;
       list.grow(sum(counts.byOffset), counts.total !== null);
+      restorePlace(counts.total !== null);
       describe();
       break;
   }
@@ -400,6 +403,7 @@ input.addEventListener("keydown", (event) => {
 // Where Back returns to from an open word: the search text, its summary and scroll position.
 let returnTo: { text: string; summary: string; scrollTop: number } | null = null;
 let entrySeq = 0; // the entry on screen; older answers are dropped
+let wordOnScreen: string | null = null; // its key, while a word's page is up (kept with the place)
 
 // The words followed since leaving the results (src/trail.ts). One history
 // step stands for all of them, so Back (browser or Android) goes straight to
@@ -463,6 +467,7 @@ const SLOW_MS = 300;
  *  nothing appears and then moves (top to bottom, in reading order). It
  *  turns in from the side it came from: forward from the right, back from the left. */
 function drawEntry(s: Suggestion, from: SwipeDirection) {
+  wordOnScreen = s.key;
   const seq = ++entrySeq;
   const slow = setTimeout(() => seq === entrySeq && paintEntry(seq, s, "loading", from), SLOW_MS);
   void definitionsOf(s.id).then((definitions) => {
@@ -775,3 +780,49 @@ const watchScreens = () => {
 };
 new MutationObserver(watchScreens).observe(document.getElementById("app")!, { attributes: true, attributeFilter: ["hidden"], subtree: true });
 watchScreens(); // the start screen's first frame has the tour's note in place, if it's showing
+
+// Where the person was (web/place.ts), in the app: kept as it goes to the background, and
+// restored on the next start, so that when Android kills it there (cheap phones do, often)
+// it comes back to the same search, scroll and word. A web page that's reloaded starts fresh.
+const PLACE_KEY = "dictionarius.place";
+let placeToFinish: Place | null = null; // restored search: its scroll and word still to come
+function keepPlace() {
+  const onWord = !entry.hidden;
+  const kept = placeToKeep(
+    {
+      query: onWord ? (returnTo?.text ?? "") : input.value,
+      scrollTop: onWord ? (returnTo?.scrollTop ?? 0) : scroller.scrollTop,
+      word: onWord ? wordOnScreen : null,
+    },
+    Date.now(),
+  );
+  if (kept === null) forget(PLACE_KEY);
+  else write(PLACE_KEY, kept);
+}
+/** The restored search's rows are in: scroll back once the list is long enough (or
+ *  complete), then open the word that was open. */
+function restorePlace(complete: boolean) {
+  const place = placeToFinish;
+  if (!place || frame.hidden) return;
+  const room = scroller.scrollHeight - scroller.clientHeight;
+  if (room < place.scrollTop && !complete) return; // not that far down yet: wait for more rows
+  placeToFinish = null;
+  scroller.scrollTop = place.scrollTop;
+  if (place.word) void wordNamed(place.word).then((s) => s && showEntry(s));
+}
+if (Capacitor.isNativePlatform()) {
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden") keepPlace();
+  });
+  window.addEventListener("pagehide", keepPlace);
+  const place = placeToRestore(read(PLACE_KEY), Date.now());
+  forget(PLACE_KEY); // once: a later start is fresh unless it's kept again
+  if (place) {
+    // History kept from before (a WebView can restore it) would make Back land on the
+    // word's old step: this start is the list's own step again.
+    if (history.state !== null) history.replaceState(null, "");
+    placeToFinish = place;
+    input.value = place.query;
+    search(place.query);
+  }
+}

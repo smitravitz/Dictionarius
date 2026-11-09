@@ -3,7 +3,7 @@
 Read this first in a new chat, then `.claude/CLAUDE.md`. Update it at the end of any
 session that changes what's below (newest state only; history lives in git).
 
-_Last updated: 2026-11-08, at v0.6.2 (the tour, nav buttons and filters change are released)._
+_Last updated: 2026-11-09, at v0.6.3; place restore and the low-RAM test diagnostics on main, unreleased._
 
 ## What it is
 
@@ -51,7 +51,7 @@ built from the English Wiktionary dump by `scripts/build_fm_index.py`.
 
 ## State
 
-- Latest release **v0.6.2** (APK 73.1 MB), on data release `data-b0d819c2` (index 32.8 MB,
+- Latest release **v0.6.3** (v0.6.2: APK 73.1 MB), on data release `data-b0d819c2` (index 32.8 MB,
   definitions 33.8 MB, examples 13.3 MB, etymology 8.5 MB, pronunciation 1.1 MB); its release
   run (including the tour's `@release` tests on the real list) and Pages publish passed.
 - Navigation buttons (back, home, forward) over the list and word pages, on by default in a
@@ -62,6 +62,11 @@ built from the English Wiktionary dump by `scripts/build_fm_index.py`.
   Guarded by `e2e/tour.spec.ts` (including a frame-by-frame smoothness check), the Playwright
   project `first-run`, which runs every other e2e test again with the tour on, and
   release.yml, which runs the tour's `@release` tests on the real word list.
+- Coming back after Android kills the app (cheap phones do, in the background): the app
+  keeps the search, scroll and open word as it goes to the background and restores them on
+  the next start within 30 minutes (`web/place.ts`, `e2e/place.spec.ts`; the app only, a
+  web page reload starts fresh). Not released yet: the low-RAM test (`tools/low-ram/`) on
+  v0.6.3 showed it lost; rerun it on the next release (or `APK=` a debug build) to confirm.
 - README (2026-11-08): screenshots of the real app in `docs/screenshots/` (light and dark,
   taken on the released data); retake them when the look changes. The repo's About should
   read "A free, fully offline English dictionary that finds a word from any part of it."

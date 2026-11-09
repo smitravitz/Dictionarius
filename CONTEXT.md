@@ -90,6 +90,9 @@ decision or module makes it load-bearing.
   through the words followed, as a swipe does; back from the list goes home. The slider's
   histogram covers them while it's open. On by default in a desktop browser, off on a phone
   and in the app; a switch in Settings, kept (`dictionarius.nav`).
+- **Place** — where the person was in the app: the search, how far down, the word open
+  (`web/place.ts`). Kept as the app goes to the background and restored on the next start
+  within 30 minutes, so Android killing it for memory doesn't lose it. The app only.
 - **Definitions file** — every word's definitions, beside the index, read by
   word id (`src/definitions.ts`, `docs/definitions-format.md`; ADR-0004), as a
   **core** (`headwords.definitions.bin`) and a **layer** file each for
