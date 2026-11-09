@@ -43,6 +43,25 @@ npm run build && npx cap sync android   # copy the web app and dist/headwords.bi
 npx cap open android                    # or: cd android && ./gradlew assembleDebug
 ```
 
+### On a low-memory phone (Docker)
+
+`tools/low-ram/` tests a release on an emulated cheap phone, 2 GB then 1.5 GB of memory
+and 2 cores, inside Docker. Needs Docker, an x86_64 machine and KVM (`/dev/kvm`, on when
+virtualisation is enabled in the BIOS); nothing else is installed on your machine.
+
+```bash
+bash tools/low-ram/run.sh                       # the newest release
+APK_TAG=v0.6.3 RAM_SIZES="1024" bash tools/low-ram/run.sh   # a given release, a given size
+APK=path/to/app.apk bash tools/low-ram/run.sh   # an APK of your own
+```
+
+The first run builds the image (about 2 GB downloaded). Each size gets a fresh phone; the
+app gets a cold start, a search, a filmed scroll, a word opened, memory pressure, a kill in
+the background and "Don't keep activities". `low-ram-results/summary.txt` has the numbers
+(start time, memory of the app and of the WebView's renderer, whether it kept its place);
+screenshots, the scroll video and logs are beside it. Timings run on your PC's CPU with
+software graphics, so they flatter or understate a real phone; memory is the figure to trust.
+
 ## Releasing
 
 Once, on your own computer: `bash scripts/setup-release.sh path/to/headwords.bin`. It creates the signing key, stores it in GitHub's Actions secrets and uploads the word index. After that, pushing a tag such as `v0.2.0` builds a signed APK and publishes it as a release ([`release.yml`](../.github/workflows/release.yml)), then publishes that version's web app to GitHub Pages ([`pages.yml`](../.github/workflows/pages.yml); only the latest release is online; once, set Settings → Pages → Source to **GitHub Actions**). To republish without a new release, run Actions → Pages → Run workflow (the latest release by default, or name a tag). The build names its files relative to the page (`base: "./"` in `vite.config.ts`), so it works from Pages' `/Dictionarius/` folder as well as inside the app. The release notes are the tag's message, so make it an annotated tag: `git tag -a v0.2.0 -m "What's new"` (several `-m` make several paragraphs; `-F notes.md` reads a file).
