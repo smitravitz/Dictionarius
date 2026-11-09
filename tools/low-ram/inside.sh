@@ -145,6 +145,8 @@ for ram in $ram_sizes; do
   done
   adb shell input keyevent KEYCODE_WAKEUP
   adb shell wm dismiss-keyguard
+  adb root > /dev/null   # Google APIs images allow root: needed to kill the app as Android would
+  adb wait-for-device
   adb install -r /tmp/app.apk > /dev/null
   adb logcat -c   # from here on, the log is the app's run only
 
@@ -155,7 +157,7 @@ for ram in $ram_sizes; do
   ready_after="not seen in 90 s"
   started=$SECONDS
   while (( SECONDS - started < 90 )); do
-    if grep -qE 'text="[0-9,]+ words"' "$(screen_text)"; then
+    if grep -qE '[0-9],[0-9]{3} words' "$(screen_text)"; then   # the word count, wherever it sits
       ready_after="$(( SECONDS - started )) s (±2)"
       break
     fi
@@ -193,11 +195,18 @@ for ram in $ram_sizes; do
   alive_after_pressure="$(app_alive)"
   screenshot "5-after-pressure"
 
-  # Test 4: killed in the background (as Android does when memory runs short), reopened.
+  # Test 4: killed in the background (as Android's low-memory killer does: kill -9, no
+  # warning), reopened. Search typed afresh first, so there's a place to keep.
   echo "  killed in the background"
+  if ! search_for "eren"; then
+    search_ok=no
+  fi
   adb shell input keyevent KEYCODE_HOME
   sleep 2
-  adb shell am kill "$app"
+  app_pid="$(adb shell pidof "$app" | tr -d '\r')"
+  if [[ -n "$app_pid" ]]; then
+    adb shell kill -9 "$app_pid"
+  fi
   sleep 2
   killed="no"
   if [[ "$(app_alive)" == "no" ]]; then
@@ -211,6 +220,9 @@ for ram in $ram_sizes; do
   # Test 5: "Don't keep activities": Android throws the screen away whenever you leave it.
   echo "  don't keep activities"
   adb shell settings put global always_finish_activities 1
+  adb shell am force-stop "$app"   # the setting holds for activities started after it
+  open_app > /dev/null
+  sleep 8
   if ! search_for "eren"; then
     search_ok=no
   fi
