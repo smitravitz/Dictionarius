@@ -2,7 +2,7 @@
 
 A free, fully offline English dictionary that finds a word from any part of it.
 
-[![CI](https://github.com/smitravitz/Dictionarius/actions/workflows/ci.yml/badge.svg)](https://github.com/smitravitz/Dictionarius/actions/workflows/ci.yml)
+[![CI](https://img.shields.io/github/actions/workflow/status/smitravitz/Dictionarius/ci.yml?branch=main&label=CI)](https://github.com/smitravitz/Dictionarius/actions/workflows/ci.yml)
 [![Latest release](https://img.shields.io/github/v/release/smitravitz/Dictionarius?sort=semver&display_name=tag)](https://github.com/smitravitz/Dictionarius/releases/latest)
 [![License: GPL-3.0-or-later](https://img.shields.io/badge/license-GPL--3.0--or--later-blue)](LICENSE)
 
@@ -33,7 +33,7 @@ Type `eren` and get *serene*, *coherent*, *adherence*: every word with your lett
 
 ### Android
 
-Add `https://github.com/smitravitz/Dictionarius` to [Obtainium](https://obtainium.imranr.dev) to install and get updates, or download the APK (about 73 MB) from the [latest release](https://github.com/smitravitz/Dictionarius/releases/latest). Everything is inside it: nothing is downloaded later.
+Needs Android 7.0 or later. Add `https://github.com/smitravitz/Dictionarius` to [Obtainium](https://obtainium.imranr.dev) to install and get updates, or download the APK (about 73 MB) from the [latest release](https://github.com/smitravitz/Dictionarius/releases/latest). Everything is inside it: nothing is downloaded later.
 
 ## ⚙️ How it works
 
@@ -51,9 +51,9 @@ Definitions are packed by word id and compressed with brotli in blocks, so openi
 
 The formats are documented in [`docs/index-format.md`](docs/index-format.md) and [`docs/definitions-format.md`](docs/definitions-format.md); every design decision has a record in [`docs/adr/`](docs/adr/).
 
-## 🗺️ Roadmap
+## 🗺️ Status and roadmap
 
-Planned, not built yet:
+Actively developed: Android and web releases ship from this repository ([releases](https://github.com/smitravitz/Dictionarius/releases)). Planned, not built yet:
 
 - PWA, iOS and F-Droid builds
 - Translations, French first ([ADR-0005](docs/adr/0005-layered-data-packs.md))
@@ -78,10 +78,19 @@ Run the app on the small sample word list that the tests use, then open <http://
 DICTIONARIUS_PUBLIC="$PWD/test/fixtures" npm run dev
 ```
 
-For the full word list, put a `data-…` release's files in a folder and point `DICTIONARIUS_PUBLIC` at it (absolute path), or build them from the Wiktionary dump. [`docs/development.md`](docs/development.md) covers that, the Android app and releasing. New here, or a coding agent? Start with [`docs/handoff.md`](docs/handoff.md); [`CONTEXT.md`](CONTEXT.md) defines the project's terms.
+For the full word list, download a data release (the newest `data-…` one on the [releases page](https://github.com/smitravitz/Dictionarius/releases); `data-b0d819c2` goes with v0.6.2), then open <http://localhost:5173/>:
+
+```bash
+gh release download data-b0d819c2 -R smitravitz/Dictionarius -D release-data
+DICTIONARIUS_PUBLIC="$PWD/release-data" npm run dev
+```
+
+`DICTIONARIUS_PUBLIC` must be an absolute path. [`docs/development.md`](docs/development.md) covers building the data from the Wiktionary dump, the Android app and releasing. New here? Start with [`docs/handoff.md`](docs/handoff.md); [`CONTEXT.md`](CONTEXT.md) defines the project's terms.
 
 ## 📄 License
 
 - **Code:** [GPL-3.0-or-later](LICENSE).
 - **Dictionary data:** from [English Wiktionary](https://en.wiktionary.org) via [wiktextract](https://github.com/tatuylonen/wiktextract), redistributed under [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/) with attribution; see [`data/README.md`](data/README.md).
 - **Fonts:** [Literata](https://www.npmjs.com/package/@fontsource-variable/literata) and [Atkinson Hyperlegible Next](https://www.npmjs.com/package/@fontsource/atkinson-hyperlegible-next), both under the SIL Open Font License 1.1.
+
+Coding agents: project instructions are in [`.claude/CLAUDE.md`](.claude/CLAUDE.md).
