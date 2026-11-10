@@ -1,8 +1,12 @@
 import { describe, it, expect } from "vitest";
-import { mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { gunzipSync } from "node:zlib";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { build } from "vite";
+import { HeadwordIndex } from "../src/headword-index";
+import { readStarter } from "../src/starter";
 
 // The web build is published to GitHub Pages under /Dictionarius/, not at a
 // site's root, and packed into the Android app: every file it names must be
@@ -26,4 +30,55 @@ describe("the production web build", () => {
       rmSync(out, { recursive: true, force: true });
     }
   }, 60_000);
+});
+
+// A browser shows the app from a small starter file while the word list comes, gzipped,
+// in the background (src/starter.ts). Only the web build has them: the Android app reads
+// its word list from the phone and would only carry them as dead weight.
+describe("the web build's data", () => {
+  const fixtures = resolve("test/fixtures");
+  const built = async (web: boolean) => {
+    const out = mkdtempSync(join(tmpdir(), "dictionarius-build-"));
+    const before = process.env.DICTIONARIUS_WEB;
+    if (web) process.env.DICTIONARIUS_WEB = "1";
+    else delete process.env.DICTIONARIUS_WEB;
+    try {
+      await build({ logLevel: "silent", publicDir: fixtures, build: { outDir: out, emptyOutDir: true } });
+    } finally {
+      if (before === undefined) delete process.env.DICTIONARIUS_WEB;
+      else process.env.DICTIONARIUS_WEB = before;
+    }
+    return out;
+  };
+  const sha = (path: string) => createHash("sha256").update(readFileSync(path)).digest("hex");
+
+  it("has each word list's starter and a gzipped copy, named by hash", async () => {
+    const out = await built(true);
+    try {
+      const bin = join(out, "headwords-sample.bin");
+      expect(gunzipSync(readFileSync(`${bin}.gz`)).equals(readFileSync(bin))).toBe(true);
+      const starter = readStarter(JSON.parse(readFileSync(join(out, "headwords-sample.starter.json"), "utf8")));
+      expect(starter).not.toBeNull();
+      expect(starter!.words).toBe(HeadwordIndex.fromBytes(new Uint8Array(readFileSync(bin))).size);
+      expect(Object.keys(starter!.pieces).length).toBeGreaterThan(20);
+      const named = ["headwords-sample.bin", "headwords-sample.bin.gz", "headwords-sample.definitions.bin", "headwords-sample.examples.bin"];
+      for (const name of named) {
+        expect(starter!.files[name], name).toEqual({ sha256: sha(join(out, name)), bytes: statSync(join(out, name)).size });
+      }
+      expect(Object.keys(starter!.files).some((name) => name.endsWith(".json"))).toBe(false); // data files only
+    } finally {
+      rmSync(out, { recursive: true, force: true });
+    }
+  }, 120_000);
+
+  it("leaves them out of the app's build", async () => {
+    const out = await built(false);
+    try {
+      expect(existsSync(join(out, "headwords-sample.bin"))).toBe(true);
+      expect(existsSync(join(out, "headwords-sample.bin.gz"))).toBe(false);
+      expect(existsSync(join(out, "headwords-sample.starter.json"))).toBe(false);
+    } finally {
+      rmSync(out, { recursive: true, force: true });
+    }
+  }, 120_000);
 });

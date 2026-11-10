@@ -11,7 +11,6 @@
  * checks that both read the same definitions.
  */
 import decompress from "brotli/decompress.js";
-import type { HeadwordIndex } from "./headword-index";
 
 /** What a word's page shows beyond its meanings, each in a file of its own beside
  *  the core (headwords.examples.bin, …). The builder writes the same list (LAYERS
@@ -69,6 +68,15 @@ const utf8 = new TextDecoder("utf-8", { fatal: true });
 /** Unpacked blocks kept per file, most recent first: a peek and its entry page (ADR-0005's
  *  gate: a file in memory is its header and two blocks, never the whole of it). */
 const CACHED_BLOCKS = 2;
+
+/** What the definitions need of their word list: how many words, the hash of their keys
+ *  (which ties the files to it), and a word's key. The index has all of it; before it's
+ *  in, a browser's starter (src/starter.ts) has the first two and its own words' keys. */
+export interface WordKeys {
+  readonly size: number;
+  keysHash(): Uint8Array | null;
+  key(id: number): string;
+}
 
 /** Where a file's bytes come from, a range at a time: Range requests, so a file is
  *  never all in memory (rangeSource), or bytes already in memory. (A Blob's slices
@@ -158,7 +166,7 @@ export class LayerFile {
 
   /** Open a layer file for `index`, reading only its header, tables and block offsets.
    *  Throws if it isn't one, or belongs to another word list. */
-  static async open(source: ByteSource, index: HeadwordIndex): Promise<LayerFile> {
+  static async open(source: ByteSource, index: WordKeys): Promise<LayerFile> {
     if (source.size < HEADER_SIZE) throw new Error("not a definitions file");
     const header = await source.read(0, HEADER_SIZE);
     const head = parseHeader(header, source.size, index);
@@ -166,7 +174,7 @@ export class LayerFile {
   }
 
   /** open() for bytes already in memory (tests, tools). */
-  static fromBytes(bytes: Uint8Array, index: HeadwordIndex): LayerFile {
+  static fromBytes(bytes: Uint8Array, index: WordKeys): LayerFile {
     const head = parseHeader(bytes.subarray(0, HEADER_SIZE), bytes.byteLength, index);
     return LayerFile.fromHead(bytesSource(bytes), head, bytes.subarray(HEADER_SIZE, head.tableEnd));
   }
@@ -215,7 +223,7 @@ interface Header {
 }
 
 /** A file's first 64 bytes, checked against its size and the index it's for. */
-function parseHeader(header: Uint8Array, size: number, index: HeadwordIndex): Header {
+function parseHeader(header: Uint8Array, size: number, index: WordKeys): Header {
   if (header.byteLength < HEADER_SIZE || ascii(header, 0, 8) !== MAGIC) {
     throw new Error("not a definitions file");
   }
@@ -242,7 +250,7 @@ export type Lines = { core: string } & Partial<Record<Layer, string>>;
 
 export class DefinitionsFile {
   private constructor(
-    private readonly index: HeadwordIndex,
+    private readonly index: WordKeys,
     private readonly core: LayerFile,
     private readonly layers: Partial<Record<Layer, LayerFile>>,
   ) {}
@@ -250,7 +258,7 @@ export class DefinitionsFile {
   /** Open the definitions for `index`: the core, and whichever layers there are, each
    *  read through its source a block at a time. Throws if one isn't a definitions file,
    *  belongs to another word list, or is given as a kind it isn't. */
-  static async open(core: ByteSource, index: HeadwordIndex, layers: Partial<Record<Layer, ByteSource>> = {}): Promise<DefinitionsFile> {
+  static async open(core: ByteSource, index: WordKeys, layers: Partial<Record<Layer, ByteSource>> = {}): Promise<DefinitionsFile> {
     const coreFile = await LayerFile.open(core, index);
     const opened: Partial<Record<Layer, LayerFile>> = {};
     for (const kind of LAYERS) {
@@ -261,7 +269,7 @@ export class DefinitionsFile {
   }
 
   /** open() for bytes already in memory (tests, tools). */
-  static fromBytes(core: Uint8Array, index: HeadwordIndex, layers: Partial<Record<Layer, Uint8Array>> = {}): DefinitionsFile {
+  static fromBytes(core: Uint8Array, index: WordKeys, layers: Partial<Record<Layer, Uint8Array>> = {}): DefinitionsFile {
     const opened: Partial<Record<Layer, LayerFile>> = {};
     for (const kind of LAYERS) {
       const bytes = layers[kind];
@@ -270,7 +278,7 @@ export class DefinitionsFile {
     return DefinitionsFile.checked(index, LayerFile.fromBytes(core, index), opened);
   }
 
-  private static checked(index: HeadwordIndex, core: LayerFile, layers: Partial<Record<Layer, LayerFile>>): DefinitionsFile {
+  private static checked(index: WordKeys, core: LayerFile, layers: Partial<Record<Layer, LayerFile>>): DefinitionsFile {
     expectKind(core, "core");
     for (const kind of LAYERS) {
       const file = layers[kind];

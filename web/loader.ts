@@ -1,7 +1,7 @@
-// The loading screen a browser shows until the word list and every definition are in,
-// so once the app appears it is all there: no "loading" anywhere inside it. The Android
-// app reads its files from the phone itself in a moment, so it never shows this screen
-// and keeps its own order (the start screen first, the definitions a little later).
+// The loading screen a browser shows until the app can work: its starter (src/starter.ts),
+// a small file, or the word list where there's no starter. The word list and definitions
+// come behind it (ADR-0008). The Android app reads its files from the phone itself in a
+// moment, so it never shows this screen.
 import { Capacitor } from "@capacitor/core";
 
 /** The dots after "Loading Dictionarius", one to three and back. */

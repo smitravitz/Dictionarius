@@ -90,6 +90,14 @@ decision or module makes it load-bearing.
   through the words followed, as a swipe does; back from the list goes home. The slider's
   histogram covers them while it's open. On by default in a desktop browser, off on a phone
   and in the app; a switch in Settings, kept (`dictionarius.nav`).
+- **Starter** — a small file beside a word list (`<list>.starter.json`, `src/starter.ts`)
+  that a browser shows the app from before the word list is in: the word count, the filters,
+  and each suggestion's counts and rows around 3 landing spots, worked out at build time by the
+  app's own search code (`tools/web-data.ts`). Its answers are the word list's own (ADR-0008).
+- **Kept on the device** — a browser's copy of the data files (Cache Storage,
+  `web/data-cache.ts`), filled in the background by the data worker once the word list is in,
+  by version (`?v=` the file's hash), so later visits download nothing and work offline. The
+  page itself is kept by the service worker (`web/sw.js`). Web only.
 - **Place** — where the person was in the app: the search, how far down, the word open
   (`web/place.ts`). Kept as the app goes to the background and restored on the next start
   within 30 minutes, so Android killing it for memory doesn't lose it. The app only.

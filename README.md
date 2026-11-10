@@ -29,7 +29,7 @@ Type `eren` and get *serene*, *coherent*, *adherence*: every word with your lett
 
 ### Web
 
-**[smitravitz.github.io/Dictionarius](https://smitravitz.github.io/Dictionarius/)** runs the latest release. The first visit downloads the word list and definitions (about 89 MB) once; after that your browser keeps them. The page loads only its own files and sends nothing anywhere, though GitHub, which hosts it, sees your visit as any host does.
+**[smitravitz.github.io/Dictionarius](https://smitravitz.github.io/Dictionarius/)** runs the latest release. It opens in moments: the start screen and its suggestions come from a small starter file while the word list (14 MB, compressed) loads behind it, and word pages load one at a time as you open them. In the background it then saves everything on your device, about 70 MB, so later visits download nothing and work offline (Settings shows when that's done). The page loads only its own files and sends nothing anywhere, though GitHub, which hosts it, sees your visit as any host does.
 
 ### Android
 

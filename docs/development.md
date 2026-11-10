@@ -43,6 +43,14 @@ npm run build && npx cap sync android   # copy the web app and dist/headwords.bi
 npx cap open android                    # or: cd android && ./gradlew assembleDebug
 ```
 
+### The web app as published
+
+`npm run test:e2e:built` builds the web app as `pages.yml` does (`DICTIONARIUS_WEB=1`: each
+word list's starter and gzipped copy, and the service worker) and tests it served as Pages
+serves it: that it opens from the starter, and works offline after one visit (ADR-0008). CI
+runs it after the main browser tests. A plain `npm run build` (the Android app's) leaves
+these out.
+
 ### On a low-memory phone (Docker)
 
 `tools/low-ram/` tests a release on an emulated cheap phone, 2 GB then 1.5 GB of memory

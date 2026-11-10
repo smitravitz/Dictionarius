@@ -103,6 +103,37 @@ export class Completer {
   }
 }
 
+/** How many words a search matches, as far as it has counted (what the page shows). */
+export interface Counts {
+  /** words starting with the query */
+  starts: number;
+  /** words ending with it; with filters, null until every position has been counted */
+  ends: number | null;
+  /** times it occurs inside headwords (an upper bound on the total) */
+  occurrences: number;
+  /** byOffset[n] = words with n letters before their first match, so far */
+  byOffset: number[];
+  /** words containing it; null until every position has been counted */
+  total: number | null;
+  /** filterKey() of the filters it was counted with */
+  filters: string;
+  /** filters left words out */
+  filtered: boolean;
+}
+
+/** A search's counts so far, under the filters named by `filters` (a filterKey()). */
+export function countsOf(m: Matches, filters: string): Counts {
+  return {
+    starts: m.starts,
+    ends: m.ends,
+    occurrences: m.occurrences,
+    byOffset: [...m.byOffset],
+    total: m.total,
+    filters,
+    filtered: m.filtered,
+  };
+}
+
 export class Matches {
   /** Words that start with the query (the exact match included). */
   readonly starts: number;

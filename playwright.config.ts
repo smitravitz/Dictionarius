@@ -5,6 +5,7 @@ import { defineConfig, devices } from "@playwright/test";
 // against the small public-domain fixture index, on a desktop and a phone.
 export default defineConfig({
   testDir: "e2e",
+  testIgnore: ["**/built/**"], // the published build's own tests: playwright.built.config.ts
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
@@ -22,7 +23,7 @@ export default defineConfig({
     // It must change nothing any other test relies on (e2e/tour.spec.ts tests the tour itself).
     {
       name: "first-run",
-      testIgnore: ["**/tour.spec.ts", "**/word-page-sample.spec.ts"],
+      testIgnore: ["**/tour.spec.ts", "**/word-page-sample.spec.ts", "**/built/**"],
       use: { ...devices["Pixel 7"], storageState: { cookies: [], origins: [] } },
     },
   ],

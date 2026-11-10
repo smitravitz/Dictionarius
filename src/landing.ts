@@ -10,6 +10,20 @@
 /** How far either side of the middle a landing may fall, as a share of the list. */
 export const LANDING_SPREAD = 0.07;
 
+/** Rows sent around a landing: a tall screen's worth below it, and the results list's
+ *  overscan above, so its first paint has every word it shows. */
+export const LAND_ABOVE = 8;
+export const LAND_BELOW = 60;
+
+/** The rows to send with a landing at `row`: whole pages of `pageSize`, from a little
+ *  above it to a screen below. */
+export function landingWindow(row: number, pageSize: number): { from: number; to: number } {
+  return {
+    from: Math.max(0, Math.floor((row - LAND_ABOVE) / pageSize) * pageSize),
+    to: Math.ceil((row + LAND_BELOW) / pageSize) * pageSize,
+  };
+}
+
 /** The row to open a list of `total` words at, or null for an empty list. */
 export function landingRow(total: number, random: () => number = Math.random): number | null {
   if (total <= 0) return null;

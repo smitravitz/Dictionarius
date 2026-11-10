@@ -3,7 +3,7 @@
 Read this first in a new chat, then `.claude/CLAUDE.md`. Update it at the end of any
 session that changes what's below (newest state only; history lives in git).
 
-_Last updated: 2026-11-09, at v0.6.3; place restore and the low-RAM test diagnostics on main, unreleased._
+_Last updated: 2026-11-10, at v0.6.3; on main, unreleased: place restore, the low-RAM test diagnostics, and the web start in layers (ADR-0008)._
 
 ## What it is
 
@@ -22,7 +22,7 @@ built from the English Wiktionary dump by `scripts/build_fm_index.py`.
 | Path | What |
 |---|---|
 | `src/` | Search engine, definitions reader, filters (runs in the worker; unit-tested) |
-| `web/` | The page: `main.ts`, the worker `search-worker.ts`, gestures, loading screen `loader.ts` |
+| `web/` | The page: `main.ts`, the worker `search-worker.ts`, the data worker `data-worker.ts`, gestures, loading screen `loader.ts`, service worker `sw.js` |
 | `scripts/` | Python data pipeline, `setup-release.sh`, privacy audit |
 | `e2e/` | Playwright tests (desktop + phone) against `test/fixtures` sample data |
 | `android/` | Capacitor Android shell, `EdgeGesturesPlugin.java` |
@@ -71,8 +71,13 @@ built from the English Wiktionary dump by `scripts/build_fm_index.py`.
   taken on the released data); retake them when the look changes. The repo's About should
   read "A free, fully offline English dictionary that finds a word from any part of it."
   with the Pages link as its website (settings writes are blocked from agent sessions).
-- Web app on Pages: a browser shows a loading screen (book turning pages) until the index
-  and all definitions are in; the Android app skips it and loads definitions after start.
+- Web app on Pages (ADR-0008, on main, unreleased): the loading screen waits only for the
+  starter (`<list>.starter.json`, ~93 KB gzipped); suggestions, peeks and word pages work at
+  once; the word list comes gzipped (13.7 MB) behind it; a data worker then keeps every file
+  on the device and a service worker keeps the page, so later visits work offline. Built by
+  `tools/web-data.ts` when `DICTIONARIUS_WEB=1` (pages.yml); the APK is unchanged. After the
+  next release, check on Pages that Range requests come back exact (206) and that Settings
+  reaches "Saved on this device". `npm run test:e2e:built` tests the published build.
 - `/dictionarius/` (lowercase) needs the owner's user-site repo `smitravitz.github.io` with
   a redirecting `404.html` (given to the owner; not confirmed set up).
 

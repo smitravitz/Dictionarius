@@ -52,7 +52,7 @@ test("the start screen opens in order: everything in place first, the word count
     } as typeof Worker.prototype.postMessage;
   });
   // The word list arrives late, as on a slow phone.
-  await page.route("**/headwords-sample.bin", async (route) => {
+  await page.route((url) => url.pathname.endsWith("/headwords-sample.bin"), async (route) => {
     await new Promise((r) => setTimeout(r, 1000));
     await route.continue();
   });

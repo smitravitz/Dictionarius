@@ -19,7 +19,7 @@
     <title>Dictionarius</title>
   </head>
   <body>
-    <!-- In a browser, shown until the word list and its definitions are in (web/loader.ts):
+    <!-- In a browser, shown until the app can work from its starter (web/loader.ts):
          a book leafing forward and back. The app itself never shows it. -->
     <div class="loader" id="loader" role="status">
       <div class="book" aria-hidden="true">
@@ -153,6 +153,8 @@
         <h2 class="settings-title" id="settings-title">Settings</h2>
         <!-- A switch per filter in src/filters.ts (labels and help text live there). -->
         <div id="switches"></div>
+        <!-- A browser: whether the dictionary is kept on this device for offline use yet. -->
+        <p class="offline-note" id="offline" role="status" hidden></p>
         <button class="settings-done" value="done">Done</button>
       </form>
     </dialog>

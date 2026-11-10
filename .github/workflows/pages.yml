@@ -67,6 +67,8 @@ jobs:
         run: npx vite build --base ./
         env:
           DICTIONARIUS_PUBLIC: ../release-data
+          # For a browser: each word list's starter and gzipped copy (tools/web-data.ts).
+          DICTIONARIUS_WEB: "1"
       - uses: actions/upload-pages-artifact@v5
         with:
           path: build/web

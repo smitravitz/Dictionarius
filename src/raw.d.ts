@@ -8,3 +8,8 @@ declare module "*?raw" {
 declare module "brotli/decompress.js" {
   export default function decompress(compressed: Uint8Array, outputSize?: number): Uint8Array;
 }
+
+/** Vite's build mode, as the page sees it (`import.meta.env`). */
+interface ImportMeta {
+  readonly env: { readonly PROD: boolean; readonly DEV: boolean };
+}

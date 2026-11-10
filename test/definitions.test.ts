@@ -1,7 +1,12 @@
 import { describe, it, expect } from "vitest";
 import { existsSync, readFileSync } from "node:fs";
 import { HeadwordIndex } from "../src/headword-index";
-import { DefinitionsFile, LAYERS, openSource, rangeSource, unpack, type ByteSource, type Definition, type Layer } from "../src/definitions";
+import { DefinitionsFile, LAYERS, bytesSource, openSource, rangeSource, unpack, type ByteSource, type Definition, type Layer, type WordKeys } from "../src/definitions";
+import { Completer } from "../src/complete";
+import { defaultFilters } from "../src/filters";
+import { SAFE_SEARCH_OVERRIDES } from "../src/safe-search-overrides";
+import { buildStarter, starterKeys } from "../src/starter";
+import { PIECES } from "../web/examples";
 
 // The definitions (docs/definitions-format.md): every word's meanings by the
 // index's word id, in compressed blocks, with examples, etymology and
@@ -319,5 +324,38 @@ describe("unpack", () => {
       { form: "zorble", pos: "verb", meanings: [{ gloss: "To wobble.", example: "It zorbled." }, { gloss: "To sway." }] },
       { form: "zorble", pos: "noun", meanings: [{ gloss: "A wobble.", example: "A big zorble." }] },
     ]);
+  });
+});
+
+describe("definitions before the word list is in", () => {
+  // A browser shows the app from its starter (src/starter.ts) while the word list is still
+  // on its way; the starter's words open their pages from the definitions straight away.
+  const base = "test/fixtures/headwords-sample";
+  const index = HeadwordIndex.fromBytes(new Uint8Array(readFileSync(`${base}.bin`)));
+  const completer = new Completer(index, SAFE_SEARCH_OVERRIDES);
+  // The fixture's definitions cover a few words: suggestions made of them hold them.
+  const covered = [6177, 7732, 12272, 13011, 15791, 17056].map((id) => index.key(id));
+  const starter = buildStarter(index, completer, [...PIECES.map(([p]) => p), ...covered], defaultFilters());
+  const file = (ext: string) => bytesSource(new Uint8Array(readFileSync(`${base}${ext}`)));
+  const open = (keys: WordKeys) =>
+    DefinitionsFile.open(file(".definitions.bin"), keys, Object.fromEntries(LAYERS.map((kind) => [kind, file(`.${kind}.bin`)])));
+
+  it("reads a starter word's page with the starter's keys, as with the word list", async () => {
+    const early = await open(starterKeys(starter));
+    const later = await open(index);
+    const ids = Object.values(starter.pieces).flatMap((p) => p.landings.flatMap((l) => l.items.map((s) => s.id)));
+    expect(ids.length).toBeGreaterThan(50);
+    let withDefinitions = 0;
+    for (const id of new Set(ids)) {
+      const page = await early.of(id);
+      expect(page, index.key(id)).toEqual(await later.of(id));
+      if (page) withDefinitions++;
+    }
+    expect(withDefinitions).toBeGreaterThan(0);
+  });
+
+  it("refuses a starter made from another word list", async () => {
+    const other = { ...starter, keysHash: starter.keysHash.replace(/^../, (b) => (b === "00" ? "01" : "00")) };
+    await expect(open(starterKeys(other))).rejects.toThrow(/another word list/);
   });
 });

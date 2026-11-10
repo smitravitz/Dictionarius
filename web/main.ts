@@ -6,7 +6,7 @@ import "./styles.css";
 import type { Suggestion } from "../src/complete";
 import { normalize } from "../src/normalize";
 import { sourcePageUrl } from "../src/attribution";
-import type { Counts, FromWorker, ToWorker } from "./protocol";
+import type { Counts, FromDataWorker, FromWorker, ToDataWorker, ToWorker } from "./protocol";
 import { ResultsList } from "./results-list";
 import { OffsetSlider } from "./offset-slider";
 import { ScrollerGestures } from "./scroller-gestures";
@@ -208,15 +208,73 @@ const wordNamed = (text: string) =>
   ask({ type: "word", text }).then((a): Suggestion | null => (a.type === "word" ? a.suggestion : null));
 const safe = () => filters["safe-search"] === true;
 
+// The background loading channel (a browser with a starter): once the word list is in, a
+// worker of its own keeps every data file on this device, and Settings says how far along.
+let toKeep: Extract<FromWorker, { type: "starter" }> | null = null;
+const offline = $("offline");
+
+function keepOnDevice() {
+  if (!toKeep || toKeep.keep.length === 0) return;
+  const keeper = new Worker(new URL("./data-worker.ts", import.meta.url), { type: "module" });
+  offline.hidden = false;
+  offline.textContent = "Saving the dictionary on this device for offline use…";
+  keeper.onmessage = ({ data }: MessageEvent<FromDataWorker>) => {
+    if (data.type === "keeping") offline.textContent = `Saving the dictionary on this device for offline use… ${Math.floor(data.share * 100)}%`;
+    else {
+      offline.textContent =
+        data.type === "kept"
+          ? "Saved on this device: works offline."
+          : data.why === "space"
+            ? "Not enough space on this device to save the dictionary for offline use."
+            : data.why === "saving-data"
+              ? "Data Saver is on, so the dictionary isn’t saved for offline use."
+              : "Couldn’t save the dictionary for offline use. It still works online.";
+      keeper.terminate();
+    }
+  };
+  const message: ToDataWorker = { type: "keep", files: toKeep.keep, alsoKeep: toKeep.alsoKeep };
+  keeper.postMessage(message);
+}
+
+// The published web app keeps the page itself on the device, to open offline (web/sw.js,
+// written by the web build only). Never in the app, nor while developing.
+if (import.meta.env.PROD && !Capacitor.isNativePlatform() && "serviceWorker" in navigator) {
+  navigator.serviceWorker.register("./sw.js").catch(() => {}); // a build without one: online only
+}
+
+let shown = false; // the word count and filters, from the starter or the word list
+let arrived = 0; // how much of the word list is in, 0 to 1 (a browser, while it comes)
+
+/** The start screen's word count and the filters on offer: from the starter, or the word
+ *  list when there's no starter; the app shows from then on. */
+function show(words: number, available: FilterInfo[]) {
+  if (shown) return;
+  shown = true;
+  status.textContent = `${words.toLocaleString()} words`;
+  facts.textContent = `${words.toLocaleString()} words · every definition · fully offline`;
+  facts.classList.add("ready"); // fades in, in the place kept for it
+  offerFilters(available);
+  loader.done();
+}
+
+/** What a search says while the word list is still on its way. */
+const stillLoading = () => `Loading the word list…${arrived > 0 ? ` ${Math.floor(arrived * 100)}%` : ""}`;
+
 worker.onmessage = ({ data }: MessageEvent<FromWorker>) => {
   switch (data.type) {
+    case "starter":
+      toKeep = data;
+      show(data.words, data.filters);
+      break;
+    case "progress":
+      arrived = data.share;
+      if (query && !ready && !frame.hidden && !counts) summary.textContent = stillLoading();
+      break;
     case "ready":
       ready = true;
-      status.textContent = `${data.words.toLocaleString()} words`;
-      facts.textContent = `${data.words.toLocaleString()} words · every definition · fully offline`;
-      facts.classList.add("ready"); // fades in, in the place kept for it
-      offerFilters(data.filters);
-      if (normalize(input.value)) summary.textContent = "Searching…";
+      show(data.words, data.filters);
+      keepOnDevice(); // the rest, now the word list is in: nothing it needs is held up
+      if (normalize(input.value) && !counts) summary.textContent = "Searching…";
       break;
     case "failed":
       status.textContent = "Word list unavailable";
@@ -224,9 +282,6 @@ worker.onmessage = ({ data }: MessageEvent<FromWorker>) => {
       facts.classList.add("ready");
       summary.textContent = `Couldn’t load the word list (${data.message}). Reload the app to try again.`;
       loader.failed();
-      break;
-    case "loaded":
-      loader.done();
       break;
     case "rows":
       if (data.seq !== seq) return; // an answer to an older search
@@ -325,7 +380,7 @@ function search(text: string) {
   intro.hidden = true;
   frame.hidden = false;
   input.setAttribute("aria-expanded", "true");
-  if (!ready) summary.textContent = "Loading the word list…";
+  if (!ready) summary.textContent = stillLoading();
   list.reset(query);
   send({ type: "search", seq, query: text });
 }

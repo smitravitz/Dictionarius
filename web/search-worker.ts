@@ -3,15 +3,24 @@
  * the current search and a cursor into it, and answers each request with one
  * page. Between requests it counts the rest of the matches, so the summary and
  * the position slider get exact numbers without slowing the first page.
+ *
+ * In a browser it starts from the starter (src/starter.ts), a small file: the app shows
+ * from it, its suggestions open from it and its words' pages are read from the
+ * definitions a block at a time, while the word list comes (gzipped) in the background.
+ * What the starter can't answer waits for the word list, then is answered.
  */
 import { HeadwordIndex } from "../src/headword-index";
-import { Completer, type Matches } from "../src/complete";
+import { Completer, countsOf, type Matches, type Suggestion } from "../src/complete";
 import { normalize } from "../src/normalize";
 import { SAFE_SEARCH_OVERRIDES } from "../src/safe-search-overrides";
 import { defaultFilters, filterKey, type FilterState } from "../src/filters";
-import { DefinitionsFile, LAYERS, layerUrl, openSource, type ByteSource, type Layer } from "../src/definitions";
-import { landingRow } from "../src/landing";
-import { PAGE_SIZE, type Counts, type FromWorker, type ToWorker } from "./protocol";
+import { DefinitionsFile, LAYERS, layerUrl, openSource, type ByteSource, type Layer, type WordKeys } from "../src/definitions";
+import { landingFrom, rowsFrom, starterKeys, type Starter } from "../src/starter";
+import { fetchStarter, fetchWordList, nameOf, versioned } from "./data-files";
+import { definitionsSource } from "./data-cache";
+import { starterUrl } from "../src/starter";
+import { landingRow, landingWindow } from "../src/landing";
+import { PAGE_SIZE, type FromWorker, type ToWorker } from "./protocol";
 import { PIECES } from "./examples";
 
 /** Background counting runs in slices this long, so requests aren't held up. */
@@ -23,8 +32,15 @@ interface WorkerScope {
 }
 const scope = self as unknown as WorkerScope;
 
+let index: HeadwordIndex | null = null;
 let completer: Completer | null = null;
 let waiting: Extract<ToWorker, { type: "search" }> | null = null; // typed before the index loaded
+// A browser's starter, and what it couldn't answer before the word list was in: the
+// suggestion's list it opened (carried on with the word list), rows past its landings, links.
+let starter: Starter | null = null;
+let early: { seq: number; query: string } | null = null;
+let later: Extract<ToWorker, { type: "rows" | "seek" }>[] = [];
+let wordsLater: Extract<ToWorker, { type: "word" }>[] = [];
 let matches: Matches | null = null;
 let matchesSeq = -1;
 let countTimer: ReturnType<typeof setTimeout> | undefined;
@@ -40,7 +56,7 @@ const AHEAD_PAUSE_MS = 4; // between slices: a search's own counting comes first
 // The definitions, loaded after the index: the core file and whichever layers are
 // there (examples, etymology, pronunciation); null when there's no core (or it doesn't fit the index).
 let found: (file: DefinitionsFile | null) => void = () => {};
-const definitions = new Promise<DefinitionsFile | null>((resolve) => (found = resolve));
+let definitions = new Promise<DefinitionsFile | null>((resolve) => (found = resolve));
 const DEFINITIONS_AFTER_MS = 1500;
 let startDefinitions = () => {}; // set once the index is in
 let definitionsTimer: ReturnType<typeof setTimeout> | undefined;
@@ -60,7 +76,8 @@ scope.onmessage = ({ data }) => {
       break;
     }
     case "word":
-      scope.postMessage({ type: "word", ask: data.ask, suggestion: completer?.word(data.text) ?? null });
+      if (completer) scope.postMessage({ type: "word", ask: data.ask, suggestion: completer.word(data.text) });
+      else wordsLater.push(data);
       break;
     case "settings":
       filters = data.filters;
@@ -69,15 +86,18 @@ scope.onmessage = ({ data }) => {
       break;
     case "search":
       if (completer) search(data);
-      else waiting = data;
+      else if (!fromStarter(data)) {
+        waiting = data;
+        early = null;
+      }
       break;
     case "rows":
-      if (matches && data.seq === matchesSeq) sendRows(data.from, data.to);
-      break;
     case "seek":
-      if (matches && data.seq === matchesSeq) {
-        const row = matches.startOf(data.offset);
-        sendRows(row, row + PAGE_SIZE, { offset: data.offset, row });
+      if (matches && data.seq === matchesSeq) answer(data);
+      else if (early && data.seq === early.seq) {
+        const rows = data.type === "rows" ? rowsFrom(starter!, early.query, filterKey(filters), data.from, data.to) : null;
+        if (rows && data.type === "rows") sendStarterRows(early.seq, early.query, data.from, rows);
+        else later.push(data); // past the starter's rows: once the word list is in
       }
       break;
   }
@@ -86,23 +106,35 @@ scope.onmessage = ({ data }) => {
 async function load(url: string, definitionsUrl: string, where: "browser" | "app") {
   const started = performance.now();
   try {
-    const response = await fetch(url);
-    if (!response.ok) throw new Error(`HTTP ${response.status} loading ${url}`);
-    const index = HeadwordIndex.fromBytes(new Uint8Array(await response.arrayBuffer()));
-    completer = new Completer(index, SAFE_SEARCH_OVERRIDES);
+    // A browser: the starter first, and the app shows from it; then the word list.
+    starter = where === "browser" ? await fetchStarter(url) : null;
+    if (starter) {
+      scope.postMessage({ type: "starter", words: starter.words, filters: starter.available, ...toKeep(url, definitionsUrl, starter) });
+      void loadDefinitions(definitionsUrl, earlyKeys(starter), true);
+    }
+    const loaded = HeadwordIndex.fromBytes(await fetchWordList(url, starter, (share) => scope.postMessage({ type: "progress", share })));
+    index = loaded;
+    completer = new Completer(loaded, SAFE_SEARCH_OVERRIDES);
     const available = completer.availableFilters();
-    scope.postMessage({ type: "ready", words: index.size, ms: performance.now() - started, filters: available });
-    if (waiting) search(waiting);
-    waiting = null;
+    scope.postMessage({ type: "ready", words: loaded.size, ms: performance.now() - started, filters: available });
+    if (starter && hex(loaded.keysHash()) !== starter.keysHash) {
+      // A starter from another word list (a deploy caught halfway): the word list's own.
+      starter = null;
+      early = null;
+      definitions = new Promise<DefinitionsFile | null>((resolve) => (found = resolve));
+      void loadDefinitions(definitionsUrl, loaded, true);
+    }
+    carryOn();
     // Work out the filters' words now, before the first search needs them.
     setTimeout(() => completer?.prepare(filters), 0);
     countAhead();
-    // The definitions (the bigger file) once the start screen has settled, or
-    // as soon as a word's are asked for.
+    if (starter) return; // the definitions are open already
+    // The definitions (the bigger files), read a block at a time: in a browser now, in the
+    // app once the start screen has settled, or as soon as a word's are asked for.
     startDefinitions = () => {
       startDefinitions = () => {};
       clearTimeout(definitionsTimer);
-      void loadDefinitions(definitionsUrl, index, where === "app");
+      void loadDefinitions(definitionsUrl, loaded, true);
     };
     if (where === "browser") startDefinitions();
     else definitionsTimer = setTimeout(() => startDefinitions(), DEFINITIONS_AFTER_MS);
@@ -111,13 +143,91 @@ async function load(url: string, definitionsUrl: string, where: "browser" | "app
   }
 }
 
-/** The definitions for `index` (the core file at `url`, its layers beside it), or
+/** The data files to keep on the device, by versioned address: the word list (gzipped when
+ *  there's a copy) and the definitions with their layers, as many as the starter lists. */
+function toKeep(url: string, definitionsUrl: string, from: Starter) {
+  const name = nameOf(url);
+  const list = from.files[`${name}.gz`] ? `${url}.gz` : url;
+  const addresses = [list, definitionsUrl, ...LAYERS.map((kind) => layerUrl(definitionsUrl, kind))];
+  const keep = addresses
+    .map((at) => ({ at, file: from.files[nameOf(at)] }))
+    .filter(({ file }) => file)
+    .map(({ at, file }) => ({ url: versioned(at, file), bytes: file!.bytes }));
+  return { keep, alsoKeep: [starterUrl(url)] };
+}
+
+/** What the definitions need of the word list before it's in: the starter's (its size,
+ *  hash and its own words' keys), then the word list's own keys. */
+function earlyKeys(from: Starter): WordKeys {
+  const own = starterKeys(from);
+  return { size: own.size, keysHash: () => own.keysHash(), key: (id) => (index ? index.key(id) : own.key(id)) };
+}
+
+const hex = (bytes: Uint8Array | null) => (bytes ? Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("") : "");
+
+/** A suggestion's search answered from the starter, before the word list is in: false
+ *  when the starter hasn't it (another search, other filters, or no starter). */
+function fromStarter(data: Extract<ToWorker, { type: "search" }>): boolean {
+  const query = normalize(data.query);
+  const landing = starter && data.land ? landingFrom(starter, query, filterKey(filters)) : null;
+  if (!landing) return false;
+  waiting = null; // a newer search than any still waiting
+  early = { seq: data.seq, query };
+  later = [];
+  scope.postMessage({
+    type: "rows",
+    seq: data.seq,
+    query,
+    from: landing.from,
+    items: landing.items,
+    known: landing.counts.total ?? landing.items.length,
+    complete: true,
+    counts: landing.counts,
+    landAt: landing.landAt,
+  });
+  return true;
+}
+
+function sendStarterRows(seq: number, query: string, from: number, items: Suggestion[]) {
+  const counts = starter!.pieces[query].counts;
+  scope.postMessage({ type: "rows", seq, query, from, items, known: counts.total ?? 0, complete: true, counts });
+}
+
+/** The word list is in: answer what waited for it. */
+function carryOn() {
+  if (waiting) search(waiting);
+  else if (early) {
+    // The suggestion's list opened from the starter: the same list, now from the word list.
+    matches = completer!.search(early.query, { filters });
+    matchesFilters = filterKey(filters);
+    matchesSeq = early.seq;
+    for (const asked of later) if (asked.seq === matchesSeq) answer(asked);
+    countInBackground(matches);
+  }
+  waiting = null;
+  early = null;
+  later = [];
+  for (const asked of wordsLater) scope.postMessage({ type: "word", ask: asked.ask, suggestion: completer!.word(asked.text) });
+  wordsLater = [];
+}
+
+/** Rows asked for, or a seek, in the current search. */
+function answer(data: Extract<ToWorker, { type: "rows" | "seek" }>) {
+  if (data.type === "rows") sendRows(data.from, data.to);
+  else {
+    const row = matches!.startOf(data.offset);
+    sendRows(row, row + PAGE_SIZE, { offset: data.offset, row });
+  }
+}
+
+/** The definitions for the word list (the core file at `url`, its layers beside it), or
  *  null when there's no core or it was built for another word list. A layer that's
  *  missing or doesn't fit is left out: the page shows what there is. `inPlace`: read
  *  each file a block at a time with Range requests, where the server sends exact
  *  ranges (the app's does: RangedAssets.java), else hold it whole. */
-async function loadDefinitions(url: string, index: HeadwordIndex, inPlace: boolean) {
-  const fetched = (at: string) => openSource(at, { inPlace });
+async function loadDefinitions(url: string, index: WordKeys, inPlace: boolean) {
+  // In a browser with a starter: from the device when it has them, else a block at a time.
+  const fetched = (at: string) => (starter ? definitionsSource(versioned(at, starter.files[nameOf(at)]), starter.files[nameOf(at)]) : openSource(at, { inPlace }));
   const [core, ...layers] = await Promise.all([fetched(url), ...LAYERS.map((kind) => fetched(layerUrl(url, kind)))]);
   try {
     if (!core) throw new Error(`no ${url}`);
@@ -136,7 +246,6 @@ async function loadDefinitions(url: string, index: HeadwordIndex, inPlace: boole
     console.warn("no definitions:", error instanceof Error ? error.message : error);
     found(null);
   }
-  scope.postMessage({ type: "loaded" });
 }
 
 function search({ seq, query, land }: Extract<ToWorker, { type: "search" }>) {
@@ -154,11 +263,6 @@ function search({ seq, query, land }: Extract<ToWorker, { type: "search" }>) {
   }
 }
 
-/** Rows sent around a landing: the screen's worth below it (a tall one), and the
- *  results list's overscan above, so its first paint has every word it shows. */
-const LAND_ABOVE = 8;
-const LAND_BELOW = 60;
-
 /** A suggestion's search: count every word (in slices, so a newer search can take
  *  over), pick the row its list opens at, and send the rows there in one answer. The
  *  page shows nothing of it until then, so it never paints the top and then jumps. */
@@ -173,8 +277,7 @@ function landOn(m: Matches) {
       return;
     }
     const row = landingRow(m.byOffset.reduce((a, b) => a + b, 0)) ?? 0;
-    const from = Math.max(0, Math.floor((row - LAND_ABOVE) / PAGE_SIZE) * PAGE_SIZE);
-    const to = Math.ceil((row + LAND_BELOW) / PAGE_SIZE) * PAGE_SIZE;
+    const { from, to } = landingWindow(row, PAGE_SIZE);
     sendRows(from, to, undefined, row);
   };
   slice();
@@ -191,7 +294,7 @@ function sendRows(from: number, to: number, seek?: { offset: number; row: number
     items,
     known: m.known,
     complete: m.complete,
-    counts: countsOf(m),
+    counts: countsOf(m, matchesFilters),
     seek,
     landAt,
   });
@@ -229,20 +332,8 @@ function countInBackground(m: Matches) {
     if (m !== matches) return; // a newer search took over
     const started = performance.now();
     while (!m.complete && performance.now() - started < COUNT_SLICE_MS) m.count(20_000);
-    if (m.complete) scope.postMessage({ type: "counts", query: m.query, counts: countsOf(m) });
+    if (m.complete) scope.postMessage({ type: "counts", query: m.query, counts: countsOf(m, matchesFilters) });
     else countTimer = setTimeout(slice, 0);
   };
   countTimer = setTimeout(slice, 0);
-}
-
-function countsOf(m: Matches): Counts {
-  return {
-    starts: m.starts,
-    ends: m.ends,
-    occurrences: m.occurrences,
-    byOffset: [...m.byOffset],
-    total: m.total,
-    filters: matchesFilters,
-    filtered: m.filtered,
-  };
 }

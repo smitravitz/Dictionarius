@@ -1211,6 +1211,14 @@ a:focus-visible {
   outline-offset: 2px;
 }
 
+.offline-note {
+  margin: 0.75rem 0 0;
+  color: var(--pencil);
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  font-variant-numeric: tabular-nums; /* the percentage doesn't jitter as it climbs */
+}
+
 .settings-done {
   display: block;
   min-height: 44px;
