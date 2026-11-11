@@ -212,6 +212,12 @@ for ram in $ram_sizes; do
   adb wait-for-device
   adb shell input keyevent KEYCODE_WAKEUP
   adb shell wm dismiss-keyguard
+  # Animations off (Android's "Remove animations"; the WebView takes it as reduced motion):
+  # reading the screen's text waits for a still screen, and the start screen's drifting
+  # pieces made each read take seconds, so the start couldn't be timed closely.
+  for scale in window_animation_scale transition_animation_scale animator_duration_scale; do
+    adb shell settings put global "$scale" 0
+  done
   adb install -r /tmp/app.apk > /dev/null
   adb logcat -c   # from here on, the log is the app's run only
   run_started=$SECONDS
@@ -302,28 +308,12 @@ for ram in $ram_sizes; do
   screenshot "6-reopened-after-kill"
   note "back on the same page: $restored_after (screen ${same_as_before} the same as before the kill)"
 
-  # Test 5: "Don't keep activities": the screen is thrown away whenever you leave it. The
-  # app is restarted after the setting, which only holds for screens started after it.
-  adb shell settings put global always_finish_activities 1
-  adb shell am force-stop "$app"
-  open_app > /dev/null
-  search_two="$(search_for "eren" "search-2")"
-  before_leaving="$(screen_text "7-before-leaving")"
-  adb shell input keyevent KEYCODE_HOME
-  sleep 2
-  recreate_result="$(open_app)"
-  sleep 6
-  after_return="$(screen_text "7-after-return")"
-  screenshot "7-reopened-after-recreate"
-  recreate_same="$(same_screen "$before_leaving" "$after_return")"
-  adb shell settings put global always_finish_activities 0
-  note "screen thrown away and rebuilt: reopened $recreate_result; screen $recreate_same the same"
-
   # Crashes in the log: the app's own, and the WebView's renderer dying; the first lines.
   adb logcat -d > "$run_folder/logcat.txt"
   app_crashes="$(awk '/FATAL EXCEPTION/ {n++} END {print n+0}' "$run_folder/logcat.txt")"
   renderer_deaths="$(awk 'tolower($0) ~ /render(er)? ?process.*(gone|crash|died)/ {n++} END {print n+0}' "$run_folder/logcat.txt")"
-  crash_lines="$(grep -iE 'FATAL EXCEPTION|render(er)? ?process.*(gone|crash|died)|AndroidRuntime' "$run_folder/logcat.txt" | sed -n 1,12p || true)"
+  # (Errors only: AndroidRuntime's other lines are the test's own screen reader starting.)
+  crash_lines="$(grep -iE 'FATAL EXCEPTION| E AndroidRuntime|render(er)? ?process.*(gone|crash|died)' "$run_folder/logcat.txt" | sed -n 1,12p || true)"
 
   {
     echo "== $ram MB (Android $android_version, WebView $webview_version, app $app_version)"
@@ -332,14 +322,13 @@ for ram in $ram_sizes; do
     echo "Word count shown after:         $count_at"
     echo "Start, every 2 s (screen's text: field, word count, a loading message, results):"
     printf '%s' "$filmstrip"
-    echo "Search 1 / search 2 typed:      $search_one / $search_two"
+    echo "Search typed:                   $search_one"
     echo "Scroll (frame stats):           ${frames:-?} frames, janky ${janky:-?}"
     echo "Memory after start:             $memory_after_start"
     echo "Memory after a search:          $memory_after_search"
     echo "Memory with a word open:        $memory_after_word"
     echo "Memory after pressure:          $memory_after_pressure (still running: $alive_after_pressure)"
     echo "Killed in the background:       $killed; reopened $reopen_result; back on the same page: $restored_after"
-    echo "Screen thrown away, rebuilt:    reopened $recreate_result (WARM = rebuilt, HOT = it wasn't); screen $recreate_same the same"
     echo "App crashes / renderer deaths:  $app_crashes / $renderer_deaths"
     if [[ -n "$crash_lines" ]]; then
       echo "First crash lines:"

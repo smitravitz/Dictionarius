@@ -523,6 +523,7 @@ const SLOW_MS = 300;
  *  turns in from the side it came from: forward from the right, back from the left. */
 function drawEntry(s: Suggestion, from: SwipeDirection) {
   wordOnScreen = s.key;
+  placeChanged(); // a word followed from another: kept too
   const seq = ++entrySeq;
   const slow = setTimeout(() => seq === entrySeq && paintEntry(seq, s, "loading", from), SLOW_MS);
   void definitionsOf(s.id).then((definitions) => {
@@ -836,9 +837,11 @@ const watchScreens = () => {
 new MutationObserver(watchScreens).observe(document.getElementById("app")!, { attributes: true, attributeFilter: ["hidden"], subtree: true });
 watchScreens(); // the start screen's first frame has the tour's note in place, if it's showing
 
-// Where the person was (web/place.ts), in the app: kept as it goes to the background, and
-// restored on the next start, so that when Android kills it there (cheap phones do, often)
-// it comes back to the same search, scroll and word. A web page that's reloaded starts fresh.
+// Where the person was (web/place.ts), in the app: kept as it changes (a moment after the
+// search, the scroll or the word does) and as it goes to the background, and restored on the
+// next start, so that when Android kills it (cheap phones do, often) it comes back to the
+// same search, scroll and word. As it changes, not only on the way out: a WebView may never
+// hear it was hidden before the kill. A web page that's reloaded starts fresh.
 const PLACE_KEY = "dictionarius.place";
 let placeToFinish: Place | null = null; // restored search: its scroll and word still to come
 function keepPlace() {
@@ -854,6 +857,15 @@ function keepPlace() {
   if (kept === null) forget(PLACE_KEY);
   else write(PLACE_KEY, kept);
 }
+/** How long the place settles before it's kept (ms): a fling or typing is kept once. */
+const PLACE_SETTLE_MS = 400;
+let placeTimer = 0;
+function placeChanged() {
+  if (!Capacitor.isNativePlatform()) return; // the app's only
+  if (placeToFinish) return; // still coming back: the place it's restoring is the one to keep
+  clearTimeout(placeTimer);
+  placeTimer = window.setTimeout(keepPlace, PLACE_SETTLE_MS);
+}
 /** The restored search's rows are in: scroll back once the list is long enough (or
  *  complete), then open the word that was open. */
 function restorePlace(complete: boolean) {
@@ -864,12 +876,16 @@ function restorePlace(complete: boolean) {
   placeToFinish = null;
   scroller.scrollTop = place.scrollTop;
   if (place.word) void wordNamed(place.word).then((s) => s && showEntry(s));
+  else placeChanged(); // back: kept again, as it is now
 }
 if (Capacitor.isNativePlatform()) {
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "hidden") keepPlace();
   });
   window.addEventListener("pagehide", keepPlace);
+  scroller.addEventListener("scroll", placeChanged, { passive: true });
+  input.addEventListener("input", placeChanged);
+  new MutationObserver(placeChanged).observe(document.getElementById("app")!, { attributes: true, attributeFilter: ["hidden"], subtree: true });
   const place = placeToRestore(read(PLACE_KEY), Date.now());
   forget(PLACE_KEY); // once: a later start is fresh unless it's kept again
   if (place) {

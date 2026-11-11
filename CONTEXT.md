@@ -99,7 +99,7 @@ decision or module makes it load-bearing.
   by version (`?v=` the file's hash), so later visits download nothing and work offline. The
   page itself is kept by the service worker (`web/sw.js`). Web only.
 - **Place** — where the person was in the app: the search, how far down, the word open
-  (`web/place.ts`). Kept as the app goes to the background and restored on the next start
+  (`web/place.ts`). Kept as it changes and as the app goes to the background, and restored on the next start
   within 30 minutes, so Android killing it for memory doesn't lose it. The app only.
 - **Definitions file** — every word's definitions, beside the index, read by
   word id (`src/definitions.ts`, `docs/definitions-format.md`; ADR-0004), as a

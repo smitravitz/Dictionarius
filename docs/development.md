@@ -65,7 +65,9 @@ APK=path/to/app.apk bash tools/low-ram/run.sh   # an APK of your own
 
 The first run builds the image (about 2 GB downloaded). Each size gets a fresh phone; the
 app gets a cold start, a search, a filmed scroll, a word opened, memory pressure, a kill in
-the background and "Don't keep activities". `low-ram-results/summary.txt` is the one file
+the background (`kill -9`, as Android's low-memory killer does), with animations off so the
+screen can be read every couple of seconds. ("Don't keep activities" was dropped: set from
+adb it never took effect.) `low-ram-results/summary.txt` is the one file
 to read or send: the host, Android and WebView versions; each start's LaunchState (COLD,
 WARM, HOT) and time; the start filmed as text every 2 s (search field, word count, loading);
 whether each search typed; scroll frame stats; memory of the app, the WebView's renderer and

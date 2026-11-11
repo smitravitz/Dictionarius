@@ -30,6 +30,21 @@ async function killAndReopen(page: Page): Promise<Page> {
   return fresh;
 }
 
+/** Killed with no warning at all: the page's process just ends (as Android's low-memory
+ *  killer ends an app), so it hears nothing, not even that it's being hidden. */
+async function killHardAndReopen(page: Page): Promise<Page> {
+  const context = page.context();
+  const fresh = await context.newPage(); // opened first: the device carries on without the old page
+  const cdp = await context.newCDPSession(page);
+  void cdp.send("Page.crash").catch(() => {}); // never answers: the page is gone
+  await page.waitForEvent("crash");
+  await page.close().catch(() => {});
+  await asTheApp(fresh);
+  await fresh.goto("/?index=headwords-sample.bin");
+  await expect(fresh.locator("#status")).toHaveText(/^[\d,]+ words$/);
+  return fresh;
+}
+
 async function searchFor(page: Page, text: string) {
   await page.locator("#q").fill(text);
   await page.locator("#q").blur();
@@ -65,6 +80,29 @@ test("and to the word that was open", async ({ page }) => {
   await app.goBack(); // Back still goes to the list
   await expect(app.locator("#frame")).toBeVisible();
   await expect(app.locator("#q")).toHaveValue("ingot");
+});
+
+test("killed without warning (no sign it went to the background), it still comes back", async ({ page }) => {
+  // On a phone the page may never hear it was hidden before Android kills it (a WebView
+  // doesn't always say), so the place is kept as it changes, not only on the way out.
+  await asTheApp(page);
+  await openApp(page);
+  await searchFor(page, "ate");
+  await page.locator("#scroller").evaluate((el) => (el.scrollTop = 900));
+  await expect.poll(() => page.locator("#scroller li.word:not(.pending)").count()).toBeGreaterThan(5);
+  const top = await page.locator("#scroller").evaluate((el) => el.scrollTop);
+  await page.waitForTimeout(800); // settled
+
+  let app = await killHardAndReopen(page);
+  await expect(app.locator("#q")).toHaveValue("ate");
+  await expect.poll(() => app.locator("#scroller").evaluate((el) => el.scrollTop)).toBe(top);
+
+  await searchFor(app, "ingot");
+  await app.locator('li.word[aria-label="ingot"]').click();
+  await expect(app.locator("#entry-word")).toHaveText("ingot");
+  await app.waitForTimeout(800);
+  app = await killHardAndReopen(app);
+  await expect(app.locator("#entry-word")).toHaveText("ingot");
 });
 
 test("after half an hour away, or from the start screen, it starts fresh", async ({ page }) => {
