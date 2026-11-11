@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# Runs before every push: checks every commit and annotated tag about to be published for
+# chat links (in case a commit got in without the commit-msg hook), and stops the push if any.
+
+set -euo pipefail
+
+hooks="$(dirname "$0")"
+zero="0000000000000000000000000000000000000000"
+checked="$(mktemp)"
+trap 'rm -f "$checked"' EXIT
+
+while read -r local_ref local_sha _remote_ref remote_sha; do
+  if [[ "$local_sha" == "$zero" ]]; then continue; fi   # a deletion: nothing published
+  if [[ "$remote_sha" == "$zero" ]]; then
+    range="$local_sha --not --remotes"                  # a new branch or tag: what the remote hasn't got
+  else
+    range="$remote_sha..$local_sha"
+  fi
+  # shellcheck disable=SC2086
+  git log --format='%B%n%(trailers)' $range > "$checked"
+  if [[ "$(git cat-file -t "$local_sha")" == "tag" ]]; then
+    git cat-file -p "$local_sha" >> "$checked"            # an annotated tag's own message
+  fi
+  bash "$hooks/no-chat-links.sh" "$checked" "push of $local_ref"
+done

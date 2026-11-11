@@ -1,5 +1,16 @@
 # Development
 
+## Before your first commit
+
+```bash
+git config user.email "39315452+smitravitz@users.noreply.github.com"
+git config core.hooksPath .githooks
+```
+
+The hooks in `.githooks/` stop a commit or push that links to a Claude chat, and a commit made
+under any other email address (see `.claude/CLAUDE.md`). Claude sessions turn them on
+themselves.
+
 ## Tests
 
 ```bash

@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# Runs on every commit (git config core.hooksPath .githooks): no chat links in the message,
+# and the commit is made as the maintainer's GitHub address, nobody's private one.
+
+set -euo pipefail
+
+hooks="$(dirname "$0")"
+bash "$hooks/no-chat-links.sh" "$1" "commit message"
+
+allowed="39315452+smitravitz@users.noreply.github.com"
+for who in GIT_AUTHOR_IDENT GIT_COMMITTER_IDENT; do
+  email="$(git var "$who" | sed -E 's/.*<([^>]*)>.*/\1/')"
+  if [[ "$email" != "$allowed" ]]; then
+    echo "Blocked: this commit's ${who%_IDENT} email isn't the GitHub address. Run: git config user.email \"$allowed\"" >&2
+    exit 1
+  fi
+done
