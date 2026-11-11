@@ -28,6 +28,7 @@ re-run on it once the ingest pipeline lands.
 
 | Script | Question it answers |
 |---|---|
+| `search-speed.ts` | How fast does the app's own search answer on the shipping word list? (`npm run bench:speed [-- path/to/headwords.bin]`; times to the first screen and to every match counted, over every letter and start-screen suggestion) |
 | `fmbench.py` | Does an FM-index give correct substring search, and how fast? (builds BWT, verifies counts vs brute force, measures latency) |
 | `fm_sizemodel.py` | How big is the FM-index — naive vs engineered (wavelet tree / RRR) rank, sampled-SA vs separator-rank locate? |
 | `trigram.py` | Baseline: how big and fast is SQLite FTS5 trigram on the same words? |

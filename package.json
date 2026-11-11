@@ -16,7 +16,8 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "test:e2e:built": "playwright test --config playwright.built.config.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "bench:speed": "node bench/search-speed.mjs"
   },
   "devDependencies": {
     "@capacitor/cli": "^8.5.3",

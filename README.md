@@ -1,12 +1,12 @@
 # Dictionarius 📖
 
-A free, fully offline English dictionary that finds a word from any part of it.
+A free, fully offline English dictionary that finds a word from any part of it, as you type.
 
 [![CI](https://img.shields.io/github/actions/workflow/status/smitravitz/Dictionarius/ci.yml?branch=main&label=CI)](https://github.com/smitravitz/Dictionarius/actions/workflows/ci.yml)
 [![Latest release](https://img.shields.io/github/v/release/smitravitz/Dictionarius?sort=semver&display_name=tag)](https://github.com/smitravitz/Dictionarius/releases/latest)
 [![License: GPL-3.0-or-later](https://img.shields.io/badge/license-GPL--3.0--or--later-blue)](LICENSE)
 
-Type `eren` and get *serene*, *coherent*, *adherence*: every word with your letters anywhere inside, not just at the start. All 1,357,380 English words and their definitions from Wiktionary live on your device. No account, no network, no permissions.
+Type `eren` and get *serene*, *coherent*, *adherence*: every word with your letters anywhere inside, not just at the start, on screen in about a millisecond. All 1,357,380 English words and their definitions from Wiktionary live on your device. No account, no network, no permissions.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/app-dark.png">
@@ -17,6 +17,7 @@ Type `eren` and get *serene*, *coherent*, *adherence*: every word with your lett
 
 ## ✨ Features
 
+- ⚡ **Instant.** Results appear as you type: the first screen in about a millisecond across all 1,357,380 words, with no server to wait for (measured under **How it works**).
 - 🔎 **Search inside words.** Any piece of a word finds every word containing it, lined up on your letters: the exact word, then words that start with it, then those with one letter before it, two, and so on. A summary counts how many start with, end with and contain it.
 - ↔️ **Slide to move the piece.** Hold the space beside a word and slide to jump to words where your letters land later or earlier; a frequency graph shows how many there are at each place. Alt+←/→ does the same from a keyboard.
 - 👀 **Peek.** Hold a word for its first meanings; let go and they're gone.
@@ -37,7 +38,15 @@ Needs Android 7.0 or later. Add `https://github.com/smitravitz/Dictionarius` to 
 
 ## ⚙️ How it works
 
-Search runs on an **FM-index**, a compressed index of all the words that *is* the word list, so finding any piece of a word is as fast as finding its start, with no server and no database. On a 370,105-word benchmark it was about 2.3× smaller than SQLite's FTS5 trigram index, and faster per query ([`bench/`](bench/README.md)).
+Search runs on an **FM-index**, a compressed index that *is* the word list, so finding a piece anywhere in a word costs no more than finding its start. There's no server and no database to wait for:
+
+| Searching all 1,357,380 words | Median | Slowest |
+|---|---|---|
+| First screen of results | 1.2 ms | 57 ms (a single letter) |
+| Every match counted, for the totals and the graph (in the background, never in the way) | 24 ms | 1.3 s (a single letter) |
+| Opening the word list | 44 ms | |
+
+These are the search code's own times on one 2.3 GHz server core, over every letter and start-screen suggestion; a phone is slower. Run them yourself with `npm run bench:speed`. The index is small too: on a 370,105-word benchmark it was about 2.3× smaller than SQLite's FTS5 trigram index ([`bench/`](bench/README.md)).
 
 Definitions are packed by word id and compressed with brotli in blocks, so opening a word unpacks one small block; the app reads blocks straight from the APK as it needs them ([ADR-0004](docs/adr/0004-all-definitions-bundled.md), [ADR-0005](docs/adr/0005-layered-data-packs.md)).
 
