@@ -155,6 +155,14 @@
         <div id="switches"></div>
         <!-- A browser: whether the dictionary is kept on this device for offline use yet. -->
         <p class="offline-note" id="offline" role="status" hidden></p>
+        <!-- Where the browser offers it (web/install.ts): install as an app of its own. -->
+        <div class="install" id="install" hidden>
+          <span class="setting-text">
+            <span class="setting-name">Install as an app</span>
+            <span class="setting-help" id="install-help">Opens from your home screen, in a window of its own.</span>
+          </span>
+          <button class="install-button" id="install-button" type="button" aria-describedby="install-help">Install</button>
+        </div>
         <button class="settings-done" value="done">Done</button>
       </form>
     </dialog>

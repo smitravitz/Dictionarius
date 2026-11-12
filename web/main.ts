@@ -32,6 +32,7 @@ import { Hands } from "./hands";
 import { placeToKeep, placeToRestore, type Place } from "./place";
 import { Capacitor } from "@capacitor/core";
 import { AS_APP } from "./shell";
+import { offerInstall } from "./install";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const input = $<HTMLInputElement>("q");
@@ -242,6 +243,8 @@ function keepOnDevice() {
 if (import.meta.env.PROD && !Capacitor.isNativePlatform() && "serviceWorker" in navigator) {
   navigator.serviceWorker.register("./sw.js").catch(() => {}); // a build without one: online only
 }
+// And where the browser offers to install it, Settings has Install (web/install.ts).
+offerInstall($("install"), $<HTMLButtonElement>("install-button"), AS_APP);
 
 let shown = false; // the word count and filters, from the starter or the word list
 let arrived = 0; // how much of the word list is in, 0 to 1 (a browser, while it comes)

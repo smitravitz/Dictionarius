@@ -8,8 +8,8 @@
  *
  * The dev server makes the starters (not the gzipped copies: a build's job); a build writes them only for the web
  * (DICTIONARIUS_WEB=1, set by pages.yml): the Android app reads its word list from the
- * phone, and would only carry them as dead weight. The web build also gets its service
- * worker (`sw.js`, from web/sw.js), which keeps the page itself on the device.
+ * phone, and would only carry them as dead weight. The page's own files (its service worker,
+ * manifest and icons) are tools/web-app.ts's.
  */
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
@@ -62,15 +62,6 @@ async function made(folder: string, list: string, gzip: boolean): Promise<{ gzip
   return { gzipped, starter };
 }
 
-/** web/sw.js with a build's files filled in, and a build name made from them (their names
- *  carry their contents' hash), so each new build is a new service worker. */
-export function serviceWorker(files: readonly string[]): string {
-  const build = createHash("sha256").update(files.join("\n")).digest("hex").slice(0, 12);
-  return readFileSync(resolve(import.meta.dirname, "../web/sw.js"), "utf8")
-    .replace("__BUILD__", build)
-    .replace("__FILES__", JSON.stringify(files));
-}
-
 export function webData(): Plugin {
   let folder = "";
   let web = false;
@@ -110,12 +101,8 @@ export function webData(): Plugin {
         );
       });
     },
-    async generateBundle(_options, bundle) {
-      if (!web) return;
-      // The service worker, with this build's files (all but the page, kept as "./").
-      const files = Object.keys(bundle).filter((name) => name !== "index.html").sort();
-      this.emitFile({ type: "asset", fileName: "sw.js", source: serviceWorker(files) });
-      if (!folder || !existsSync(folder)) return;
+    async generateBundle() {
+      if (!web || !folder || !existsSync(folder)) return;
       for (const list of wordLists(readdirSync(folder))) {
         const { gzipped, starter } = await made(folder, list, true);
         this.emitFile({ type: "asset", fileName: `${list}.gz`, source: gzipped! });

@@ -1138,7 +1138,8 @@ a:focus-visible {
   font-weight: 500;
 }
 
-.setting {
+.setting,
+.install {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1217,6 +1218,35 @@ a:focus-visible {
   font-size: 0.8125rem;
   line-height: 1.4;
   font-variant-numeric: tabular-nums; /* the percentage doesn't jitter as it climbs */
+}
+
+/* Install as an app: a row like a switch's, with a button where the switch would be (not a
+   switch: the tour lights only those). */
+.install {
+  margin-top: 0.75rem;
+  cursor: default;
+}
+
+.install-button {
+  flex: none;
+  min-height: 44px;
+  padding: 0.5rem 1rem;
+  border: 1px solid var(--hairline);
+  border-radius: 0.375rem;
+  background: transparent;
+  color: var(--proof);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.install-button:hover {
+  background: var(--proof-wash);
+}
+
+.install-button:focus-visible {
+  outline: 2px solid var(--proof);
+  outline-offset: 2px;
 }
 
 .settings-done {

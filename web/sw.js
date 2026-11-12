@@ -8,6 +8,9 @@ const BUILD = "__BUILD__";
 const FILES = __FILES__;
 const SHELL = `dictionarius-shell-${BUILD}`;
 const PAGE = new URL("./", self.registration.scope).href;
+/** How long opening the page waits for the network's copy before opening the kept one (ms):
+ *  plenty for a connection that works; on a weak signal, not long to look at nothing. */
+const PATIENCE_MS = 2000;
 
 // A new build: its files kept before it takes over.
 self.addEventListener("install", (event) => {
@@ -35,8 +38,7 @@ self.addEventListener("fetch", (event) => {
   if (request.method !== "GET" || url.origin !== location.origin) return;
   if (/\.(bin|gz)$/.test(url.pathname) || url.pathname.endsWith(".starter.json")) return; // the workers' own
   if (request.mode === "navigate") {
-    // The page: the network's, so a new build shows at once; the kept one when offline.
-    event.respondWith(fetch(request).catch(() => caches.match(PAGE, { cacheName: SHELL, ignoreVary: true }).then((page) => page ?? Response.error())));
+    event.respondWith(page(request));
     return;
   }
   // Scripts, styles, fonts: named by their content, so a kept one is always right. Matched
@@ -44,3 +46,15 @@ self.addEventListener("fetch", (event) => {
   // didn't (a server's "Vary: Origin" would otherwise rule it out).
   event.respondWith(caches.match(request, { cacheName: SHELL, ignoreVary: true }).then((kept) => kept ?? fetch(request)));
 });
+
+/** The page: the network's, so a new build shows at once; the kept one when the network
+ *  can't answer, or hasn't within PATIENCE_MS (a weak signal). With nothing kept yet, the
+ *  network's, however long it takes. */
+async function page(request) {
+  const network = fetch(request);
+  const kept = await caches.match(PAGE, { cacheName: SHELL, ignoreVary: true });
+  if (!kept) return network.catch(() => Response.error());
+  let timer = 0;
+  const late = new Promise((resolve) => (timer = setTimeout(resolve, PATIENCE_MS, kept)));
+  return Promise.race([network.catch(() => kept), late]).finally(() => clearTimeout(timer));
+}
