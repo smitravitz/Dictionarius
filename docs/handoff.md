@@ -3,7 +3,7 @@
 Read this first in a new chat, then `.claude/CLAUDE.md`. Update it at the end of any
 session that changes what's below (newest state only; history lives in git).
 
-_Last updated: 2026-11-10, at v0.6.3; on main, unreleased: place restore, the low-RAM test diagnostics, and the web start in layers (ADR-0008)._
+_Last updated: 2026-11-12, at v0.7.1 (v0.7.0 and v0.7.1 shipped the web start in layers, ADR-0008, and place restore); on main, unreleased: the installable web app with light/dark and "Still downloading" (ADR-0009)._
 
 ## What it is
 
@@ -14,7 +14,8 @@ built from the English Wiktionary dump by `scripts/build_fm_index.py`.
 
 - Data formats: `docs/index-format.md`, `docs/definitions-format.md`
 - Decisions: `docs/adr/` (ADR-0005, layered data packs: Proposed, its step 1 built;
-  ADR-0006, letter and position conditions as bitmaps: Proposed)
+  ADR-0006, letter and position conditions as bitmaps: Proposed; ADR-0009, the installable
+  web app: Accepted)
 - Build, test, release: `docs/development.md`
 
 ## Where things are
@@ -22,7 +23,8 @@ built from the English Wiktionary dump by `scripts/build_fm_index.py`.
 | Path | What |
 |---|---|
 | `src/` | Search engine, definitions reader, filters (runs in the worker; unit-tested) |
-| `web/` | The page: `main.ts`, the worker `search-worker.ts`, the data worker `data-worker.ts`, gestures, loading screen `loader.ts`, service worker `sw.js` |
+| `web/` | The page: `main.ts`, the worker `search-worker.ts`, the data worker `data-worker.ts`, gestures, loading screen `loader.ts`, service worker `sw.js`, which shell it runs in `shell.ts`, light/dark `theme.ts` (+ `theme-boot.js`), the web app's icons `icons/` |
+| `tools/` | Vite steps: `web-data.ts` (starter, gzipped list), `web-app.ts` (manifest, icons, service worker), `theme-script.ts`; `make-icons.ts` draws `web/icons/` from `docs/brand/icon.svg` |
 | `scripts/` | Python data pipeline, `setup-release.sh`, privacy audit |
 | `e2e/` | Playwright tests (desktop + phone) against `test/fixtures` sample data |
 | `android/` | Capacitor Android shell, `EdgeGesturesPlugin.java` |
@@ -51,9 +53,8 @@ built from the English Wiktionary dump by `scripts/build_fm_index.py`.
 
 ## State
 
-- Latest release **v0.6.3** (v0.6.2: APK 73.1 MB), on data release `data-b0d819c2` (index 32.8 MB,
-  definitions 33.8 MB, examples 13.3 MB, etymology 8.5 MB, pronunciation 1.1 MB); its release
-  run (including the tour's `@release` tests on the real list) and Pages publish passed.
+- Latest release **v0.7.1** (2026-11-11), on the format-3 data pinned in
+  `data/headwords.sha256` (a core file plus examples, etymology and pronunciation layers).
 - Navigation buttons (back, home, forward) over the list and word pages, on by default in a
   desktop browser, a switch in Settings; the funnel's filters are no longer kept between starts.
 - A first-run tour (5 steps, in order: search, scrub, peek, filters, settings; each shown,
@@ -65,38 +66,29 @@ built from the English Wiktionary dump by `scripts/build_fm_index.py`.
 - Coming back after Android kills the app (cheap phones do, in the background): the app
   keeps the search, scroll and open word as it goes to the background and restores them on
   the next start within 30 minutes (`web/place.ts`, `e2e/place.spec.ts`; the app only, a
-  web page reload starts fresh). Not released yet: the low-RAM test (`tools/low-ram/`) on
-  v0.6.3 showed it lost; rerun it on the next release (or `APK=` a debug build) to confirm.
+  web page reload starts fresh). Released in v0.7.0 and v0.7.1 (kept as it changes); the
+  low-RAM test (`tools/low-ram/`) on v0.6.3 showed it lost: rerun it on a release to confirm.
 - README (2026-11-08): screenshots of the real app in `docs/screenshots/` (light and dark,
   taken on the released data); retake them when the look changes. The repo's About should
   read "A free, fully offline English dictionary that finds a word from any part of it."
   with the Pages link as its website (settings writes are blocked from agent sessions).
-- Web app on Pages (ADR-0008, on main, unreleased): the loading screen waits only for the
+- Web app on Pages (ADR-0008, released in v0.7.0): the loading screen waits only for the
   starter (`<list>.starter.json`, ~93 KB gzipped); suggestions, peeks and word pages work at
   once; the word list comes gzipped (13.7 MB) behind it; a data worker then keeps every file
   on the device and a service worker keeps the page, so later visits work offline. Built by
-  `tools/web-data.ts` when `DICTIONARIUS_WEB=1` (pages.yml); the APK is unchanged. After the
-  next release, check on Pages that Range requests come back exact (206) and that Settings
+  `tools/web-data.ts` when `DICTIONARIUS_WEB=1` (pages.yml); the APK is unchanged. Check on Pages that Range requests come back exact (206) and that Settings
   reaches "Saved on this device". `npm run test:e2e:built` tests the published build.
+- Installable web app (ADR-0009, on main, unreleased): a manifest and icons (web build only),
+  Install in Settings where the browser offers it; installed, it behaves like the Android app
+  (Back word → results → start screen → out, place kept), decided in `web/shell.ts`; the service
+  worker opens the kept page after 2 s on a weak signal. Also for every build: a light/dark switch
+  at the top right of Settings (kept only when against the system's), and "Still downloading"
+  with dots on a word's page whose definitions are on their way ("Still loading" in the app).
+  The Android app's Back now steps through the same history (its clear-the-search case is gone).
+  After the next release: install from Pages on a phone and check that Back closes Settings
+  first, and in the Android app that a forced theme sets the status bar's icon colour.
 - `/dictionarius/` (lowercase) needs the owner's user-site repo `smitravitz.github.io` with
   a redirecting `404.html` (given to the owner; not confirmed set up).
-
-## Before the next release (data format 3)
-
-`main` reads definitions format 3 (a core file plus examples, etymology and pronunciation
-layers, ADR-0005); the pinned data (`data/headwords.sha256`) is still format 2. The release
-workflow refuses to build until they match. Once, on the owner's computer:
-
-```bash
-git pull && pip install -r scripts/requirements.txt
-python scripts/upgrade_definitions.py dist/headwords.definitions.bin   # ~5 min; or rebuild from the dump
-(cd dist && shasum -a 256 headwords.bin headwords.definitions.bin headwords.examples.bin \
-  headwords.etymology.bin headwords.pronunciation.bin) > data/headwords.sha256
-git commit -m "Pin format-3 data" data/headwords.sha256 && git push
-bash scripts/setup-release.sh dist/headwords.bin
-```
-
-Then tag (v0.6.0: a data format change).
 
 ## Open items
 

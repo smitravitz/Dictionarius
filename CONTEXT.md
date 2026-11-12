@@ -98,9 +98,10 @@ decision or module makes it load-bearing.
   `web/data-cache.ts`), filled in the background by the data worker once the word list is in,
   by version (`?v=` the file's hash), so later visits download nothing and work offline. The
   page itself is kept by the service worker (`web/sw.js`). Web only.
-- **Place** — where the person was in the app: the search, how far down, the word open
+- **Place** — where the person was in an app: the search, how far down, the word open
   (`web/place.ts`). Kept as it changes and as the app goes to the background, and restored on the next start
-  within 30 minutes, so Android killing it for memory doesn't lose it. The app only.
+  within 30 minutes, so the phone closing it for memory doesn't lose it. Any app (the Android
+  app, or the web app installed), not a page in a tab.
 - **Definitions file** — every word's definitions, beside the index, read by
   word id (`src/definitions.ts`, `docs/definitions-format.md`; ADR-0004), as a
   **core** (`headwords.definitions.bin`) and a **layer** file each for
@@ -127,6 +128,26 @@ decision or module makes it load-bearing.
   goes down it again.
 - **Peek** — hold a word in the results to see its first two meanings beside
   the row until the finger lifts (`web/peek.ts`).
+
+## Where it runs (ADR-0009)
+
+- **Shell** — which way Dictionarius is running, decided in one place (`web/shell.ts`): the
+  **Android app** (Capacitor), the web app **installed** from the browser (a PWA, in a window of
+  its own) or a page in a **browser** tab. The first two are **apps**: Back steps out of them,
+  and they keep their place.
+- **History steps** — Back's stops (`main.ts`, `settleHistory`): in an app, the start screen,
+  the results and a word's page (the trail is one step); in a tab, the results and a word's
+  page. Going somewhere by hand takes the steps it left out of the history, so Back never does
+  nothing.
+- **Install** — Settings' button where the browser offers to install the page
+  (`web/install.ts`); the manifest and icons are the web build's (`tools/web-app.ts`,
+  `web/icons/` from `tools/make-icons.ts`).
+- **Theme** — light or dark: the system's, unless the person picks the other with the switch at
+  the top right of Settings (`web/theme.ts`, `web/theme-choice.ts`); only a pick against the
+  system is kept (`dictionarius.theme`), and `web/theme-boot.js` shows it from the first frame.
+- **Still downloading** — what a word's page says while its definitions are on their way
+  (after 300 ms), with dots coming and going (`web/dots.ts`; "Still loading" in the Android app,
+  which downloads nothing).
 
 ## Privacy
 

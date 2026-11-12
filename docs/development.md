@@ -57,10 +57,18 @@ npx cap open android                    # or: cd android && ./gradlew assembleDe
 ### The web app as published
 
 `npm run test:e2e:built` builds the web app as `pages.yml` does (`DICTIONARIUS_WEB=1`: each
-word list's starter and gzipped copy, and the service worker) and tests it served as Pages
-serves it: that it opens from the starter, and works offline after one visit (ADR-0008). CI
-runs it after the main browser tests. A plain `npm run build` (the Android app's) leaves
-these out.
+word list's starter and gzipped copy, the service worker, the manifest and icons) and tests it
+served as Pages serves it: that it opens from the starter, works offline after one visit
+(ADR-0008), that Chrome finds it installable, and that on a weak signal it opens from the kept
+page (ADR-0009). CI runs it after the main browser tests. A plain `npm run build` (the Android
+app's) leaves these out.
+
+The web app's icons (`web/icons/`) are drawn from `docs/brand/icon.svg`; after changing it,
+run `node tools/make-icons.ts` and commit what it writes (a unit test fails until you do).
+
+Browser tests run the page as each app with `asTheApp(page)` (the Android app) or
+`asInstalled(page)` (the web app installed; it answers `(display-mode: standalone)`, which
+Chromium can't emulate) from `e2e/as-the-app.ts`.
 
 ### On a low-memory phone (Docker)
 

@@ -24,6 +24,7 @@ Type `eren` and get *serene*, *coherent*, *adherence*: every word with your lett
 - 📚 **Full entries.** Tap a word for its meanings, an example of each in use, pronunciation and origin. Words inside a definition open their own entries, and a swipe (or the back and forward buttons) steps through the words you followed.
 - 🎚️ **Filters and settings.** Word length with two roller wheels; safe search, phrases and names in Settings (common words only by default).
 - 🧭 **Shows you how.** A five-step tour on first run, and **How It Works** behind the **?** any time.
+- 🌗 **Light or dark.** Follows your device, or pick one with the switch at the top of Settings.
 - 🔒 **Private by design.** The Android app requests no permissions at all: no network, no storage, no sensors. CI checks every build against [`privacy.toml`](privacy.toml).
 
 ## 📲 Install
@@ -31,6 +32,8 @@ Type `eren` and get *serene*, *coherent*, *adherence*: every word with your lett
 ### Web
 
 **[smitravitz.github.io/Dictionarius](https://smitravitz.github.io/Dictionarius/)** runs the latest release. It opens in moments: the start screen and its suggestions come from a small starter file while the word list (14 MB, compressed) loads behind it, and word pages load one at a time as you open them. In the background it then saves everything on your device, about 70 MB, so later visits download nothing and work offline (Settings shows when that's done). The page loads only its own files and sends nothing anywhere, though GitHub, which hosts it, sees your visit as any host does.
+
+To install it as an app, use **Install** in Settings or your browser's own Install (on iPhone: Share → Add to Home Screen). It then opens in a window of its own, from your device, and behaves like the Android app: Back goes from a word to the results to the start screen, and it comes back to where you were if your phone closes it.
 
 ### Android
 
@@ -64,7 +67,7 @@ The formats are documented in [`docs/index-format.md`](docs/index-format.md) and
 
 Actively developed: Android and web releases ship from this repository ([releases](https://github.com/smitravitz/Dictionarius/releases)). Planned, not built yet:
 
-- PWA, iOS and F-Droid builds
+- iOS and F-Droid builds
 - Translations, French first ([ADR-0005](docs/adr/0005-layered-data-packs.md))
 - Search by letter pattern, such as a letter in a given place ([ADR-0006](docs/adr/0006-letter-and-position-bitmaps.md))
 - Pronunciations for words that don't have one yet, worked out from their parts where that's reliable ([ADR-0007](docs/adr/0007-derived-pronunciations.md))
