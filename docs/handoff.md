@@ -35,10 +35,14 @@ built from the English Wiktionary dump by `scripts/build_fm_index.py`.
 - Release: `git tag -a vX.Y.Z -m "notes" && git push origin vX.Y.Z` (the owner pushes tags;
   sessions can't). Builds the signed APK, publishes the GitHub release, then starts
   `pages.yml` on main to put that version at https://smitravitz.github.io/Dictionarius/.
-- Republish Pages without a release: Actions → Pages → Run workflow.
+- Republish Pages without a release: Actions → Pages → Run workflow (it refuses a release
+  from before the bad-connection check below).
 - Before a release publishes, it checks the data opens with the tagged code and that 40
   randomly picked real words show their whole page, in a browser and in the app's mode
-  (`e2e/word-page-sample.spec.ts`). The Java that reads definitions in place runs on an
+  (`e2e/word-page-sample.spec.ts`). Release and Pages both check, on the real word list,
+  that on a slow, lossy or dead connection every part of a word's page arrives together and
+  never loads for good, frame by frame, for each data file on its own, in no more than three
+  requests per file (`e2e/word-page-network.spec.ts`; in CI on the fixture too). The Java that reads definitions in place runs on an
   Android emulator whenever it changes (`android-device.yml`).
 - Data changes: rebuild with the pipeline, then `bash scripts/setup-release.sh …` uploads
   the files as a `data-<sum>` release and updates `data/headwords.sha256`; commit that.
@@ -90,7 +94,9 @@ built from the English Wiktionary dump by `scripts/build_fm_index.py`.
   decided in `web/shell.ts`; once kept, the page opens from the device at once and a new build
   from the next start. Also for every build: a light/dark switch
   at the top right of Settings (dark by default everywhere; light kept once picked), and "Still downloading"
-  with dots on a word's page whose definitions are on their way ("Still loading" in the app).
+  with dots on a word's page whose definitions are on their way ("Still loading" in the app);
+  with no network it says so instead, and fills in once the signal's back (ADR-0005, "On a
+  phone's network"): definitions never load for ever.
   The Android app's Back now steps through the same history (its clear-the-search case is gone).
   After the next release: install from Pages on a phone and check that Back closes Settings
   first, and in the Android app that a forced theme sets the status bar's icon colour.

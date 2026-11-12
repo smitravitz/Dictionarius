@@ -67,8 +67,9 @@ export type FromWorker =
     }
   /** Counting finished in the background (for the query in `query`). */
   | { type: "counts"; query: string; counts: Counts }
-  /** null: no definitions for that word (or no definitions file). */
-  | { type: "definitions"; ask: number; definitions: Definition[] | null }
+  /** null: no definitions for that word (or no definitions file). `unavailable`: they
+   *  couldn't be read just now (no network); asking again later may bring them. */
+  | { type: "definitions"; ask: number; definitions: Definition[] | null; unavailable?: true }
   | { type: "word"; ask: number; suggestion: Suggestion | null };
 
 /** To the data worker (web/data-worker.ts): keep these files on the device, and let go of
