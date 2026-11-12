@@ -840,13 +840,12 @@ setUpTheme($<HTMLButtonElement>("theme"), { read, write, forget });
 
 // Back, home and forward, for a mouse: over the top of the list or a word's page. Back and
 // forward step through the words followed, as a swipe does; back from the list, and home,
-// go to the start screen. On by default in a desktop browser, off on a phone and in the app;
-// a switch in Settings, kept on the device.
+// go to the start screen. On by default on every device, the app's too; a switch in
+// Settings turns them off, and that's kept on the device.
 const NAV_KEY = "dictionarius.nav";
 const nav = $("nav");
 const navForward = $<HTMLButtonElement>("nav-forward");
-const navByDefault = () => !Capacitor.isNativePlatform() && !matchMedia("(pointer: coarse)").matches;
-let navOn = (read(NAV_KEY) ?? (navByDefault() ? "on" : "off")) === "on";
+let navOn = read(NAV_KEY) !== "off";
 function updateNav() {
   const hide = !navOn || !intro.hidden || (frame.hidden && entry.hidden);
   // Only when it changes: the screen watcher below hears every "hidden" set inside the app.

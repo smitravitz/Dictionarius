@@ -4,8 +4,8 @@ import { asTheApp } from "./as-the-app";
 // Back, home and forward at the top of the word list and of a word's page, for a mouse:
 // back and forward step through the words followed (as a swipe does), back from the list
 // goes to the start screen, home goes straight there. Plain grey glyphs like the cog's,
-// no outline, no proof colour. The histogram covers them while it's open. On by default
-// in a desktop browser; off on a phone and in the app; a switch in Settings, kept.
+// no outline, no proof colour. The histogram covers them while it's open. On by default on
+// every device, the app's too; a switch in Settings turns them off, and that's kept.
 
 async function open(page: Page) {
   await page.goto("/?index=headwords-sample.bin");
@@ -42,8 +42,7 @@ async function wordOnScreen(page: Page) {
 const desktopOnly = () => test.skip(test.info().project.name !== "desktop", "a desktop browser's default");
 const phoneOnly = () => test.skip(test.info().project.name !== "phone", "a phone's default");
 
-test("in a desktop browser, back, home and forward sit at the top of the list and of a word's page", async ({ page }) => {
-  desktopOnly();
+test("back, home and forward sit at the top of the list and of a word's page, on every device", async ({ page }) => {
   await open(page);
   await expect(page.locator("#nav")).toBeHidden(); // nothing to go back from on the start screen
   await search(page, "ate");
@@ -132,7 +131,6 @@ test("the histogram covers them while it's open", async ({ page }) => {
 });
 
 test("a switch in Settings turns them off, and it's kept", async ({ page }) => {
-  desktopOnly();
   await open(page);
   await page.locator("#settings-open").click();
   await expect(toggle(page)).toBeChecked();
@@ -148,25 +146,20 @@ test("a switch in Settings turns them off, and it's kept", async ({ page }) => {
   await expect(toggle(page)).not.toBeChecked();
 });
 
-test("a phone starts without them; the switch brings them", async ({ page }) => {
+test("a phone starts with them too", async ({ page }) => {
   phoneOnly();
   await open(page);
   await search(page, "ate");
-  await expect(page.locator("#nav")).toBeHidden();
+  await expect(back(page)).toBeVisible();
   await page.locator("#settings-open").click();
-  await expect(toggle(page)).not.toBeChecked();
-  await toggle(page).click();
-  await page.locator("#settings").getByRole("button", { name: "Done" }).click();
-  await expect(back(page)).toBeVisible();
-  await expect(back(page)).toBeVisible();
+  await expect(toggle(page)).toBeChecked();
 });
 
-test("the app starts without them, even on a big screen", async ({ page }) => {
-  desktopOnly();
+test("the Android app starts with them too", async ({ page }) => {
   await asTheApp(page);
   await open(page);
   await search(page, "ate");
-  await expect(page.locator("#nav")).toBeHidden();
+  await expect(back(page)).toBeVisible();
   await page.locator("#settings-open").click();
-  await expect(toggle(page)).not.toBeChecked();
+  await expect(toggle(page)).toBeChecked();
 });
