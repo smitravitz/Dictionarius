@@ -1,6 +1,6 @@
 # ADR-0009: The web app installs as an app, and an installed app behaves like the Android one
 
-- **Status:** Accepted; built 2026-11-12 (v0.7.2); amended 2026-11-12: opens from the device at once, and comes back straight to a word
+- **Status:** Accepted; built 2026-11-12 (v0.7.2); amended 2026-11-12: opens from the device at once, comes back straight to a word, dark by default, keeps its storage once installed
 - **Date:** 2026-11-12
 - **Deciders:** project owner
 - **Builds on:** [ADR-0008](0008-web-start-in-layers.md) (the page and its data kept on the device)
@@ -75,13 +75,15 @@ showing anything. The Android app does all of these better already.
   and an open page never asks for a file of its build that's gone. (At first the page waited
   up to 2 s for the network's copy, so a new build showed at once: on a phone that wait, on
   every open, was most of the white screen before the loading screen.)
-- **Light or dark** (`web/theme.ts`, a switch at the top right of Settings): the system's
-  setting, unless the person picks the other; only a pick against the system is kept
-  (`dictionarius.theme`), so picking the system's own again follows the system again. It sets
+- **Light or dark** (`web/theme.ts`, a switch at the top right of Settings): **dark** on every
+  device, whatever the system's own setting, unless the person picks light; only light is kept
+  (`dictionarius.theme`), so picking dark again goes back to the default. It sets
   `:root[data-theme]` (the hook styles.css already had), the theme-color tags and, in the
-  Android app, the status bar icons' colour (Capacitor's SystemBars). A plain script,
-  `web/theme-boot.js`, in every build's `<head>` (`tools/theme-script.ts`), puts a kept pick
-  on the page before its first frame.
+  Android app, the status bar icons' colour (Capacitor's SystemBars, set to light icons from
+  launch). A plain script, `web/theme-boot.js`, in every build's `<head>`
+  (`tools/theme-script.ts`), puts the theme on the page before its first frame. The manifest's
+  splash and the Android app's launch screen are the dark paper too. (At first it followed the
+  system, with a pick against it kept; the owner asked for dark everywhere.)
 - **Still downloading** (`web/dots.ts`): a word's page whose definitions haven't come after
   300 ms says "Still downloading" (the Android app, which downloads nothing: "Still loading"),
   with dots coming and going (". .. ... .."). The loading screen's dots are the same: one CSS
@@ -94,9 +96,11 @@ showing anything. The Android app does all of these better already.
 - In a browser tab Back is as before, except that a step left behind by going somewhere by
   hand is taken out (Back from a word's page after a new search leaves the page at once
   instead of doing nothing once).
-- Persistent storage (`navigator.storage.persist()`) isn't asked for: Firefox would prompt.
-  An installed app is rarely cleared by Chromium; Safari exempts home-screen apps from its
-  7-day limit.
+- Installed, the app asks for persistent storage (`navigator.storage.persist()`) at each
+  start, so its settings, place and kept dictionary aren't cleared when the device runs short
+  of space: Chromium grants it to an installed app without asking, Firefox may ask once. A tab
+  doesn't ask (the person never chose to keep it); the Android app's storage is its own. (At
+  first nothing asked, to spare Firefox's prompt; the owner asked for settings kept for good.)
 - The manifest has one `background_color`: the splash is light paper even when the page is
   dark (browsers offer no dark splash yet).
 - iOS has no install prompt to ask; Safari's Share → Add to Home Screen works with the
@@ -134,4 +138,3 @@ showing anything. The Android app does all of these better already.
 - Chromium's Back skips history steps a page added without a tap or key (its guard against
   back-trapping). Restoring a place adds the results' and word's steps as the app starts:
   confirm on a phone that Back after a restore still goes word → results → start screen.
-- Whether to ask for persistent storage in the installed app only, if eviction is ever seen.
