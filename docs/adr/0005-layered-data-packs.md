@@ -168,6 +168,18 @@ three words; word page time is Enter to its meanings shown, median of eight word
   whose blocks aren't cached 48–68 → 85–97 ms (median, two runs of eight words). A
   browser still holds the files whole: its loading screen promises nothing is fetched
   after it.
+- **On a phone's network** (amended 2026-11-12). The web app reads in place over the real
+  network until the dictionary is saved on the device, and there "holds it whole" only ever
+  meant a server without ranges. A request that gets no answer (lost on the way, or none in
+  20 s) is asked once more, then it's `Unreachable`: never a reason to fetch the whole file
+  (34 MB of definitions), and never a wait without end. The worker answers such a word
+  "unavailable", apart from "no definition"; a failed block isn't kept as a failure; and
+  definitions that couldn't be opened at all are opened again at the next question. The page
+  says "Couldn’t download the definitions: no connection. They’ll show here once it’s back."
+  and asks again when the browser says it's online, or every 10 s. Coming back to a word (the
+  installed app) waits 1.5 s at most for its definitions before showing its page. Before: on
+  the real data, a lost request, a stalled signal or no signal each left the page "Still
+  downloading" for good, and an app reopened on a word kept its loading screen for good.
 - **The decoder's window.** The JavaScript brotli decoder sets aside the window a block
   declares for every block it unpacks (10 unpacks of a 110 KB block: 10.7 MB at the old
   4 MB window, 3.3 MB at one sized to the block). Blocks declared 4 MB (`lgwin=22`)

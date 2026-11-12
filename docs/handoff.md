@@ -86,7 +86,9 @@ built from the English Wiktionary dump by `scripts/build_fm_index.py`.
   decided in `web/shell.ts`; once kept, the page opens from the device at once and a new build
   from the next start. Also for every build: a light/dark switch
   at the top right of Settings (dark by default everywhere; light kept once picked), and "Still downloading"
-  with dots on a word's page whose definitions are on their way ("Still loading" in the app).
+  with dots on a word's page whose definitions are on their way ("Still loading" in the app);
+  with no network it says so instead, and fills in once the signal's back (ADR-0005, "On a
+  phone's network"): definitions never load for ever.
   The Android app's Back now steps through the same history (its clear-the-search case is gone).
   After the next release: install from Pages on a phone and check that Back closes Settings
   first, and in the Android app that a forced theme sets the status bar's icon colour.
