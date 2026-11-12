@@ -41,15 +41,22 @@ async function killAndReopen(page: Page, runAs: RunAs, watch?: (page: Page) => P
   return fresh;
 }
 
-/** Killed with no warning at all: the page's process just ends (as Android's low-memory
- *  killer ends an app), so it hears nothing, not even that it's being hidden. */
+/** Killed with no warning at all, as Android's low-memory killer ends an app: the page hears
+ *  nothing, not even that it's being hidden, so all it kept is what it kept as it went. The
+ *  page's "going away" events (visibilitychange, pagehide and their kin) are stopped before
+ *  they reach the app, then the page is closed. (Crashing it through the DevTools protocol
+ *  instead left Playwright unable to drive the next page about one run in five: an internal
+ *  "Assertion error", then the reopened page's session gone mid-load.) */
 async function killHardAndReopen(page: Page, runAs: RunAs): Promise<Page> {
   const context = page.context();
-  const fresh = await context.newPage(); // opened first: the device carries on without the old page
-  const cdp = await context.newCDPSession(page);
-  void cdp.send("Page.crash").catch(() => {}); // never answers: the page is gone
-  await page.waitForEvent("crash");
-  await page.close().catch(() => {});
+  await page.evaluate(() => {
+    // On the window, capturing: these run before any listener of the app's.
+    for (const type of ["visibilitychange", "pagehide", "freeze", "beforeunload", "unload"]) {
+      window.addEventListener(type, (event) => event.stopImmediatePropagation(), { capture: true });
+    }
+  });
+  await page.close({ runBeforeUnload: false });
+  const fresh = await context.newPage();
   await runAs(fresh);
   await fresh.goto("/?index=headwords-sample.bin");
   await expect(fresh.locator("#status")).toHaveText(/^[\d,]+ words$/);
@@ -195,6 +202,24 @@ for (const shell of apps) {
       await app.waitForTimeout(800);
       app = await killHardAndReopen(app, shell.as);
       await expect(app.locator("#entry-word")).toHaveText("ingot");
+    });
+
+    test("killed while the tour shows the list's slider, it comes back to where the person left the list, not where the show had it", async ({
+      page,
+    }) => {
+      await shell.as(page);
+      await openApp(page);
+      await searchFor(page, "ate");
+      await page.locator("#scroller").evaluate((el) => (el.scrollTop = 900));
+      await expect.poll(() => page.locator("#scroller li.word:not(.pending)").count()).toBeGreaterThan(5);
+      const top = await page.locator("#scroller").evaluate((el) => el.scrollTop);
+      // Left still, the tour shows the slider on the real list, which moves it; killed then.
+      await expect.poll(() => page.locator("#scroller").evaluate((el) => el.scrollTop), { timeout: 10_000 }).not.toBe(top);
+      await page.waitForTimeout(600); // longer than the place takes to settle
+
+      const app = await killHardAndReopen(page, shell.as);
+      await expect(app.locator("#q")).toHaveValue("ate");
+      await expect.poll(() => app.locator("#scroller").evaluate((el) => el.scrollTop)).toBe(top);
     });
 
     test("after half an hour away, or from the start screen, it starts fresh", async ({ page }) => {

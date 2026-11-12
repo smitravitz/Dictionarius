@@ -939,9 +939,11 @@ const coach = new Coach(
     slider,
     holdPlace: () => {
       const top = scroller.scrollTop;
+      heldTop = top; // the person's place, kept while the show moves the list
       return () => {
         seeking = -1; // a seek still on its way was the show's
         scroller.scrollTop = top;
+        heldTop = null;
       };
     },
   }),
@@ -981,12 +983,15 @@ watchScreens(); // the start screen's first frame has the tour's note in place, 
 // it was hidden before the kill. A page in a browser tab that's reloaded starts fresh.
 const PLACE_KEY = "dictionarius.place";
 let scrollToFinish: number | null = null; // how far down the list goes once its rows are in
+/** Where the person left the list while a tour show has it moved, or null: the place kept is
+ *  theirs, not the show's (killed mid-show, the app comes back to it). */
+let heldTop: number | null = null;
 function keepPlace() {
   const onWord = !entry.hidden;
   const kept = placeToKeep(
     {
       query: onWord ? (returnTo?.text ?? "") : input.value,
-      scrollTop: onWord ? (returnTo?.scrollTop ?? 0) : scroller.scrollTop,
+      scrollTop: onWord ? (returnTo?.scrollTop ?? 0) : (heldTop ?? scroller.scrollTop),
       word: onWord ? wordOnScreen : null,
     },
     Date.now(),
