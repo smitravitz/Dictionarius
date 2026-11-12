@@ -180,6 +180,12 @@ three words; word page time is Enter to its meanings shown, median of eight word
   installed app) waits 1.5 s at most for its definitions before showing its page. Before: on
   the real data, a lost request, a stalled signal or no signal each left the page "Still
   downloading" for good, and an app reopened on a word kept its loading screen for good.
+  Opening, too: every file is opened once, all at the same time (`openFitting`), and the
+  first 64 bytes fetched to check the server are the header it reads, so the first word
+  needs three round trips per file (first bytes, tables, its block). Before, checking each
+  layer re-read the core's head, one layer after another: with every file at 1.5 s a request,
+  the first word took over 30 s. `e2e/word-page-network.spec.ts` holds all this, frame by
+  frame and request by request, and release and Pages run it on the real word list.
 - **The decoder's window.** The JavaScript brotli decoder sets aside the window a block
   declares for every block it unpacks (10 unpacks of a 110 KB block: 10.7 MB at the old
   4 MB window, 3.3 MB at one sized to the block). Blocks declared 4 MB (`lgwin=22`)
