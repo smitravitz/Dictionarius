@@ -284,6 +284,7 @@ worker.onmessage = ({ data }: MessageEvent<FromWorker>) => {
       if (data.seq !== seq) return; // an answer to an older search
       if (data.landAt !== undefined) {
         reveal(data);
+        enterIfAsked();
         break;
       }
       counts = mergeCounts(counts, data.counts);
@@ -294,6 +295,7 @@ worker.onmessage = ({ data }: MessageEvent<FromWorker>) => {
         seeking = -1;
       }
       describe();
+      enterIfAsked();
       break;
     case "definitions":
     case "word":
@@ -318,7 +320,45 @@ function mergeCounts(old: Counts | null, next: Counts): Counts {
   return old.total !== null || old.byOffset.length > next.byOffset.length ? old : next;
 }
 
-input.addEventListener("input", () => search(input.value));
+input.addEventListener("input", () => {
+  if (input.value !== enterFor) enterFor = null; // typed on: an early Enter was for other text
+  search(input.value);
+});
+
+// Enter opens the highlighted word, or the first: the word itself, when typed in full. Its
+// page is for reading, so the keyboard goes. Pressed before the results are on screen, it's
+// done once they are, for the text it was pressed on.
+let enterFor: string | null = null;
+function enter() {
+  const s = list.current();
+  if (!s) return (enterFor = input.value);
+  enterFor = null;
+  showEntry(s);
+  input.blur();
+}
+function enterIfAsked() {
+  if (enterFor !== null && enterFor === input.value && list.current()) enter();
+}
+
+// Coming back to the box selects its text, so typing replaces it; a click while it's already
+// focused places the cursor as usual. Leaving it drops the selection.
+let selectOnUp = false;
+input.addEventListener("focus", () => {
+  input.select();
+  selectOnUp = true; // the click that focused it would otherwise place a cursor
+});
+input.addEventListener("mouseup", (event) => {
+  if (!selectOnUp) return;
+  selectOnUp = false;
+  event.preventDefault();
+});
+input.addEventListener("pointerdown", () => {
+  if (document.activeElement !== input) selectOnUp = true;
+});
+input.addEventListener("blur", () => {
+  selectOnUp = false;
+  input.setSelectionRange(input.value.length, input.value.length);
+});
 
 // The cross at the field's end (shown while typing) clears it and keeps the
 // keyboard up: pressing it mustn't take the focus from the box.
@@ -428,6 +468,7 @@ function describe() {
 }
 
 input.addEventListener("keydown", (event) => {
+  if (event.key === "Enter") return enter();
   if (frame.hidden) return;
   if (event.altKey && (event.key === "ArrowLeft" || event.key === "ArrowRight")) {
     // The keyboard's way to move the position slider: from the position at
@@ -441,14 +482,6 @@ input.addEventListener("keydown", (event) => {
     event.preventDefault();
     const id = list.move(event.key === "ArrowDown" ? 1 : -1);
     if (id) input.setAttribute("aria-activedescendant", id);
-  } else if (event.key === "Enter") {
-    // Opens the highlighted word, or the first: the word itself, when typed in
-    // full. Its page is for reading, so the keyboard goes.
-    const s = list.current();
-    if (s) {
-      showEntry(s);
-      input.blur();
-    }
   } else if (event.key === "Escape") {
     input.value = "";
     search("");
