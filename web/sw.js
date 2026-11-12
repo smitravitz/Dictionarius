@@ -1,28 +1,24 @@
 // The published web app's service worker: keeps the page itself (its HTML, scripts,
-// styles and fonts) on the device, so after one visit the app opens with no network.
+// styles and fonts) on the device, so after one visit the app opens from the device, at
+// once, as an installed app should, whatever the network is doing. A new build comes down in
+// the background and opens from the next start, once no page of the old one is open.
 // The data files aren't its business: the workers keep those (web/data-cache.ts) and it
-// lets their requests through. Written out by tools/web-data.ts for the web build only,
+// lets their requests through. Written out by tools/web-app.ts for the web build only,
 // with this build's name and files filled in below; never in the Android app.
 
 const BUILD = "__BUILD__";
 const FILES = __FILES__;
 const SHELL = `dictionarius-shell-${BUILD}`;
 const PAGE = new URL("./", self.registration.scope).href;
-/** How long opening the page waits for the network's copy before opening the kept one (ms):
- *  plenty for a connection that works; on a weak signal, not long to look at nothing. */
-const PATIENCE_MS = 2000;
 
-// A new build: its files kept before it takes over.
+// A new build: its files kept before it takes over. It takes over once no page of the old
+// build is open (the browser's own rule, with no skipWaiting): an open page goes on with the
+// old build's files, which stay kept until then, so it never asks for one that's gone.
 self.addEventListener("install", (event) => {
-  event.waitUntil(
-    caches
-      .open(SHELL)
-      .then((cache) => cache.addAll([PAGE, ...FILES.map((file) => new URL(file, PAGE).href)]))
-      .then(() => self.skipWaiting()),
-  );
+  event.waitUntil(caches.open(SHELL).then((cache) => cache.addAll([PAGE, ...FILES.map((file) => new URL(file, PAGE).href)])));
 });
 
-// The old builds' files let go of; this build serves the open pages from now on.
+// The old builds' files let go of; this build serves the pages from now on.
 self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches
@@ -47,14 +43,9 @@ self.addEventListener("fetch", (event) => {
   event.respondWith(caches.match(request, { cacheName: SHELL, ignoreVary: true }).then((kept) => kept ?? fetch(request)));
 });
 
-/** The page: the network's, so a new build shows at once; the kept one when the network
- *  can't answer, or hasn't within PATIENCE_MS (a weak signal). With nothing kept yet, the
- *  network's, however long it takes. */
+/** The page: the one kept with this build, at once; with nothing kept yet (a first visit),
+ *  the network's, however long it takes. */
 async function page(request) {
-  const network = fetch(request);
   const kept = await caches.match(PAGE, { cacheName: SHELL, ignoreVary: true });
-  if (!kept) return network.catch(() => Response.error());
-  let timer = 0;
-  const late = new Promise((resolve) => (timer = setTimeout(resolve, PATIENCE_MS, kept)));
-  return Promise.race([network.catch(() => kept), late]).finally(() => clearTimeout(timer));
+  return kept ?? fetch(request).catch(() => Response.error());
 }
