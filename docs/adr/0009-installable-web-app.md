@@ -1,6 +1,6 @@
 # ADR-0009: The web app installs as an app, and an installed app behaves like the Android one
 
-- **Status:** Accepted; built 2026-11-12
+- **Status:** Accepted; built 2026-11-12 (v0.7.2); amended 2026-11-12: opens from the device at once, and comes back straight to a word
 - **Date:** 2026-11-12
 - **Deciders:** project owner
 - **Builds on:** [ADR-0008](0008-web-start-in-layers.md) (the page and its data kept on the device)
@@ -8,7 +8,7 @@
   `web/theme.ts`, `web/theme-boot.js`, `web/dots.ts`, `tools/web-app.ts`,
   `tools/theme-script.ts`, `tools/make-icons.ts`, `web/icons/`, `e2e/back.spec.ts`,
   `e2e/place.spec.ts`, `e2e/install.spec.ts`, `e2e/theme.spec.ts`, `e2e/built/install.spec.ts`,
-  `e2e/built/weak-signal.spec.ts`, `test/web-app.test.ts`
+  `e2e/built/opening.spec.ts`, `test/web-app.test.ts`
 
 ## Context and problem statement
 
@@ -51,7 +51,11 @@ showing anything. The Android app does all of these better already.
   Back to the start screen brings the search back. The Android app's Back now only closes a
   panel, then steps back through this history while it can; its own "clear the search" step is
   gone (the history step does it). Each start's history step is the start screen's.
-- **Place** (`web/place.ts`) is kept and restored in any app, not only the Android one.
+- **Place** (`web/place.ts`) is kept and restored in any app, not only the Android one. A
+  place with a word open comes back straight to that word's page: the screen stays as the app
+  started (a browser's loading screen, the app's start screen) until the page is ready, then
+  the search is set up behind it in the same frame, for Back to find the list as far down as
+  it was. (At first it showed the list, then opened the word: two screens, the first a flash.)
 - **Installable** (`tools/web-app.ts`, web build and dev server only): the page links
   `app.webmanifest` (name, description and colours read from the page's own `<title>` and
   `<meta>` tags, so they can't disagree; `display: standalone`; start and scope `./`), a
@@ -65,8 +69,12 @@ showing anything. The Android app does all of these better already.
 - **The service worker** moves from `tools/web-data.ts` to `tools/web-app.ts` and keeps the
   manifest, icons and theme script with the page. Its build name now hashes each file's
   contents, not only names: the manifest and icons keep their names from build to build.
-  Opening the page waits **2 s** for the network's copy (so a new build shows at once), then
-  opens the kept one; with nothing kept, it waits as any page does.
+  Once kept, the page opens from the device **at once**, whatever the network is doing; with
+  nothing kept, it waits as any page does. A new build comes down in the background and takes
+  over once no page of the old one is open (no `skipWaiting`), so it opens from the next start
+  and an open page never asks for a file of its build that's gone. (At first the page waited
+  up to 2 s for the network's copy, so a new build showed at once: on a phone that wait, on
+  every open, was most of the white screen before the loading screen.)
 - **Light or dark** (`web/theme.ts`, a switch at the top right of Settings): the system's
   setting, unless the person picks the other; only a pick against the system is kept
   (`dictionarius.theme`), so picking the system's own again follows the system again. It sets
@@ -104,8 +112,14 @@ showing anything. The Android app does all of these better already.
 - `e2e/built/install.spec.ts`: Chrome's own installability check
   (`Page.getInstallabilityErrors`) finds nothing; the maskable icon's glyph stays inside the
   safe circle on an opaque square; the touch icon is opaque; the PNGs match the SVG.
-- `e2e/built/weak-signal.spec.ts`: with the network 30 s slow, the kept page opens after
-  about 2 s; a network that answers in time is what opens; a first visit waits.
+- `e2e/built/opening.spec.ts`: once kept, the page's first frame comes within a second with
+  the network 30 s slow; a copy of the site given a new build serves the kept build at once,
+  holds the new one waiting while a page is open, and opens it from the next start; a first
+  visit waits for the network. Measured with the real dictionary on a 4× slowed phone, from
+  asking to open to the loading screen: 1,632 ms with the network answering in 1.5 s and
+  2,125 ms with it answering in 5 s, before; 150 to 295 ms after, whatever the network.
+- `e2e/place.spec.ts` also records every frame of a restore with a word open: the word's page
+  is the first screen after the start, never the list.
 - `e2e/back.spec.ts`, `e2e/place.spec.ts`: Back and place, as the installed app (Chromium can't
   emulate the display mode, so `asInstalled` answers that one media query) and as the Android
   app; Back in a tab.

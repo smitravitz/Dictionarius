@@ -53,6 +53,12 @@ const panels = [settings, $<HTMLDialogElement>("filters"), help];
 const worker = new Worker(new URL("./search-worker.ts", import.meta.url), { type: "module" });
 const send = (message: ToWorker) => worker.postMessage(message);
 const loader = setUpLoader($("loader"), $("app"));
+// What the loading screen still waits for (a browser): the starter or word list, and, when
+// the app comes back to a word that was open, that word's page (restoreWord()).
+let loaderWaits = 1;
+function loaderDone() {
+  if (--loaderWaits === 0) loader.done();
+}
 
 let seq = 0; // id of the latest search; older answers are ignored
 let ready = false;
@@ -259,7 +265,7 @@ function show(words: number, available: FilterInfo[]) {
   facts.textContent = `${words.toLocaleString()} words · every definition · fully offline`;
   facts.classList.add("ready"); // fades in, in the place kept for it
   offerFilters(available);
-  loader.done();
+  loaderDone();
 }
 
 /** What a search says while the word list is still on its way. */
@@ -296,7 +302,7 @@ worker.onmessage = ({ data }: MessageEvent<FromWorker>) => {
       }
       counts = mergeCounts(counts, data.counts);
       list.receive(data.from, data.items, data.known, data.complete);
-      restorePlace(data.complete);
+      finishScroll(data.complete);
       if (data.seek && data.seek.offset === seeking) {
         list.scrollToRow(data.seek.row);
         seeking = -1;
@@ -312,7 +318,7 @@ worker.onmessage = ({ data }: MessageEvent<FromWorker>) => {
       if (data.query !== query || data.counts.filters !== filterKey(filters)) return;
       counts = data.counts;
       list.grow(sum(counts.byOffset), counts.total !== null);
-      restorePlace(counts.total !== null);
+      finishScroll(counts.total !== null);
       describe();
       break;
   }
@@ -573,13 +579,14 @@ document.addEventListener("keydown", (event) => {
  *  (the file is still on its way) rather than nothing happening. */
 const SLOW_MS = 300;
 
-/** Show a word's page once its definitions are in, all of it at once, so
- *  nothing appears and then moves (top to bottom, in reading order). It
- *  turns in from the side it came from: forward from the right, back from the left. */
-function drawEntry(s: Suggestion, from: SwipeDirection) {
+/** Show a word's page once its definitions are in (or with `known`, the ones already in
+ *  hand), all of it at once, so nothing appears and then moves (top to bottom, in reading
+ *  order). It turns in from the side it came from: forward from the right, back from the left. */
+function drawEntry(s: Suggestion, from: SwipeDirection, known?: Definition[] | null) {
   wordOnScreen = s.key;
   placeChanged(); // a word followed from another: kept too
   const seq = ++entrySeq;
+  if (known !== undefined) return paintEntry(seq, s, known ? entryView(known, { safe: safe() }) : null, from); // in hand: at once
   const slow = setTimeout(() => seq === entrySeq && paintEntry(seq, s, "loading", from), SLOW_MS);
   void definitionsOf(s.id).then((definitions) => {
     clearTimeout(slow);
@@ -676,7 +683,12 @@ window.addEventListener("popstate", (event) => {
   input.value = returnTo.text;
   summary.textContent = returnTo.summary;
   frame.hidden = false;
-  scroller.scrollTop = returnTo.scrollTop; // hiding the list reset it
+  // Hiding the list reset its scroll. If it's not that long yet (its rows were still coming
+  // behind the word's page), it goes the rest of the way as they come.
+  if (!list.scrollTo(returnTo.scrollTop)) {
+    scrollToFinish = returnTo.scrollTop;
+    finishScroll(counts?.total != null);
+  }
   input.setAttribute("aria-expanded", "true");
   updateNav();
 });
@@ -912,7 +924,7 @@ watchScreens(); // the start screen's first frame has the tour's note in place, 
 // search, scroll and word. As it changes, not only on the way out: a WebView may never hear
 // it was hidden before the kill. A page in a browser tab that's reloaded starts fresh.
 const PLACE_KEY = "dictionarius.place";
-let placeToFinish: Place | null = null; // restored search: its scroll and word still to come
+let scrollToFinish: number | null = null; // how far down the list goes once its rows are in
 function keepPlace() {
   const onWord = !entry.hidden;
   const kept = placeToKeep(
@@ -931,21 +943,45 @@ const PLACE_SETTLE_MS = 400;
 let placeTimer = 0;
 function placeChanged() {
   if (!AS_APP) return; // an app's only
-  if (placeToFinish) return; // still coming back: the place it's restoring is the one to keep
+  if (scrollToFinish !== null) return; // still coming back: the place it's restoring is the one to keep
   clearTimeout(placeTimer);
   placeTimer = window.setTimeout(keepPlace, PLACE_SETTLE_MS);
 }
-/** The restored search's rows are in: scroll back once the list is long enough (or
- *  complete), then open the word that was open. */
-function restorePlace(complete: boolean) {
-  const place = placeToFinish;
-  if (!place || frame.hidden) return;
-  const room = scroller.scrollHeight - scroller.clientHeight;
-  if (room < place.scrollTop && !complete) return; // not that far down yet: wait for more rows
-  placeToFinish = null;
-  scroller.scrollTop = place.scrollTop;
-  if (place.word) void wordNamed(place.word).then((s) => s && showEntry(s));
-  else placeChanged(); // back: kept again, as it is now
+/** More of the list is in: scroll as far down as it's to go, once it's long enough (or
+ *  complete). */
+function finishScroll(complete: boolean) {
+  if (scrollToFinish === null || frame.hidden) return;
+  if (!list.scrollTo(scrollToFinish) && !complete) return; // not that far down yet: wait for more rows
+  scrollToFinish = null;
+  placeChanged(); // back: kept again, as it is now
+}
+
+/** Back to the search that was open: the list, scrolled back as its rows come in. */
+function restoreList(place: Place) {
+  scrollToFinish = place.scrollTop;
+  input.value = place.query;
+  search(place.query);
+}
+
+/** Back to the word that was open: its page is the first screen shown. Until it's ready, the
+ *  screen stays as the app started (a browser's loading screen, the app's start screen); then,
+ *  in one block the browser paints once, the search is set up behind the page, for Back to
+ *  find it as far down as it was. Anything the person does first wins. */
+async function restoreWord(place: Place & { word: string }) {
+  loaderWaits++;
+  const started = seq;
+  const s = await wordNamed(place.word);
+  const definitions = s ? await definitionsOf(s.id) : null;
+  if (seq === started && !s) restoreList({ ...place, word: null }); // that word's gone: the list
+  if (seq === started && s) {
+    input.value = place.query;
+    search(place.query);
+    returnTo = { text: input.value, summary: summary.textContent ?? "", scrollTop: place.scrollTop };
+    trail.start(s);
+    settleHistory("word");
+    drawEntry(s, "forward", definitions);
+  }
+  loaderDone();
 }
 if (AS_APP) {
   document.addEventListener("visibilitychange", () => {
@@ -957,9 +993,6 @@ if (AS_APP) {
   new MutationObserver(placeChanged).observe(document.getElementById("app")!, { attributes: true, attributeFilter: ["hidden"], subtree: true });
   const place = placeToRestore(read(PLACE_KEY), Date.now());
   forget(PLACE_KEY); // once: a later start is fresh unless it's kept again
-  if (place) {
-    placeToFinish = place;
-    input.value = place.query;
-    search(place.query);
-  }
+  if (place?.word) void restoreWord({ ...place, word: place.word });
+  else if (place) restoreList(place);
 }
