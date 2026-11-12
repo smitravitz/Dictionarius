@@ -14,7 +14,10 @@ It looks for:
     url()) must point at one of network.hosts, not just network.links;
   - a Content-Security-Policy that keeps the WebView offline when the budget allows no hosts;
   - Android settings that leak data or hurt F-Droid builds (cloud backup, debuggable,
-    cleartext traffic, Google's dependency-info block).
+    cleartext traffic, Google's dependency-info block);
+  - in the iOS app: permission prompts (NS...UsageDescription keys) beyond the budget, App
+    Transport Security switched off, and a privacy manifest (PrivacyInfo.xcprivacy) that is
+    missing, left out of the Xcode project, or says the app tracks or collects.
 
 Exits with 1 when anything breaks the budget, so CI can stop the build. Standard library
 only (Python 3.11+); reading an APK needs aapt2 (Android build-tools) or androguard.
@@ -24,6 +27,7 @@ import argparse
 import glob
 import json
 import os
+import plistlib
 import re
 import shutil
 import subprocess
@@ -150,6 +154,56 @@ def check_manifests(root, budget):
     return findings
 
 
+def read_plist(path):
+    """A property list as a dict; {} when it can't be read as one."""
+    try:
+        with open(path, "rb") as f:
+            data = plistlib.load(f)
+    except Exception:  # not a plist: nothing to check in it
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def check_ios(root, budget):
+    """The iOS app (ios/App/App): iOS has no permission list to read from a build, so the
+    budget is checked in what the app declares."""
+    app = os.path.join(root, "ios", "App", "App")
+    findings = []
+    for path in sorted(glob.glob(os.path.join(app, "*Info.plist"))):
+        info = read_plist(path)
+        # Each NS...UsageDescription key is a permission the app may ask for.
+        for key in sorted(k for k in info if re.fullmatch(r"NS\w+UsageDescription", k)):
+            if key not in budget["usage_descriptions"]:
+                findings.append(Finding("error", f"declares {key}, which privacy.toml doesn't allow", rel(root, path),
+                                        "remove it, and the code that needs it, or add it to privacy.toml on purpose"))
+        # iOS has no network permission; App Transport Security is what refuses plain http.
+        if info.get("NSAppTransportSecurity", {}).get("NSAllowsArbitraryLoads"):
+            findings.append(Finding("error", "App Transport Security is switched off (NSAllowsArbitraryLoads)",
+                                    rel(root, path), "remove NSAllowsArbitraryLoads"))
+    if not os.path.exists(os.path.join(app, "Info.plist")):
+        return findings  # no iOS app here
+
+    # The privacy manifest is what Apple reads: it must exist, be packed into the app, and
+    # say what the budget says (no tracking, nothing collected).
+    manifest_path = os.path.join(app, "PrivacyInfo.xcprivacy")
+    if not os.path.exists(manifest_path):
+        findings.append(Finding("error", "the iOS app has no privacy manifest (PrivacyInfo.xcprivacy)", rel(root, app),
+                                "add ios/App/App/PrivacyInfo.xcprivacy: no tracking, no collected data"))
+        return findings
+    project = os.path.join(root, "ios", "App", "App.xcodeproj", "project.pbxproj")
+    if not os.path.exists(project) or "PrivacyInfo.xcprivacy in Resources" not in read(project):
+        findings.append(Finding("error", "the privacy manifest isn't in the Xcode project, so it isn't in the app",
+                                rel(root, project), "add PrivacyInfo.xcprivacy to the App target's resources"))
+    manifest = read_plist(manifest_path)
+    for key, what in (("NSPrivacyTracking", "says the app tracks people"),
+                      ("NSPrivacyCollectedDataTypes", "says the app collects data"),
+                      ("NSPrivacyTrackingDomains", "lists tracking domains")):
+        if manifest.get(key):
+            findings.append(Finding("error", f"the privacy manifest {what} ({key})", rel(root, manifest_path),
+                                    "the app does neither: take it out, with the code that did it"))
+    return findings
+
+
 def check_dependencies(root):
     findings = []
     pkg_path = os.path.join(root, "package.json")
@@ -256,7 +310,7 @@ def check_apk(permissions, budget, apk):
 
 def audit(root, apk=None):
     budget = load_budget(root)
-    findings = check_manifests(root, budget) + check_dependencies(root) + check_network(root, budget) + check_csp(root, budget)
+    findings = check_manifests(root, budget) + check_ios(root, budget) + check_dependencies(root) + check_network(root, budget) + check_csp(root, budget)
     if apk:
         findings += check_apk(apk_permissions(apk), budget, apk)
     return findings

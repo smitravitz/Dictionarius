@@ -35,6 +35,14 @@ PAGE = """<!doctype html>
 {head}
 </head><body>{body}</body></html>
 """
+PLIST = """<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>{keys}</dict></plist>
+"""
+PRIVACY_MANIFEST = PLIST.format(keys="<key>NSPrivacyTracking</key><false/>"
+                                "<key>NSPrivacyTrackingDomains</key><array/>"
+                                "<key>NSPrivacyCollectedDataTypes</key><array/>"
+                                "<key>NSPrivacyAccessedAPITypes</key><array/>")
 GRADLE = "android { dependenciesInfo { includeInApk = false\n includeInBundle = false } }\n"
 
 
@@ -56,6 +64,13 @@ class Project:
         os.makedirs(os.path.dirname(full), exist_ok=True)
         with open(full, "w") as f:
             f.write(textwrap.dedent(text))
+
+    def add_ios(self, info="", manifest=PRIVACY_MANIFEST, project="PrivacyInfo.xcprivacy in Resources"):
+        """The iOS app: its Info.plist, its privacy manifest and the Xcode project that packs it."""
+        self.write("ios/App/App/Info.plist", PLIST.format(keys="<key>CFBundleName</key><string>x</string>" + info))
+        if manifest is not None:
+            self.write("ios/App/App/PrivacyInfo.xcprivacy", manifest)
+        self.write("ios/App/App.xcodeproj/project.pbxproj", f"// {project}\n")
 
     def errors(self):
         return [f.what for f in audit_privacy.audit(self.root) if f.level == "error"]
@@ -148,6 +163,40 @@ class Audit(unittest.TestCase):
                      MANIFEST.format(permissions="").replace('android:allowBackup="false"', 'android:allowBackup="true"'))
         self.p.write("android/app/build.gradle", "android { }\n")
         self.assertEqual(len(self.p.warnings()), 2)
+
+    def test_a_clean_ios_app_passes(self):
+        self.p.add_ios()
+        self.assertEqual(self.p.errors(), [])
+
+    def test_an_ios_usage_description_beyond_the_budget(self):
+        self.p.add_ios(info="<key>NSCameraUsageDescription</key><string>To scan words</string>")
+        self.assertEqual(self.p.errors(), ["declares NSCameraUsageDescription, which privacy.toml doesn't allow"])
+        self.p.write("privacy.toml", BUDGET + '[ios]\nusage_descriptions = ["NSCameraUsageDescription"]\n')
+        self.assertEqual(self.p.errors(), [])
+
+    def test_ios_may_not_switch_off_transport_security(self):
+        self.p.add_ios(info="<key>NSAppTransportSecurity</key><dict><key>NSAllowsArbitraryLoads</key><true/></dict>")
+        self.assertEqual(self.p.errors(), ["App Transport Security is switched off (NSAllowsArbitraryLoads)"])
+
+    def test_an_ios_app_needs_a_privacy_manifest_that_ships(self):
+        self.p.add_ios(manifest=None)
+        self.assertEqual(self.p.errors(), ["the iOS app has no privacy manifest (PrivacyInfo.xcprivacy)"])
+        # Written, but not among the files Xcode packs into the app: Apple never sees it.
+        self.p.add_ios(project="nothing")
+        self.assertEqual(self.p.errors(), ["the privacy manifest isn't in the Xcode project, so it isn't in the app"])
+
+    def test_an_ios_privacy_manifest_that_tracks_or_collects(self):
+        self.p.add_ios(manifest=PRIVACY_MANIFEST.replace("<key>NSPrivacyTracking</key><false/>", "<key>NSPrivacyTracking</key><true/>"))
+        self.assertEqual(self.p.errors(), ["the privacy manifest says the app tracks people (NSPrivacyTracking)"])
+        self.p.add_ios(manifest=PRIVACY_MANIFEST.replace(
+            "<key>NSPrivacyCollectedDataTypes</key><array/>",
+            "<key>NSPrivacyCollectedDataTypes</key><array><dict><key>NSPrivacyCollectedDataType</key>"
+            "<string>NSPrivacyCollectedDataTypeDeviceID</string></dict></array>"))
+        self.assertEqual(self.p.errors(), ["the privacy manifest says the app collects data (NSPrivacyCollectedDataTypes)"])
+        self.p.add_ios(manifest=PRIVACY_MANIFEST.replace(
+            "<key>NSPrivacyTrackingDomains</key><array/>",
+            "<key>NSPrivacyTrackingDomains</key><array><string>example.org</string></array>"))
+        self.assertEqual(self.p.errors(), ["the privacy manifest lists tracking domains (NSPrivacyTrackingDomains)"])
 
     def test_reading_aapt2_output(self):
         text = ("package: io.example\n"
