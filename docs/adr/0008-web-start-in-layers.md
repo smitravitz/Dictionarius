@@ -58,8 +58,15 @@ download. The person waited for ~90 MB before they could touch anything, every f
 - **A loading channel of its own.** Once the word list is in, a second worker
   (`web/data-worker.ts`) keeps every data file on the device (Cache Storage), one at a time at
   low fetch priority, so a word's page is never held up by it; reads switch to the device's
-  copy as soon as it's there. Settings says how far along it is ("Saved on this device: works
-  offline."). Skipped with Data Saver on, or without room.
+  copy as soon as it's there. A thin bar under the title says how far along it is and how good
+  the connection is, judged from the download's own speed (`web/keep-on-device.ts`,
+  `web/connection.ts`: fast from 1 MB/s, slow from 100 kB/s, very slow below, none after 8 s
+  with nothing in or with the browser offline; nothing is sent anywhere to measure it). Once
+  it's all in, "Downloaded · works offline", then it fades out over 5 s. With no connection it
+  stays, and carries on as soon as the browser says it's back (or every 15 s). It sits over the
+  page, so nothing moves for it; it only shows while something is downloading. Settings says
+  only how it ended ("Saved on this device: works offline."). Skipped with Data Saver on, or
+  without room. (Amended 2026-11-12: the progress was a line in Settings.)
 - **Versions by hash**: data files are fetched as `<file>?v=<sha256 prefix>`, so neither the
   browser's cache nor the device's copy can serve an old file for a new one; old versions are
   let go after a new set is kept. The starter is always asked for fresh (the device's copy
