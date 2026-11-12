@@ -1,0 +1,13 @@
+# Chat traces: links to Claude chats and sessions, never published in this repository: not in
+# commit or tag messages, pull requests, issues, comments, reviews, release notes, code or docs.
+# One extended regular expression per line, matched without regard to case. Read by
+# .githooks/no-chat-links.sh, .claude/hooks/no-chat-links.sh and scripts/chat_traces.py (the
+# "No chat traces" workflow). Written so this file never matches itself.
+# Allowed: a Co-Authored-By line, and a generated-with footer that links to no chat.
+
+# A link to a session, a chat, a shared chat or a project: an address with its id.
+claude\.ai/(code|chat|share|project)/[a-z0-9_-]{6,}
+# A session's id on its own.
+session_01[0-9a-z]{8,}
+# The trailer some tools add to a commit message, linking its session.
+claude-session *:
