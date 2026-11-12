@@ -160,9 +160,14 @@ def earlier_versions(github, report, what, label, node_id):
         return
     try:
         answer, _ = github.request("POST", github.graphql, {"query": _EDITS, "variables": {"id": node_id}})
-        edits = answer["data"]["node"]["userContentEdits"]["nodes"]
-    except (urllib.error.HTTPError, KeyError, TypeError):
-        report.warnings.append(f"{what}: its edit history couldn't be read")
+    except urllib.error.HTTPError as error:
+        report.warnings.append(f"{what}: its edit history couldn't be read ({error.code})")
+        return
+    node = (answer.get("data") or {}).get("node") or {}
+    edits = (node.get("userContentEdits") or {}).get("nodes")
+    if edits is None:
+        reason = "; ".join(error.get("message", "?") for error in answer.get("errors") or []) or "none returned"
+        report.warnings.append(f"{what}: its edit history couldn't be read ({reason})")
         return
     # The newest is the text as it is now (checked above); one deleted has no text left.
     earlier = sorted(edits, key=lambda edit: edit.get("editedAt") or "")[:-1]

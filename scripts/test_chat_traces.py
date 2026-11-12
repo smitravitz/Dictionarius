@@ -342,7 +342,8 @@ class GuardsGitHub(Case):
         self.repo.commit("Fix the list")
         self.github.graphql_errors = True
         report = self.run_event("pull_request", {"pull_request": self.pull_request()})
-        self.assertEqual((report.problems, report.warnings), ([], ["pull request #1: its edit history couldn't be read"]))
+        self.assertEqual((report.problems, report.warnings),
+                         ([], ["pull request #1: its edit history couldn't be read (Resource not accessible by integration)"]))
 
 
     def test_the_sweep_cleans_everything_already_published_across_pages(self):
