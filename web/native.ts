@@ -1,12 +1,10 @@
 // Behaviour that applies only inside the native app shells (Capacitor).
 import { Capacitor } from "@capacitor/core";
 
-/** Steps the Android back button takes, each returning whether it did anything. */
+/** What the Android back button does before it steps back through the history. */
 export interface BackSteps {
-  /** Close an open panel (settings). */
+  /** Close an open panel (settings), returning whether one was open. */
   closePanel(): boolean;
-  /** Empty the search box. */
-  clearSearch(): boolean;
 }
 
 /** Wire up the Android back button and outbound links. */
@@ -19,13 +17,13 @@ export async function setUpNativeShell(back: BackSteps): Promise<void> {
     link.removeAttribute("target");
   }
 
-  // Back closes a panel, then goes from any word followed straight to the
-  // results (one history step for them all; swipes step one word at a time),
-  // then clears the search, then leaves the app.
+  // Back closes a panel, then steps back through the history: from any word followed
+  // straight to the results (one step for them all; swipes step one word at a time), then
+  // to the start screen (main.ts keeps those steps); from there it leaves the app.
   const { App } = await import("@capacitor/app");
   await App.addListener("backButton", ({ canGoBack }) => {
     if (back.closePanel()) return;
     if (canGoBack) history.back();
-    else if (!back.clearSearch()) void App.exitApp();
+    else void App.exitApp();
   });
 }

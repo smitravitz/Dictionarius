@@ -1,9 +1,10 @@
 // Where the person was when the app went to the background: the search, how far down its
-// list, and the word open, if any. Android kills apps in the background when memory runs
-// short (cheap phones do it often), and the app then starts from nothing; with this kept
-// on the device, it comes back to the same place instead. Only for a while: after
-// KEEP_MS a start is a fresh start. main.ts keeps and restores it (the app only: a web
-// page that's reloaded starts fresh, as pages do). No DOM here.
+// list, and the word open, if any. A phone closes apps in the background when memory runs
+// short (cheap phones do it often), the Android app and an installed web app alike, and the
+// app then starts from nothing; with this kept on the device, it comes back to the same place
+// instead. Only for a while: after KEEP_MS a start is a fresh start. main.ts keeps and
+// restores it (an app only, web/shell.ts: a page in a browser tab that's reloaded starts
+// fresh, as pages do). No DOM here.
 
 export interface Place {
   /** When it was kept (ms since 1970). */

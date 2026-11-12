@@ -1,10 +1,19 @@
 import { test, expect, type Page } from "@playwright/test";
-import { asTheApp } from "./as-the-app";
+import { asInstalled, asTheApp } from "./as-the-app";
 
-// Android kills an app in the background when memory runs short, and it then starts from
-// nothing. The app keeps where the person was as it goes to the background, and comes back
-// there: the search, how far down, the word open. A new page on the same device stands
-// in for the kill: the old one goes, with its history; storage stays.
+// A phone closes apps in the background when memory runs short, and they then start from
+// nothing: Android kills the Android app, and the web app installed from the browser alike.
+// An app keeps where the person was as it goes to the background, and comes back there:
+// the search, how far down, the word open. A new page on the same device stands in for the
+// kill: the old one goes, with its history; storage stays. A page in a browser tab is a page:
+// reloaded, it starts fresh.
+
+/** Each app, run as itself in every page it opens. */
+const apps = [
+  { name: "the Android app", as: asTheApp },
+  { name: "installed from the browser", as: asInstalled },
+];
+type RunAs = (page: Page) => Promise<void>;
 
 async function openApp(page: Page) {
   await page.goto("/?index=headwords-sample.bin");
@@ -20,11 +29,11 @@ async function toBackground(page: Page) {
 }
 
 /** Killed in the background, then opened again: a fresh page, the device's storage kept. */
-async function killAndReopen(page: Page): Promise<Page> {
+async function killAndReopen(page: Page, runAs: RunAs): Promise<Page> {
   const context = page.context();
   await page.close();
   const fresh = await context.newPage();
-  await asTheApp(fresh); // still the app
+  await runAs(fresh); // still the app
   await fresh.goto("/?index=headwords-sample.bin");
   await expect(fresh.locator("#status")).toHaveText(/^[\d,]+ words$/);
   return fresh;
@@ -32,14 +41,14 @@ async function killAndReopen(page: Page): Promise<Page> {
 
 /** Killed with no warning at all: the page's process just ends (as Android's low-memory
  *  killer ends an app), so it hears nothing, not even that it's being hidden. */
-async function killHardAndReopen(page: Page): Promise<Page> {
+async function killHardAndReopen(page: Page, runAs: RunAs): Promise<Page> {
   const context = page.context();
   const fresh = await context.newPage(); // opened first: the device carries on without the old page
   const cdp = await context.newCDPSession(page);
   void cdp.send("Page.crash").catch(() => {}); // never answers: the page is gone
   await page.waitForEvent("crash");
   await page.close().catch(() => {});
-  await asTheApp(fresh);
+  await runAs(fresh);
   await fresh.goto("/?index=headwords-sample.bin");
   await expect(fresh.locator("#status")).toHaveText(/^[\d,]+ words$/);
   return fresh;
@@ -51,78 +60,85 @@ async function searchFor(page: Page, text: string) {
   await expect(page.locator("#scroller li.word:not(.pending)").first()).toBeVisible();
 }
 
-test("the app comes back to the search, and how far down it was, after being killed", async ({ page }) => {
-  await asTheApp(page);
-  await openApp(page);
-  await searchFor(page, "ate");
-  await page.locator("#scroller").evaluate((el) => (el.scrollTop = 1500));
-  await expect.poll(() => page.locator("#scroller li.word:not(.pending)").count()).toBeGreaterThan(5);
-  const top = await page.locator("#scroller").evaluate((el) => el.scrollTop);
-  await toBackground(page);
+for (const shell of apps) {
+  test.describe(`as an app (${shell.name})`, () => {
+    test("it comes back to the search, and how far down it was, after being killed", async ({ page }) => {
+      await shell.as(page);
+      await openApp(page);
+      await searchFor(page, "ate");
+      await page.locator("#scroller").evaluate((el) => (el.scrollTop = 1500));
+      await expect.poll(() => page.locator("#scroller li.word:not(.pending)").count()).toBeGreaterThan(5);
+      const top = await page.locator("#scroller").evaluate((el) => el.scrollTop);
+      await toBackground(page);
 
-  const app = await killAndReopen(page);
-  await expect(app.locator("#frame")).toBeVisible();
-  await expect(app.locator("#q")).toHaveValue("ate");
-  await expect.poll(() => app.locator("#scroller").evaluate((el) => el.scrollTop)).toBe(top);
-});
+      const app = await killAndReopen(page, shell.as);
+      await expect(app.locator("#frame")).toBeVisible();
+      await expect(app.locator("#q")).toHaveValue("ate");
+      await expect.poll(() => app.locator("#scroller").evaluate((el) => el.scrollTop)).toBe(top);
+    });
 
-test("and to the word that was open", async ({ page }) => {
-  await asTheApp(page);
-  await openApp(page);
-  await searchFor(page, "ingot");
-  await page.locator('li.word[aria-label="ingot"]').click();
-  await expect(page.locator("#entry-word")).toHaveText("ingot");
-  await toBackground(page);
+    test("and to the word that was open", async ({ page }) => {
+      await shell.as(page);
+      await openApp(page);
+      await searchFor(page, "ingot");
+      await page.locator('li.word[aria-label="ingot"]').click();
+      await expect(page.locator("#entry-word")).toHaveText("ingot");
+      await toBackground(page);
 
-  const app = await killAndReopen(page);
-  await expect(app.locator("#entry")).toBeVisible();
-  await expect(app.locator("#entry-word")).toHaveText("ingot");
-  await app.goBack(); // Back still goes to the list
-  await expect(app.locator("#frame")).toBeVisible();
-  await expect(app.locator("#q")).toHaveValue("ingot");
-});
+      const app = await killAndReopen(page, shell.as);
+      await expect(app.locator("#entry")).toBeVisible();
+      await expect(app.locator("#entry-word")).toHaveText("ingot");
+      await app.goBack(); // Back still goes to the list
+      await expect(app.locator("#frame")).toBeVisible();
+      await expect(app.locator("#q")).toHaveValue("ingot");
+      await app.goBack(); // and from there to the start screen, as on any start
+      await expect(app.locator("#intro")).toBeVisible();
+      await expect(app.locator("#q")).toHaveValue("");
+    });
 
-test("killed without warning (no sign it went to the background), it still comes back", async ({ page }) => {
-  // On a phone the page may never hear it was hidden before Android kills it (a WebView
-  // doesn't always say), so the place is kept as it changes, not only on the way out.
-  await asTheApp(page);
-  await openApp(page);
-  await searchFor(page, "ate");
-  await page.locator("#scroller").evaluate((el) => (el.scrollTop = 900));
-  await expect.poll(() => page.locator("#scroller li.word:not(.pending)").count()).toBeGreaterThan(5);
-  const top = await page.locator("#scroller").evaluate((el) => el.scrollTop);
-  await page.waitForTimeout(800); // settled
+    test("killed without warning (no sign it went to the background), it still comes back", async ({ page }) => {
+      // On a phone the page may never hear it was hidden before Android kills it (a WebView
+      // doesn't always say), so the place is kept as it changes, not only on the way out.
+      await shell.as(page);
+      await openApp(page);
+      await searchFor(page, "ate");
+      await page.locator("#scroller").evaluate((el) => (el.scrollTop = 900));
+      await expect.poll(() => page.locator("#scroller li.word:not(.pending)").count()).toBeGreaterThan(5);
+      const top = await page.locator("#scroller").evaluate((el) => el.scrollTop);
+      await page.waitForTimeout(800); // settled
 
-  let app = await killHardAndReopen(page);
-  await expect(app.locator("#q")).toHaveValue("ate");
-  await expect.poll(() => app.locator("#scroller").evaluate((el) => el.scrollTop)).toBe(top);
+      let app = await killHardAndReopen(page, shell.as);
+      await expect(app.locator("#q")).toHaveValue("ate");
+      await expect.poll(() => app.locator("#scroller").evaluate((el) => el.scrollTop)).toBe(top);
 
-  await searchFor(app, "ingot");
-  await app.locator('li.word[aria-label="ingot"]').click();
-  await expect(app.locator("#entry-word")).toHaveText("ingot");
-  await app.waitForTimeout(800);
-  app = await killHardAndReopen(app);
-  await expect(app.locator("#entry-word")).toHaveText("ingot");
-});
+      await searchFor(app, "ingot");
+      await app.locator('li.word[aria-label="ingot"]').click();
+      await expect(app.locator("#entry-word")).toHaveText("ingot");
+      await app.waitForTimeout(800);
+      app = await killHardAndReopen(app, shell.as);
+      await expect(app.locator("#entry-word")).toHaveText("ingot");
+    });
 
-test("after half an hour away, or from the start screen, it starts fresh", async ({ page }) => {
-  await asTheApp(page);
-  await openApp(page);
-  // From the start screen: nothing to come back to.
-  await toBackground(page);
-  await page.reload();
-  await expect(page.locator("#status")).toHaveText(/^[\d,]+ words$/);
-  await expect(page.locator("#intro")).toBeVisible();
-  // A place kept more than half an hour ago: too old.
-  await page.evaluate(() =>
-    localStorage.setItem("dictionarius.place", JSON.stringify({ at: Date.now() - 31 * 60_000, query: "ate", scrollTop: 0, word: null })),
-  );
-  await page.reload();
-  await expect(page.locator("#status")).toHaveText(/^[\d,]+ words$/);
-  await page.waitForTimeout(500);
-  await expect(page.locator("#intro")).toBeVisible();
-  await expect(page.locator("#q")).toHaveValue("");
-});
+    test("after half an hour away, or from the start screen, it starts fresh", async ({ page }) => {
+      await shell.as(page);
+      await openApp(page);
+      // From the start screen: nothing to come back to.
+      await toBackground(page);
+      await page.reload();
+      await expect(page.locator("#status")).toHaveText(/^[\d,]+ words$/);
+      await expect(page.locator("#intro")).toBeVisible();
+      // A place kept more than half an hour ago: too old.
+      await page.evaluate(() =>
+        localStorage.setItem("dictionarius.place", JSON.stringify({ at: Date.now() - 31 * 60_000, query: "ate", scrollTop: 0, word: null })),
+      );
+      await page.reload();
+      await expect(page.locator("#status")).toHaveText(/^[\d,]+ words$/);
+      await page.waitForTimeout(500);
+      await expect(page.locator("#intro")).toBeVisible();
+      await expect(page.locator("#q")).toHaveValue("");
+    });
+  });
+}
 
 test("a web page that's reloaded starts fresh, as pages do", async ({ page }) => {
   await openApp(page);
