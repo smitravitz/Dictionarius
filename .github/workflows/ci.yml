@@ -18,22 +18,6 @@ defaults:
     shell: bash # -eo pipefail, so a failing step can't hide behind `tee`
 
 jobs:
-  history:
-    name: No chat session links in commit messages
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          fetch-depth: 0 # every commit, not just the last
-      - name: Check every commit message
-        run: |
-          # A link to the chat a commit was written in (a "Claude-Session:" line) must never be
-          # published; .claude/settings.json turns it off for Claude sessions in this repo.
-          if git log --format='%H %B' | grep -n -i -E 'Claude-Session:|claude\.ai/code/session'; then
-            echo "::error::A commit message links to a chat session. Rewrite it out before pushing."
-            exit 1
-          fi
-
   test:
     name: Tests (Node ${{ matrix.node }})
     runs-on: ubuntu-latest

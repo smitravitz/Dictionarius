@@ -1,0 +1,53 @@
+name: No chat traces
+
+# Chat traces (links to a Claude chat or session, session ids, the session trailer) are never
+# published here: see CLAUDE.md, and .github/chat-traces.txt for the list. This takes them out
+# of what's written on GitHub (pull requests, issues, comments, reviews, release notes), and
+# fails on what it can't rewrite: a commit or tag message, a file, or an earlier version of
+# edited text, which GitHub keeps in its "edited" menu until it's deleted there by hand.
+# It runs on each such write, on every push and pull request, daily, and by hand; the daily
+# and by-hand runs sweep everything already published. Its log names places, never traces.
+
+on:
+  push:
+    branches: ["**"]
+    tags: ["**"]
+  pull_request:
+    types: [opened, edited, reopened, synchronize]
+  issues:
+    types: [opened, edited]
+  issue_comment:
+    types: [created, edited]
+  pull_request_review:
+    types: [submitted, edited]
+  pull_request_review_comment:
+    types: [created, edited]
+  release:
+    types: [created, published, edited]
+  schedule:
+    - cron: "17 6 * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: no-chat-traces-${{ github.event_name }}-${{ github.event.pull_request.number || github.event.issue.number || github.event.comment.id || github.event.release.id || github.ref }}
+
+jobs:
+  traces:
+    name: No chat traces
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write # release notes
+      issues: write # issues and their comments
+      pull-requests: write # pull requests, reviews and review comments
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # every commit and tag, for the history checks
+          persist-credentials: false
+      - name: Take traces out of what was written; check commits, tags and files
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python3 scripts/chat_traces.py github

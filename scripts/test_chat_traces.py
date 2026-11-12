@@ -13,7 +13,9 @@ import os
 import subprocess
 import sys
 import tempfile
+import threading
 import unittest
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(__file__))
@@ -115,6 +117,250 @@ class RemovesTraces(Case):
         self.same(chat_traces.remove_from_title(f"Fix the list (https://{AI}/code/{SESSION_ID})"), "Fix the list")
         self.same(chat_traces.remove_from_title(f"Fix the list, from {AI}/chat/0f3c9a1e"), "Fix the list, from")
         self.same(chat_traces.remove_from_title("Fix the list"), "Fix the list")
+
+
+class FakeGitHub:
+    """GitHub's REST API, for what the guard reads and writes: objects by path, lists in pages."""
+
+    def __init__(self):
+        self.objects, self.lists, self.writes, self.refuse = {}, {}, [], set()
+        self.edits, self.graphql_errors = {}, False  # edit histories by node id, newest first
+        fake = self
+
+        class Handler(BaseHTTPRequestHandler):
+            def log_message(self, *args):
+                pass
+
+            def _send(self, status, body, headers=()):
+                data = json.dumps(body).encode()
+                self.send_response(status)
+                self.send_header("Content-Type", "application/json")
+                for name, value in headers:
+                    self.send_header(name, value)
+                self.end_headers()
+                self.wfile.write(data)
+
+            def do_GET(self):
+                path, _, query = self.path.partition("?")
+                if self.headers.get("Authorization") != "Bearer test-token":
+                    return self._send(401, {"message": "Bad credentials"})
+                if path in fake.lists:
+                    pages = fake.lists[path]
+                    page = int(dict(p.split("=") for p in query.split("&") if p).get("page", "1"))
+                    links = [("Link", f'<{fake.url}{path}?page={page + 1}>; rel="next"')] if page < len(pages) else []
+                    return self._send(200, pages[page - 1], links)
+                if path in fake.objects:
+                    return self._send(200, fake.objects[path])
+                self._send(404, {"message": "Not Found"})
+
+            def _write(self):
+                data = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
+                fake.writes.append((self.command, self.path, data))
+                if self.path in fake.refuse:
+                    return self._send(403, {"message": "Resource not accessible by integration"})
+                fake.objects.setdefault(self.path, {}).update(data)
+                self._send(200, fake.objects[self.path])
+
+            do_PATCH = do_PUT = _write
+
+            def do_POST(self):
+                assert self.path == "/graphql", self.path
+                query = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
+                if fake.graphql_errors:
+                    return self._send(200, {"errors": [{"message": "Resource not accessible by integration"}]})
+                edits = fake.edits.get(query["variables"]["id"], [])
+                self._send(200, {"data": {"node": {"userContentEdits": {"nodes": edits}}}})
+
+        self.server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        self.url = f"http://127.0.0.1:{self.server.server_address[1]}"
+        threading.Thread(target=self.server.serve_forever, daemon=True).start()
+
+    def close(self):
+        self.server.shutdown()
+        self.server.server_close()
+
+
+REPO = "/repos/owner/app"
+
+
+class Repository:
+    """A small git repository with a main branch, for the commit and file checks."""
+
+    def __init__(self):
+        self.folder = tempfile.TemporaryDirectory()
+        self.path = self.folder.name
+        self.git("init", "-q", "-b", "main")
+        self.main = self.commit("Start the app", {"README.md": "An app.\n"})
+
+    def git(self, *args):
+        env = {**os.environ, "GIT_AUTHOR_NAME": "Maintainer", "GIT_AUTHOR_EMAIL": "m@example.org",
+               "GIT_COMMITTER_NAME": "Maintainer", "GIT_COMMITTER_EMAIL": "m@example.org"}
+        result = subprocess.run(["git", "-c", "core.hooksPath=/dev/null", *args], cwd=self.path,
+                                env=env, capture_output=True, text=True, check=True)
+        return result.stdout.strip()
+
+    def commit(self, message, files=None):
+        for name, text in (files or {"change.txt": message.splitlines()[0] + "\n"}).items():
+            Path(self.path, name).parent.mkdir(parents=True, exist_ok=True)
+            Path(self.path, name).write_text(text, encoding="utf-8")
+        self.git("add", "-A")
+        self.git("commit", "-q", "-m", message)
+        return self.git("rev-parse", "HEAD")
+
+
+class GuardsGitHub(Case):
+    def setUp(self):
+        self.github = FakeGitHub()
+        self.addCleanup(self.github.close)
+        self.repo = Repository()
+        self.addCleanup(self.repo.folder.cleanup)
+        self.api = chat_traces.GitHub(self.github.url, "owner/app", "test-token")
+
+    def run_event(self, name, payload):
+        payload.setdefault("repository", {"default_branch": "main"})
+        report = chat_traces.run(name, payload, self.api, self.repo.path)
+        # What the check prints is public on a public repository: places, never the traces.
+        self.no_trace("\n".join(report.cleaned + report.problems + report.warnings), "the check's log")
+        return report
+
+    def pull_request(self, number=1, title="Fix the list", body="Fixes it."):
+        url = f"{self.github.url}{REPO}/pulls/{number}"
+        self.github.objects[f"{REPO}/pulls/{number}"] = {"number": number, "title": title, "body": body}
+        head = self.repo.git("rev-parse", "HEAD")
+        return {"number": number, "url": url, "node_id": f"PR_{number}", "base": {"sha": self.repo.main}, "head": {"sha": head}}
+
+    def test_a_pull_request_loses_a_session_link_and_nothing_else(self):
+        self.repo.commit("Fix the list")
+        body = "Two fixes.\n\n---\n" + FOOTER + "\n\n" + SESSION_LINK
+        report = self.run_event("pull_request", {"pull_request": self.pull_request(body=body)})
+        self.same(self.github.writes, [("PATCH", f"{REPO}/pulls/1", {"body": "Two fixes.\n\n---\n" + FOOTER})])
+        self.assertEqual(report.problems, [])
+        self.assertEqual(report.cleaned, ["pull request #1: description, 1 trace line taken out"])
+
+    def test_every_kind_of_text_people_write_on_github_is_cleaned_where_it_is_kept(self):
+        url = self.github.url + REPO
+        cases = {
+            "issues": ({"issue": {"number": 4, "url": f"{url}/issues/4"}}, f"{REPO}/issues/4", "PATCH"),
+            "issue_comment": ({"comment": {"id": 7, "url": f"{url}/issues/comments/7"}}, f"{REPO}/issues/comments/7", "PATCH"),
+            "pull_request_review_comment": ({"comment": {"id": 8, "url": f"{url}/pulls/comments/8"}}, f"{REPO}/pulls/comments/8", "PATCH"),
+            "pull_request_review": ({"review": {"id": 9}, "pull_request": {"number": 2, "url": f"{url}/pulls/2"}}, f"{REPO}/pulls/2/reviews/9", "PUT"),
+            "release": ({"release": {"id": 3, "url": f"{url}/releases/3"}}, f"{REPO}/releases/3", "PATCH"),
+        }
+        for event, (payload, path, method) in cases.items():
+            with self.subTest(event):
+                self.github.writes.clear()
+                self.github.objects[path] = {"body": "Thanks.\n\n" + SESSION_LINK}
+                report = self.run_event(event, payload)
+                self.same(self.github.writes, [(method, path, {"body": "Thanks."})])
+                self.assertEqual(report.problems, [])
+
+    def test_titles_and_release_names_are_cleaned_too(self):
+        self.github.objects[f"{REPO}/releases/3"] = {"name": f"v1.0 https://{AI}/code/{SESSION_ID}", "body": "Notes."}
+        self.run_event("release", {"release": {"id": 3, "url": f"{self.github.url}{REPO}/releases/3"}})
+        self.same(self.github.writes, [("PATCH", f"{REPO}/releases/3", {"name": "v1.0"})])
+
+    def test_text_with_no_trace_is_never_written_back(self):
+        # A write would add a revision to the text's public edit history for nothing.
+        self.repo.commit("Fix the list")
+        body = "Fixes it.\n\nCo-Authored-By: Claude <noreply@anthropic.com>\n\n---\n" + FOOTER + "\n" + BADGE
+        report = self.run_event("pull_request", {"pull_request": self.pull_request(body=body)})
+        self.same(self.github.writes, [])
+        self.assertEqual(report.cleaned + report.problems, [])
+
+    def test_a_commit_message_with_a_trace_fails_the_check_by_its_commit_not_its_text(self):
+        self.repo.commit("Fix the list")
+        bad = self.repo.commit(f"Fix the count\n\n{TRAILER}: https://{AI}/code/{SESSION_ID}")
+        report = self.run_event("pull_request", {"pull_request": self.pull_request()})
+        self.assertEqual(report.problems, [f"commit {bad[:12]}: its message, line 3"])
+
+    def test_a_push_checks_its_new_commits_and_a_tags_message(self):
+        before = self.repo.commit("Fix the list")
+        self.repo.git("branch", "feature")  # remote branches, as a checkout sees them
+        self.repo.git("update-ref", "refs/remotes/origin/main", self.repo.main)
+        bad = self.repo.commit(f"Fix the count\n\nSee {SESSION_LINK}")
+        tip = self.repo.commit("Tidy the list")  # the trace isn't in the last commit pushed
+        report = self.run_event("push", {"ref": "refs/heads/feature", "before": before, "after": tip, "deleted": False})
+        self.assertEqual(report.problems, [f"commit {bad[:12]}: its message, line 3"])
+
+        new_branch = self.run_event("push", {"ref": "refs/heads/feature", "before": "0" * 40, "after": tip, "deleted": False})
+        self.assertEqual(new_branch.problems, report.problems)  # all it has that main hasn't
+
+        self.repo.git("tag", "-a", "v1.0", "-m", f"Release\n\nhttps://{AI}/share/5e6f7a8b", self.repo.main)
+        tag = self.repo.git("rev-parse", "v1.0")
+        tagged = self.run_event("push", {"ref": "refs/tags/v1.0", "before": "0" * 40, "after": tag, "deleted": False})
+        self.assertEqual(tagged.problems, ["tag v1.0: its message, line 3"])
+
+    def test_a_file_with_a_trace_fails_the_check_by_its_path_and_line(self):
+        self.repo.commit("Add notes", {"docs/notes.md": f"# Notes\n\nFrom {SESSION_LINK}\n"})
+        head = self.repo.git("rev-parse", "HEAD")
+        report = self.run_event("push", {"ref": "refs/heads/main", "before": self.repo.main, "after": head, "deleted": False})
+        self.assertEqual(report.problems, ["file docs/notes.md, line 3"])
+
+    def test_a_write_github_refuses_fails_the_check(self):
+        self.repo.commit("Fix the list")
+        self.github.refuse.add(f"{REPO}/pulls/1")
+        report = self.run_event("pull_request", {"pull_request": self.pull_request(body="Fixes.\n" + SESSION_LINK)})
+        self.assertEqual(report.problems, ["pull request #1: description still has 1 trace line; GitHub refused the edit (403)"])
+
+    # GitHub keeps every earlier version of edited text, in its "edited" menu, for anyone to
+    # open; the API can't delete one, so the check fails until it's deleted by hand there.
+    def edit(self, minutes, text, deleted=False):
+        # A deleted version keeps its text here, so only its deletedAt says it's gone.
+        return {"editedAt": f"2026-11-12T10:{minutes:02d}:00Z", "deletedAt": "2026-11-12T11:00:00Z" if deleted else None,
+                "diff": text}
+
+    def test_an_earlier_version_still_showing_a_trace_fails_the_check_until_it_is_deleted(self):
+        self.repo.commit("Fix the list")
+        pr = self.pull_request(body="Fixes it.\n" + SESSION_LINK)
+        self.github.edits["PR_1"] = [self.edit(5, "Fixes it."), self.edit(0, "Fixes it.\n" + SESSION_LINK)]
+        report = self.run_event("pull_request", {"pull_request": pr})
+        self.assertEqual(report.problems, ["pull request #1: 1 earlier version of its description still shows a trace;"
+                                           " delete it in the description's edited menu, then run this check again"])
+
+        self.github.edits["PR_1"] = [self.edit(5, "Fixes it."), self.edit(0, "Fixes it.\n" + SESSION_LINK, deleted=True)]
+        self.assertEqual(self.run_event("pull_request", {"pull_request": pr}).problems, [])
+
+    def test_the_newest_version_is_the_text_itself_and_is_not_counted_as_earlier(self):
+        # By its time, not its place in GitHub's list (newest first, oldest first), and also when
+        # its "diff" shows what that edit took out.
+        self.repo.commit("Fix the list")
+        pr = self.pull_request(body="Fixes it.")
+        newest, oldest = self.edit(5, "Fixes it.\n-" + SESSION_LINK), self.edit(0, "Fixes it.")
+        for order in ([newest, oldest], [oldest, newest]):
+            self.github.edits["PR_1"] = order
+            self.assertEqual(self.run_event("pull_request", {"pull_request": pr}).problems, [])
+
+    def test_comments_and_reviews_have_their_history_checked_too(self):
+        url = self.github.url + REPO
+        self.github.objects[f"{REPO}/issues/comments/7"] = {"body": "Thanks."}
+        self.github.edits["IC_7"] = [self.edit(5, "Thanks."), self.edit(0, "Thanks. " + SESSION_LINK)]
+        report = self.run_event("issue_comment", {"comment": {"id": 7, "node_id": "IC_7", "url": f"{url}/issues/comments/7"}})
+        self.assertEqual(report.problems, ["comment 7: 1 earlier version of its text still shows a trace;"
+                                           " delete it in the text's edited menu, then run this check again"])
+
+    def test_an_edit_history_that_cannot_be_read_is_a_warning_not_a_failure(self):
+        self.repo.commit("Fix the list")
+        self.github.graphql_errors = True
+        report = self.run_event("pull_request", {"pull_request": self.pull_request()})
+        self.assertEqual((report.problems, report.warnings), ([], ["pull request #1: its edit history couldn't be read"]))
+
+
+    def test_the_sweep_cleans_everything_already_published_across_pages(self):
+        url = self.github.url + REPO
+        self.github.lists = {
+            f"{REPO}/issues": [[{"number": 2, "url": f"{url}/issues/2", "title": "Bug", "body": "Clean."}],
+                               [{"number": 1, "url": f"{url}/issues/1", "title": "Fix", "body": "Fix.\n" + SESSION_LINK, "pull_request": {}}]],
+            f"{REPO}/issues/comments": [[{"id": 7, "url": f"{url}/issues/comments/7", "body": SESSION_LINK}]],
+            f"{REPO}/pulls/comments": [[]],
+            f"{REPO}/releases": [[{"id": 3, "url": f"{url}/releases/3", "name": "v1", "body": "Notes."}]],
+            f"{REPO}/pulls/1/reviews": [[{"id": 9, "body": "Looks right.\n" + SESSION_LINK}]],
+        }
+        report = self.run_event("workflow_dispatch", {})
+        self.assertEqual(sorted((method, path) for method, path, _ in self.github.writes), [
+            ("PATCH", f"{REPO}/issues/1"), ("PATCH", f"{REPO}/issues/comments/7"), ("PUT", f"{REPO}/pulls/1/reviews/9")])
+        self.same(self.github.objects[f"{REPO}/issues/1"], {"body": "Fix."})
+        self.same(self.github.objects[f"{REPO}/issues/comments/7"], {"body": ""})
+        self.assertEqual(report.problems, [])
 
 
 class HooksUseTheSameList(unittest.TestCase):
