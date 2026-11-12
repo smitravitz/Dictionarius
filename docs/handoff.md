@@ -78,10 +78,11 @@ built from the English Wiktionary dump by `scripts/build_fm_index.py`.
   on the device and a service worker keeps the page, so later visits work offline. Built by
   `tools/web-data.ts` when `DICTIONARIUS_WEB=1` (pages.yml); the APK is unchanged. Check on Pages that Range requests come back exact (206) and that Settings
   reaches "Saved on this device". `npm run test:e2e:built` tests the published build.
-- Installable web app (ADR-0009, on main, unreleased): a manifest and icons (web build only),
+- Installable web app (ADR-0009, released in v0.7.2): a manifest and icons (web build only),
   Install in Settings where the browser offers it; installed, it behaves like the Android app
-  (Back word → results → start screen → out, place kept), decided in `web/shell.ts`; the service
-  worker opens the kept page after 2 s on a weak signal. Also for every build: a light/dark switch
+  (Back word → results → start screen → out, place kept, straight back to a word that was open),
+  decided in `web/shell.ts`; once kept, the page opens from the device at once and a new build
+  from the next start. Also for every build: a light/dark switch
   at the top right of Settings (kept only when against the system's), and "Still downloading"
   with dots on a word's page whose definitions are on their way ("Still loading" in the app).
   The Android app's Back now steps through the same history (its clear-the-search case is gone).

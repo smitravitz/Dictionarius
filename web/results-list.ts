@@ -128,6 +128,15 @@ export class ResultsList {
     this.render();
   }
 
+  /** Scroll to `top` (a scroll position), as far as the rows known so far reach; whether
+   *  it got there. */
+  scrollTo(top: number): boolean {
+    this.list.style.height = `${Math.min(this.contentHeight(), MAX_HEIGHT)}px`; // tall enough first, as above
+    this.scroller.scrollTop = top;
+    this.render();
+    return this.scroller.scrollTop >= top - 1;
+  }
+
   /** Position (letters before the match) of the row at the top, if loaded. */
   topOffset(): number | null {
     const i = Math.floor(this.virtualTop() / ROW_HEIGHT);

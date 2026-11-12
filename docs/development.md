@@ -59,8 +59,8 @@ npx cap open android                    # or: cd android && ./gradlew assembleDe
 `npm run test:e2e:built` builds the web app as `pages.yml` does (`DICTIONARIUS_WEB=1`: each
 word list's starter and gzipped copy, the service worker, the manifest and icons) and tests it
 served as Pages serves it: that it opens from the starter, works offline after one visit
-(ADR-0008), that Chrome finds it installable, and that on a weak signal it opens from the kept
-page (ADR-0009). CI runs it after the main browser tests. A plain `npm run build` (the Android
+(ADR-0008), that Chrome finds it installable, and that once kept it opens from the device at
+once, a new build from the next start (ADR-0009). CI runs it after the main browser tests. A plain `npm run build` (the Android
 app's) leaves these out.
 
 The web app's icons (`web/icons/`) are drawn from `docs/brand/icon.svg`; after changing it,
