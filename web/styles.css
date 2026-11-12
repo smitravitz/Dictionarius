@@ -133,6 +133,51 @@ body {
   outline-offset: 3px;
 }
 
+/* The title, with the download bar hung under it: absolutely placed, so the page never moves
+   for it. A proofreader's rule in magenta, filling by transform only, and a pencil caption. */
+.title {
+  position: relative;
+}
+
+.download {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  width: 11.5rem;
+  margin-top: 0.3rem;
+  pointer-events: none;
+}
+
+.download-track {
+  height: 2px;
+  overflow: hidden;
+  border-radius: 1px;
+  background: var(--hairline);
+}
+
+.download-fill {
+  height: 100%;
+  background: var(--proof);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 250ms linear;
+}
+
+.download-text {
+  margin: 0.25rem 0 0;
+  color: var(--pencil);
+  font-size: 0.6875rem;
+  line-height: 1.2;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums; /* the percentage doesn't jitter as it climbs */
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .download-fill {
+    transition: none;
+  }
+}
+
 .masthead-end {
   display: flex;
   align-items: center;
@@ -353,10 +398,13 @@ body {
   margin-left: auto;
 }
 
-.app:has(> .intro:not([hidden])) .wordmark {
+.app:has(> .intro:not([hidden])) .title {
   order: 2;
   flex-basis: 100%;
   margin-top: 2.25rem;
+}
+
+.app:has(> .intro:not([hidden])) .wordmark {
   font-size: 3.125rem;
   font-weight: 600;
   line-height: 1;

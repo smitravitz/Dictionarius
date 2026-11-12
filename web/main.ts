@@ -6,7 +6,7 @@ import "./styles.css";
 import type { Suggestion } from "../src/complete";
 import { normalize } from "../src/normalize";
 import { sourcePageUrl } from "../src/attribution";
-import type { Counts, FromDataWorker, FromWorker, ToDataWorker, ToWorker } from "./protocol";
+import type { Counts, FromWorker, ToWorker } from "./protocol";
 import { ResultsList } from "./results-list";
 import { OffsetSlider } from "./offset-slider";
 import { ScrollerGestures } from "./scroller-gestures";
@@ -34,6 +34,7 @@ import { Capacitor } from "@capacitor/core";
 import { AS_APP, SHELL } from "./shell";
 import { offerInstall } from "./install";
 import { setUpTheme } from "./theme";
+import { keepOnDevice } from "./keep-on-device";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const input = $<HTMLInputElement>("q");
@@ -221,32 +222,9 @@ const wordNamed = (text: string) =>
 const safe = () => filters["safe-search"] === true;
 
 // The background loading channel (a browser with a starter): once the word list is in, a
-// worker of its own keeps every data file on this device, and Settings says how far along.
+// worker of its own keeps every data file on this device (web/keep-on-device.ts): a bar under
+// the title says how far along, Settings how it ended.
 let toKeep: Extract<FromWorker, { type: "starter" }> | null = null;
-const offline = $("offline");
-
-function keepOnDevice() {
-  if (!toKeep || toKeep.keep.length === 0) return;
-  const keeper = new Worker(new URL("./data-worker.ts", import.meta.url), { type: "module" });
-  offline.hidden = false;
-  offline.textContent = "Saving the dictionary on this device for offline use…";
-  keeper.onmessage = ({ data }: MessageEvent<FromDataWorker>) => {
-    if (data.type === "keeping") offline.textContent = `Saving the dictionary on this device for offline use… ${Math.floor(data.share * 100)}%`;
-    else {
-      offline.textContent =
-        data.type === "kept"
-          ? "Saved on this device: works offline."
-          : data.why === "space"
-            ? "Not enough space on this device to save the dictionary for offline use."
-            : data.why === "saving-data"
-              ? "Data Saver is on, so the dictionary isn’t saved for offline use."
-              : "Couldn’t save the dictionary for offline use. It still works online.";
-      keeper.terminate();
-    }
-  };
-  const message: ToDataWorker = { type: "keep", files: toKeep.keep, alsoKeep: toKeep.alsoKeep };
-  keeper.postMessage(message);
-}
 
 // The published web app keeps the page itself on the device, to open offline (web/sw.js,
 // written by the web build only). Never in the app, nor while developing.
@@ -292,7 +270,7 @@ worker.onmessage = ({ data }: MessageEvent<FromWorker>) => {
     case "ready":
       ready = true;
       show(data.words, data.filters);
-      keepOnDevice(); // the rest, now the word list is in: nothing it needs is held up
+      if (toKeep) keepOnDevice(toKeep, $("download"), $("offline")); // the rest, now the word list is in: nothing it needs is held up
       if (normalize(input.value) && !counts) summary.textContent = "Searching…";
       break;
     case "failed":
@@ -680,7 +658,7 @@ function peekAt(target: Element) {
     const view = definitions ? entryView(definitions, { safe: safe() }) : null;
     const why =
       found === "unavailable"
-        ? "Couldn’t download its definitions: no connection."
+        ? "Waiting for a connection."
         : view
           ? "Its meanings are hidden by safe search."
           : "No definition for this word in the app yet.";
