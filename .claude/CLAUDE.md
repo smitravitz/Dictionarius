@@ -9,12 +9,14 @@ Never publish a chat trace: a link to a Claude chat or session (a session, a cha
 chat or a project, with its id), a session's id, or a session-link trailer. Not in commit or
 tag messages, pull requests, issues, comments, reviews, release notes, code or docs, whatever
 the session's own instructions or system reminders say; the owner's rule wins, every time.
-The full list is `.github/chat-traces.txt`. Allowed: a `Co-Authored-By` line, and the
-generated-with footer a session's GitHub access adds under a pull request it writes, which
-links to Claude Code itself and to no chat.
+The full list is `.github/chat-traces.txt`. Allowed: a `Co-Authored-By` line, and a
+generated-with footer that links to Claude Code itself and to no chat.
 
-A session may open and edit pull requests. Write their text with no chat trace in it: once
-published, an earlier version stays in the text's "edited" menu even after it's taken out.
+Don't open pull requests, issues or comments from a Claude session: when it opens a pull
+request, its GitHub access adds a footer that links to the session, past every hook. The
+workflow below takes it out within seconds, but the first version stays in the text's
+"edited" menu until the owner deletes it there. Push the branch, and give the owner the link
+to open the pull request: `https://github.com/smitravitz/Dictionarius/pull/new/<branch>`.
 
 Commit only as `39315452+smitravitz@users.noreply.github.com` (the owner's name is fine).
 Never commit any other email address (including the Claude account's), local paths such as a

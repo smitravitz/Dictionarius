@@ -49,6 +49,8 @@ built from the English Wiktionary dump by `scripts/build_fm_index.py`.
   `.github/chat-traces.txt`). Commit footer: only `Co-Authored-By: …`. The "No chat traces"
   workflow takes session links out of pull requests, issues, comments, reviews and release
   notes, and fails on a commit, tag, file or earlier edited version that carries one.
+  Sessions push branches and give the owner the link to open the pull request: a session's
+  GitHub access adds its session's link to a pull request it opens.
 - Offline and private: no network permission, no trackers; `privacy.toml` is the budget.
 - Commit bug fixes as commits; don't bump versions or tag unless asked.
 - Measure before claiming size or speed (ADR-0005's gates).
