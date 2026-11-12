@@ -19,6 +19,7 @@ Consequences · Evidence · Open questions.
 | [0007](0007-derived-pronunciations.md) | Pronunciations for the words Wiktionary gives none, worked out from their parts | Proposed (planning only) |
 | [0008](0008-web-start-in-layers.md) | The web app starts from a small starter; the rest loads behind it and stays on the device | Accepted |
 | [0009](0009-installable-web-app.md) | The web app installs as an app, and an installed app behaves like the Android one | Accepted |
+| [0010](0010-store-distribution.md) | One build for every shelf: Google Play and the App Store beside GitHub | Accepted |
 
 ## Decisions anticipated (not yet recorded)
 

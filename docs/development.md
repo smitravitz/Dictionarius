@@ -54,6 +54,31 @@ npm run build && npx cap sync android   # copy the web app and dist/headwords.bi
 npx cap open android                    # or: cd android && ./gradlew assembleDebug
 ```
 
+## iOS
+
+Needs a Mac with Xcode 26 or later to build or run it; without one, CI does both
+([`ios.yml`](../.github/workflows/ios.yml) builds it for the simulator, [`ios-release.yml`](../.github/workflows/ios-release.yml)
+sends a release to TestFlight). The project in `ios/` is Capacitor's, with Swift Package
+Manager; `npx cap sync ios` works on any system and rewrites `ios/App/CapApp-SPM/Package.swift`
+when a plugin is added or removed (commit it; CI fails if it's stale).
+
+```bash
+npm run build && npx cap sync ios   # copy the web app and the word list into ios/
+npx cap open ios                    # on a Mac: opens Xcode
+```
+
+The app asks for nothing: no `NS…UsageDescription` keys, and a privacy manifest
+(`ios/App/App/PrivacyInfo.xcprivacy`) that says no tracking and no collected data. The
+privacy audit checks both against `privacy.toml`. Its icon is drawn by `tools/make-icons.ts`.
+
+## The stores
+
+[`docs/stores.md`](stores.md): what Google Play and the App Store each need, what the
+repository already does, and the steps only the owner can take in each console. The store
+listings are in `fastlane/metadata/`; `npm test` holds them to each store's length limits.
+Store screenshots: Actions → Store screenshots → Run workflow, or
+`DICTIONARIUS_SAMPLE_DATA=release-data npx playwright test --config playwright.store.config.ts`.
+
 ### The web app as published
 
 `npm run test:e2e:built` builds the web app as `pages.yml` does (`DICTIONARIUS_WEB=1`: each
@@ -97,7 +122,7 @@ software graphics, so they flatter or understate a real phone; memory is the fig
 
 ## Releasing
 
-Once, on your own computer: `bash scripts/setup-release.sh path/to/headwords.bin`. It creates the signing key, stores it in GitHub's Actions secrets and uploads the word index. After that, pushing a tag such as `v0.2.0` builds a signed APK and publishes it as a release ([`release.yml`](../.github/workflows/release.yml)), then publishes that version's web app to GitHub Pages ([`pages.yml`](../.github/workflows/pages.yml); only the latest release is online; once, set Settings → Pages → Source to **GitHub Actions**). To republish without a new release, run Actions → Pages → Run workflow (the latest release by default, or name a tag). The build names its files relative to the page (`base: "./"` in `vite.config.ts`), so it works from Pages' `/Dictionarius/` folder as well as inside the app. The release notes are the tag's message, so make it an annotated tag: `git tag -a v0.2.0 -m "What's new"` (several `-m` make several paragraphs; `-F notes.md` reads a file).
+Once, on your own computer: `bash scripts/setup-release.sh path/to/headwords.bin`. It creates the signing key, stores it in GitHub's Actions secrets and uploads the word index. After that, pushing a tag such as `v0.2.0` builds a signed APK and publishes it as a release ([`release.yml`](../.github/workflows/release.yml)), keeps the same build as an app bundle for Google Play (the run's `play-app-bundle` artifact), sends the iOS app to TestFlight once Apple's secrets are set ([`ios-release.yml`](../.github/workflows/ios-release.yml)), then publishes that version's web app to GitHub Pages ([`pages.yml`](../.github/workflows/pages.yml); only the latest release is online; once, set Settings → Pages → Source to **GitHub Actions**). To republish without a new release, run Actions → Pages → Run workflow (the latest release by default, or name a tag). The build names its files relative to the page (`base: "./"` in `vite.config.ts`), so it works from Pages' `/Dictionarius/` folder as well as inside the app. The release notes are the tag's message, so make it an annotated tag: `git tag -a v0.2.0 -m "What's new"` (several `-m` make several paragraphs; `-F notes.md` reads a file).
 
 ## More
 

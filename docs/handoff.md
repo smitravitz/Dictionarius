@@ -3,20 +3,21 @@
 Read this first in a new chat, then `.claude/CLAUDE.md`. Update it at the end of any
 session that changes what's below (newest state only; history lives in git).
 
-_Last updated: 2026-11-12, at v0.7.2 (the installable web app, ADR-0009); unreleased: opening from the device at once, back straight to a word, dark by default, navigation buttons on everywhere, the title as a link home._
+_Last updated: 2026-11-12, at v0.7.4; unreleased: the iOS app, the Play app bundle, store listings and privacy policy (ADR-0010), none published to a store yet._
 
 ## What it is
 
 Dictionarius: an offline, open-source English dictionary that finds a word from any part
-of it. TypeScript web app (no framework, Vite 7) wrapped for Android with Capacitor 8.
+of it. TypeScript web app (no framework, Vite 7) wrapped for Android and iOS with Capacitor 8.
 Search is an FM-index in a Web Worker; definitions are a brotli-blocked file. Data is
 built from the English Wiktionary dump by `scripts/build_fm_index.py`.
 
 - Data formats: `docs/index-format.md`, `docs/definitions-format.md`
 - Decisions: `docs/adr/` (ADR-0005, layered data packs: Proposed, its step 1 built;
   ADR-0006, letter and position conditions as bitmaps: Proposed; ADR-0009, the installable
-  web app: Accepted)
+  web app: Accepted; ADR-0010, Google Play and the App Store: Accepted, built, unpublished)
 - Build, test, release: `docs/development.md`
+- The stores, step by step: `docs/stores.md`
 
 ## Where things are
 
@@ -28,7 +29,9 @@ built from the English Wiktionary dump by `scripts/build_fm_index.py`.
 | `scripts/` | Python data pipeline, `setup-release.sh`, privacy audit |
 | `e2e/` | Playwright tests (desktop + phone) against `test/fixtures` sample data |
 | `android/` | Capacitor Android shell, `EdgeGesturesPlugin.java` |
-| `.github/workflows/` | `ci.yml`, `release.yml` (tag → signed APK), `pages.yml` (web app on Pages) |
+| `ios/` | Capacitor iOS shell (Swift Package Manager), its privacy manifest; iPhone only, iOS 16+ |
+| `fastlane/metadata/` | Store listings: Play (`android/en-US/`) and App Store (`en-US/`); `PRIVACY.md` is the policy they link to |
+| `.github/workflows/` | `ci.yml`, `release.yml` (tag → signed APK and Play app bundle), `pages.yml` (web app on Pages), `ios.yml` (iOS builds), `ios-release.yml` (tag → TestFlight), `store-screenshots.yml` (by hand) |
 
 ## Shipping
 
@@ -105,6 +108,13 @@ built from the English Wiktionary dump by `scripts/build_fm_index.py`.
 
 ## Open items
 
+0. **Stores (ADR-0010), first release as the app is; ADR-0005, 0006 and 0007 are not needed
+   for it.** In the repository: done, but `ios.yml`, `ios-release.yml`, the bundle check and
+   `store-screenshots.yml` have never run (written with no Mac, Android SDK or browser to
+   hand): fix what their first runs show. The owner's part is `docs/stores.md`: Play's
+   12 testers for 14 days (start first), the Apple account and its key, the app-signing
+   choice on Play, the console forms, and a check of the first TestFlight build on an iPhone.
+   Not built: a WebKit project in the browser tests; iPad; uploads to the stores from CI.
 1. ADR-0005: next, links and "plural of" as ids, then translations (French first). A
    core-only APK flavour is now possible (33.8 MB of definitions instead of 56.9).
 2. The 102 MB installed vs 73.3 MB APK gap: get Android's storage breakdown (app/data/cache).
