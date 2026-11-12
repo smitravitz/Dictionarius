@@ -1492,11 +1492,6 @@ a:focus-visible {
   letter-spacing: 0.01em;
   color: var(--pencil);
 }
-.loader-dots {
-  display: inline-block;
-  width: 1.5ch; /* room for three, so the words don't shift as the dots come and go */
-  text-align: left;
-}
 .loader.stuck .book {
   display: none;
 }
@@ -1508,6 +1503,31 @@ a:focus-visible {
   .loader > * {
     animation-duration: 0.01s;
   }
+}
+
+/* ------------------------------------------------------------ still working */
+
+/* Dots after "Loading Dictionarius" or "Still downloading" (web/dots.ts): one, two, three and
+   back (". .. ... .."), a step every 420 ms. Each dot keeps its place and only its opacity
+   changes, so the words never shift; with reduced motion all three simply stay. */
+.dots i {
+  font-style: normal;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .dots i:nth-child(2) {
+    animation: dot-two 1.68s step-end infinite;
+  }
+  .dots i:nth-child(3) {
+    animation: dot-three 1.68s step-end infinite;
+  }
+}
+@keyframes dot-two {
+  0% { opacity: 0; }
+  25% { opacity: 1; }
+}
+@keyframes dot-three {
+  0%, 75% { opacity: 0; }
+  50% { opacity: 1; }
 }
 
 /* ------------------------------------------------------------ how it works */

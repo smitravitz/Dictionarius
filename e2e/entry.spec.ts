@@ -1,4 +1,5 @@
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect, type Locator, type Page } from "@playwright/test";
+import { asTheApp } from "./as-the-app";
 
 // A word's entry and its peek, on the fixture's made-up definitions:
 // "ingot" (noun with a pronunciation and origin, then verb), "zorbles" (plural
@@ -98,7 +99,7 @@ test("a browser shows the loading screen until its starter is in, then nothing s
   await page.goto("/?index=headwords-sample.bin");
   const loader = page.locator("#loader");
   await expect(loader).toContainText("Loading Dictionarius");
-  await expect(page.locator(".loader-dots")).toHaveText("..."); // the dots come and go
+  expect(await dotsOverTime(loader.locator(".dots"))).toEqual(expect.arrayContaining([1, 2, 3])); // the dots come and go
   await expect(loader).toBeVisible();
   expect(await page.locator("#app").evaluate((app) => (app as HTMLElement).inert)).toBe(true);
   release();
@@ -106,6 +107,87 @@ test("a browser shows the loading screen until its starter is in, then nothing s
   await openWord(page, "ingot", "ingot");
   await expect(entry(page).locator(".meaning")).toHaveCount(3);
   await expect(entry(page).locator(".entry-note")).toBeHidden();
+});
+
+/** How many of a "still working" line's dots show, each animation frame for two seconds:
+ *  the dots come one, two, three, and back (". .. ... .."). */
+function dotsOverTime(dots: Locator): Promise<number[]> {
+  return dots.evaluate(
+    (el) =>
+      new Promise<number[]>((resolve) => {
+        const seen: number[] = [];
+        const start = performance.now();
+        const frame = (now: number) => {
+          seen.push([...el.children].filter((dot) => Number(getComputedStyle(dot).opacity) > 0.5).length);
+          if (now - start < 2000) requestAnimationFrame(frame);
+          else resolve(seen);
+        };
+        requestAnimationFrame(frame);
+      }),
+  );
+}
+
+/** Holds back the definitions (the file and its layers) until `release` is called. */
+async function holdDefinitions(page: Page) {
+  let release!: () => void;
+  const held = new Promise<void>((resolve) => (release = resolve));
+  await page.context().route(
+    (url) => /\.(definitions|examples|etymology|pronunciation)\.bin$/.test(url.pathname),
+    async (route) => {
+      await held;
+      await route.continue().catch(() => {});
+    },
+  );
+  return release;
+}
+
+test("a word whose definitions are still downloading says so, the dots coming and going, the line holding still", async ({
+  page,
+}) => {
+  const release = await holdDefinitions(page);
+  await open(page);
+  await page.locator("#q").fill("ingot");
+  await page.locator('li.word[aria-label="ingot"]').click();
+  // The page turns at once, with the word; past a moment, it says the rest is on its way.
+  await expect(page.locator("#entry-word")).toHaveText("ingot");
+  const note = entry(page).locator(".entry-note");
+  await expect(note).toHaveText(/^Still downloading/);
+  const dots = note.locator(".dots");
+  await expect(dots).toHaveAttribute("aria-hidden", "true"); // read out once, not dot by dot
+  // Each step of ". .. ... .." seen, in a line whose width never changes as they come and go.
+  const widthBefore = (await note.locator(".still").boundingBox())!.width;
+  const seen = await dotsOverTime(dots);
+  expect(seen).toEqual(expect.arrayContaining([1, 2, 3]));
+  expect(seen.filter((n) => n < 1 || n > 3)).toEqual([]);
+  expect((await note.locator(".still").boundingBox())!.width).toBeCloseTo(widthBefore, 2);
+  // In: the meanings, and nothing says downloading any more.
+  release();
+  await expect(entry(page).locator(".meaning")).toHaveCount(3);
+  await expect(note).toBeHidden();
+});
+
+test("with reduced motion, the dots hold still: all three", async ({ page }) => {
+  const release = await holdDefinitions(page);
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await open(page);
+  await page.locator("#q").fill("ingot");
+  await page.locator('li.word[aria-label="ingot"]').click();
+  const dots = entry(page).locator(".entry-note .dots");
+  await expect(dots).toBeVisible();
+  expect(new Set(await dotsOverTime(dots))).toEqual(new Set([3]));
+  release();
+});
+
+test("the Android app, which downloads nothing, says its definitions are still loading", async ({ page }) => {
+  await asTheApp(page);
+  const release = await holdDefinitions(page);
+  await page.goto("/?index=headwords-sample.bin");
+  await expect(page.locator("#status")).toHaveText(/^[\d,]+ words$/);
+  await page.locator("#q").fill("ingot");
+  await page.locator('li.word[aria-label="ingot"]').click();
+  await expect(entry(page).locator(".entry-note")).toHaveText(/^Still loading/);
+  release();
+  await expect(entry(page).locator(".meaning")).toHaveCount(3);
 });
 
 /** How many lines of text an element shows. */

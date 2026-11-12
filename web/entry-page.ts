@@ -7,6 +7,12 @@
  */
 import { glossParts, type EntryView, type MeaningView, type PeekView } from "../src/entry-view";
 import { clamp } from "./clamp";
+import { stillWorking } from "./dots";
+import { SHELL } from "./shell";
+
+/** What a word's page says while its definitions are on their way: a browser downloads them;
+ *  the Android app has them on the phone and only reads them. */
+const STILL = SHELL === "app" ? "Still loading" : "Still downloading";
 
 /** Opens the word a link names. */
 export type OpenWord = (word: string) => void;
@@ -60,7 +66,7 @@ export function renderEntry(
   parts.body.replaceChildren(...body);
   const { note } = parts;
   note.hidden = false;
-  if (content === "loading") note.textContent = "Loading the definitions…";
+  if (content === "loading") note.replaceChildren(stillWorking(STILL));
   else if (!view) note.textContent = "No definition for this word in the app yet.";
   else if (view.hidden) note.textContent = `${view.hidden} ${view.hidden === 1 ? "meaning" : "meanings"} hidden by safe search.`;
   else note.hidden = true;
