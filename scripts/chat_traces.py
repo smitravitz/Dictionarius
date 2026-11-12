@@ -150,7 +150,9 @@ def clean(github, report, what, url, current, fields, method="PATCH"):
     report.cleaned += [f"{what}: {label}, {_lines(n)} taken out" for label, n in counts.items()]
 
 
-_EDITS = """query($id: ID!) { node(id: $id) { ... on UserContentEditable {
+# Pull requests, issues, comments and reviews all keep their edit history through the Comment
+# interface. The fake API in the tests doesn't read this query: only GitHub checks it.
+_EDITS = """query($id: ID!) { node(id: $id) { ... on Comment {
   userContentEdits(first: 100) { nodes { editedAt deletedAt diff } } } } }"""
 
 
