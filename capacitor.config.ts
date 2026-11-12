@@ -10,6 +10,9 @@ const config: CapacitorConfig = {
       // The page draws behind the status and navigation bars (viewport-fit=cover)
       // and pads itself with env(safe-area-inset-*).
       initialViewportFitValueHint: "cover",
+      // Light icons from launch: the app starts dark (web/theme-choice.ts); web/theme.ts
+      // turns them dark if light is picked.
+      style: "DARK",
     },
   },
 };
