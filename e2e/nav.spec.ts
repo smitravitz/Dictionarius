@@ -163,3 +163,54 @@ test("the Android app starts with them too", async ({ page }) => {
   await page.locator("#settings-open").click();
   await expect(toggle(page)).toBeChecked();
 });
+
+// The title at the top left, "Dictionarius", is a link to the start screen, from anywhere.
+const title = (page: Page) => page.locator("header").getByRole("link", { name: "Dictionarius" });
+
+test("the title at the top left goes to the start screen, from the list and from a word's page", async ({ page }) => {
+  await open(page);
+  await search(page, "ate");
+  await title(page).click();
+  await expect(page.locator("#intro")).toBeVisible();
+  await expect(page.locator("#q")).toHaveValue("");
+
+  await search(page, "ingot");
+  await page.locator('li.word[aria-label="ingot"]').click();
+  await expect(page.locator("#entry-word")).toHaveText("ingot");
+  const box = (await title(page).boundingBox())!;
+  const column = (await page.locator("#app").boundingBox())!; // the page's column (centred on a wide screen)
+  expect(box.x - column.x).toBeLessThan(40); // top left
+  expect(box.y - column.y).toBeLessThan(80);
+  await title(page).click();
+  await expect(page.locator("#intro")).toBeVisible();
+  await expect(page.locator("#entry")).toBeHidden();
+  await expect(page.locator("#q")).toHaveValue("");
+  // Gone home by hand: the steps left behind are taken out, so Back leaves at once.
+  await page.goBack();
+  await expect(page).toHaveURL("about:blank");
+});
+
+test("the title is a real link: reached by the keyboard, shown when focused, and opened with Enter", async ({ page }) => {
+  desktopOnly();
+  await open(page);
+  await search(page, "ate");
+  await expect(title(page)).toHaveAttribute("href", "./");
+  await title(page).focus();
+  const ring = await title(page).evaluate((el) => getComputedStyle(el).outlineStyle);
+  expect(ring).not.toBe("none");
+  await page.keyboard.press("Enter");
+  await expect(page.locator("#intro")).toBeVisible();
+  await expect(page).toHaveURL(/index=headwords-sample\.bin/); // the page itself, not reloaded elsewhere
+});
+
+test("the title keeps the wordmark's look: no underline, the ink's colour", async ({ page }) => {
+  await open(page);
+  await search(page, "ate");
+  const look = await title(page).evaluate((el) => {
+    const link = getComputedStyle(el);
+    const heading = getComputedStyle(el.closest("h1")!);
+    return { underline: link.textDecorationLine, colour: link.color, heading: heading.color };
+  });
+  expect(look.underline).toBe("none");
+  expect(look.colour).toBe(look.heading);
+});

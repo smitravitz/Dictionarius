@@ -858,6 +858,13 @@ function goToStart() {
 }
 $("nav-back").addEventListener("click", () => (entry.hidden ? goToStart() : step("back")));
 $("nav-home").addEventListener("click", goToStart);
+// The title, top left, is a link to the start screen: in the page, at once. A click that asks
+// for a new tab or window is the browser's.
+$("home-link").addEventListener("click", (event) => {
+  if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+  event.preventDefault();
+  goToStart();
+});
 navForward.addEventListener("click", () => step("forward"));
 addSwitch("nav-buttons", "Navigation buttons", "Back, forward and the start screen, at the top.", navOn, (on) => {
   navOn = on;

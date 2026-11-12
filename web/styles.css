@@ -121,6 +121,18 @@ body {
   letter-spacing: -0.01em;
 }
 
+/* The title is a link to the start screen, set as the title: no underline, the ink's colour. */
+.wordmark-link {
+  color: inherit;
+  text-decoration: none;
+  border-radius: 0.25rem;
+}
+
+.wordmark-link:focus-visible {
+  outline: 2px solid var(--proof);
+  outline-offset: 3px;
+}
+
 .masthead-end {
   display: flex;
   align-items: center;
