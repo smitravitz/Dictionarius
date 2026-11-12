@@ -143,7 +143,7 @@ body {
   position: absolute;
   top: 100%;
   left: 0;
-  width: 11.5rem;
+  width: 100%; /* a rule under the word, as long as it */
   margin-top: 0.3rem;
   pointer-events: none;
 }
@@ -398,10 +398,25 @@ body {
   margin-left: auto;
 }
 
+/* The title on a line of its own (a break before it), and only as wide as the word, so the
+   download bar's rule is as long as the word. */
+.app:has(> .intro:not([hidden])) .masthead::before {
+  content: "";
+  order: 1;
+  flex-basis: 100%;
+  height: 0;
+}
+
 .app:has(> .intro:not([hidden])) .title {
   order: 2;
-  flex-basis: 100%;
+  width: fit-content;
   margin-top: 2.25rem;
+  padding-bottom: 1.25rem; /* room for the download bar: the tagline never moves for it */
+}
+
+.app:has(> .intro:not([hidden])) .download {
+  top: auto;
+  bottom: 0;
 }
 
 .app:has(> .intro:not([hidden])) .wordmark {

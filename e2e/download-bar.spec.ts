@@ -70,7 +70,7 @@ test("while the dictionary downloads, a bar under the title says how far along a
   await expect(text).toHaveText(PROGRESS);
   await expect(text).toHaveText(/ · (Fast|Slow|Very slow) connection$/, { timeout: 15_000 });
   const bar = page.locator("#download");
-  const title = (await page.locator("#masthead-title").boundingBox())!;
+  const title = (await page.locator(".wordmark").boundingBox())!; // the word itself
   const box = (await bar.boundingBox())!;
   expect(box.y).toBeGreaterThanOrEqual(title.y + title.height - 1); // under the title
   expect(Math.abs(box.x - title.x)).toBeLessThan(2); // from its left edge
