@@ -27,7 +27,7 @@ export interface EntryParts {
 
 /** What the page shows for a word: its definitions, none (null), that they're still on
  *  their way (the definitions file is loading), or that they couldn't be downloaded (no
- *  network: the page tries again by itself). */
+ *  network: the page tries again by itself; the download bar under the title says more). */
 export type EntryContent = EntryView | null | "loading" | "unavailable";
 
 /** Fill the whole entry page at once. A word class under another written form
@@ -68,7 +68,7 @@ export function renderEntry(
   const { note } = parts;
   note.hidden = false;
   if (content === "loading") note.replaceChildren(stillWorking(STILL));
-  else if (content === "unavailable") note.textContent = "Couldn’t download the definitions: no connection. They’ll show here once it’s back.";
+  else if (content === "unavailable") note.replaceChildren(stillWorking("Waiting for a connection")); // the bar says more
   else if (!view) note.textContent = "No definition for this word in the app yet.";
   else if (view.hidden) note.textContent = `${view.hidden} ${view.hidden === 1 ? "meaning" : "meanings"} hidden by safe search.`;
   else note.hidden = true;

@@ -137,7 +137,7 @@ async function openWord(page: Page, key: string) {
 }
 
 const STILL = /^Still (downloading|loading)$/;
-const NO_SIGNAL = "Couldn’t download the definitions: no connection. They’ll show here once it’s back";
+const NO_SIGNAL = "Waiting for a connection"; // as a frame records it: its dots dropped
 const hasBody = (f: Frame) => f.ipa + f.origin + f.classes + f.meanings + f.glosses + f.examples + f.text > 0;
 const body = ({ ipa, origin, classes, meanings, glosses, examples }: Frame) => ({ ipa, origin, classes, meanings, glosses, examples });
 
