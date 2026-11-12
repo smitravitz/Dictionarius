@@ -45,8 +45,10 @@ built from the English Wiktionary dump by `scripts/build_fm_index.py`.
 
 ## Rules that always apply
 
-- Never put a link to a Claude chat or session in anything published (see `.claude/CLAUDE.md`).
-  Commit footer: only `Co-Authored-By: …`. CI fails on a session link.
+- No chat traces in anything published (see `.claude/CLAUDE.md`; the list is
+  `.github/chat-traces.txt`). Commit footer: only `Co-Authored-By: …`. The "No chat traces"
+  workflow takes session links out of pull requests, issues, comments, reviews and release
+  notes, and fails on a commit, tag, file or earlier edited version that carries one.
 - Offline and private: no network permission, no trackers; `privacy.toml` is the budget.
 - Commit bug fixes as commits; don't bump versions or tag unless asked.
 - Measure before claiming size or speed (ADR-0005's gates).
