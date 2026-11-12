@@ -218,3 +218,30 @@ describe("the Android app, dark from launch", () => {
     expect(readFileSync("capacitor.config.ts", "utf8")).toMatch(/SystemBars:\s*\{[^}]*style:\s*"DARK"/);
   });
 });
+
+describe("the iOS app, dark from launch", () => {
+  // The same dark paper as the Android app's launch (above), in the three places iOS shows
+  // before the page has drawn: the launch screen, then the web view's own background.
+  const darkPaper = /:root\[data-theme="dark"\]\s*\{[^}]*--paper:\s*(#[0-9a-f]{6})/i.exec(readFileSync("web/styles.css", "utf8"))![1].toLowerCase();
+
+  it("launches on the dark paper", () => {
+    const storyboard = readFileSync("ios/App/App/Base.lproj/LaunchScreen.storyboard", "utf8");
+    const [, red, green, blue] = /backgroundColor" red="([\d.]+)" green="([\d.]+)" blue="([\d.]+)"/.exec(storyboard)!;
+    const hex = (part: string) => Math.round(Number(part) * 255).toString(16).padStart(2, "0");
+    expect(`#${hex(red)}${hex(green)}${hex(blue)}`).toBe(darkPaper);
+  });
+
+  it("keeps the web view dark until the page draws", async () => {
+    const { default: config } = await import("../capacitor.config");
+    expect(config.ios?.backgroundColor?.toLowerCase()).toBe(darkPaper);
+  });
+});
+
+describe("the iOS app's icon", () => {
+  // The App Store takes one 1024 px square with no transparency (it rounds the corners itself).
+  it("is 1024 px square and opaque (else: node tools/make-icons.ts)", () => {
+    const png = readFileSync("ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-512@2x.png");
+    const TRUECOLOUR_NO_ALPHA = 2; // the PNG header's colour type
+    expect([png.readUInt32BE(16), png.readUInt32BE(20), png[25]]).toEqual([1024, 1024, TRUECOLOUR_NO_ALPHA]);
+  });
+});
