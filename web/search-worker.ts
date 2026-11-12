@@ -262,18 +262,10 @@ async function loadDefinitions(url: string, index: WordKeys, inPlace: boolean) {
   }
   try {
     if (!core) throw new Error(`no ${url}`);
-    const kept: Partial<Record<Layer, ByteSource>> = {};
-    for (const [i, kind] of LAYERS.entries()) {
-      if (!layers[i]) continue;
-      try {
-        await DefinitionsFile.open(core, index, { [kind]: layers[i] }); // fits this core? (reads headers only)
-        kept[kind] = layers[i];
-      } catch (error) {
-        if (error instanceof Unreachable) throw error; // no network: not a layer that doesn't fit
-        console.warn(`left out ${kind}:`, error instanceof Error ? error.message : error);
-      }
-    }
-    done(await DefinitionsFile.open(core, index, kept));
+    const given: Partial<Record<Layer, ByteSource>> = {};
+    LAYERS.forEach((kind, i) => layers[i] && (given[kind] = layers[i]));
+    // Every file opened once, all at the same time; a layer that doesn't fit is left out.
+    done(await DefinitionsFile.openFitting(core, index, given, (kind, why) => console.warn(`left out ${kind}:`, why instanceof Error ? why.message : why)));
   } catch (error) {
     console.warn("no definitions:", error instanceof Error ? error.message : error);
     if (error instanceof Unreachable) failed(error); // the next question tries again

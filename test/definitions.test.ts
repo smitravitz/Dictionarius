@@ -293,6 +293,57 @@ describe("reading in place: every word, whatever the server does", () => {
     for (const id of ids) expect(await read.of(id), index.key(id)).toEqual(await expected(id));
   };
 
+  // Opening on a slow network: every round trip before the first word shows is a wait.
+  describe("opening, on a slow network", () => {
+    const url = (n: string) => `/headwords-sample.${n}.bin`;
+    const sourcesFrom = (fetchFn: typeof fetch) => Promise.all(names.map((n) => openSource(url(n), { inPlace: true, fetchFn })));
+    const asLayers = (sources: (ByteSource | null)[]) => Object.fromEntries(LAYERS.map((k, i) => [k, sources[i + 1]!]));
+
+    it("opens every file at the same time, each in two requests: its first bytes, then its tables", async () => {
+      const asked: string[] = [];
+      const tablesHeld: (() => void)[] = [];
+      const fetchFn = (async (at: string, init?: RequestInit) => {
+        const name = nameOf(at);
+        const range = new Headers(init?.headers).get("Range")!;
+        asked.push(name);
+        const [, a, b] = /^bytes=(\d+)-(\d+)$/.exec(range)!.map(Number);
+        if (a === 64) {
+          // Each file's tables are answered only once every file has asked for its own:
+          // files opened one after another would never get there.
+          await new Promise<void>((resolve) => {
+            tablesHeld.push(resolve);
+            if (tablesHeld.length === names.length) tablesHeld.forEach((answer) => answer());
+          });
+        }
+        return partial(files[name], [a, b + 1]);
+      }) as typeof fetch;
+      const sources = await sourcesFrom(fetchFn);
+      const opening = DefinitionsFile.openFitting(sources[0]!, index, asLayers(sources));
+      const definitions = await Promise.race([opening, new Promise<never>((_, no) => setTimeout(() => no(new Error("the files were opened one after another")), 2000))]);
+      for (const name of names) expect(asked.filter((n) => n === name), name).toHaveLength(2);
+      for (const id of ids.slice(0, 50)) expect(await definitions.of(id), index.key(id)).toEqual(await whole.of(id));
+    });
+
+    it("leaves out a layer that isn't the kind it's given as, and opens the rest", async () => {
+      const sources = await sourcesFrom(serve(honest));
+      const layers = { ...asLayers(sources), examples: sources[1 + LAYERS.indexOf("etymology")]! }; // etymology, posing as examples
+      const leftOut: string[] = [];
+      const definitions = await DefinitionsFile.openFitting(sources[0]!, index, layers, (kind) => leftOut.push(kind));
+      expect(leftOut).toEqual(["examples"]);
+      const withoutExamples = async (id: number) =>
+        (await whole.of(id))?.map((d) => ({ ...d, meanings: d.meanings.map(({ example: _, ...m }) => m) })) ?? null;
+      for (const id of ids.slice(0, 50)) expect(await definitions.of(id), index.key(id)).toEqual(await withoutExamples(id));
+    });
+
+    it("doesn't take a network that's gone for a layer that doesn't fit", async () => {
+      const sources = await sourcesFrom(serve(honest));
+      const gone: ByteSource = { size: sources[1]!.size, read: async () => Promise.reject(new Unreachable(url("examples"), new TypeError("Failed to fetch"))) };
+      const leftOut: string[] = [];
+      await expect(DefinitionsFile.openFitting(sources[0]!, index, { ...asLayers(sources), examples: gone }, (kind) => leftOut.push(kind))).rejects.toBeInstanceOf(Unreachable);
+      expect(leftOut).toEqual([]);
+    });
+  });
+
   it("when the server sends ranges", () => sameAsWhole(serve(honest)));
   it("when it says 206 but sends the whole file (Capacitor's)", () =>
     sameAsWhole(serve((file, range) => (range ? new Response(file as BodyInit, { status: 206, headers: { "Content-Range": `bytes ${range[0]}-${range[1] - 1}/${file.byteLength}` } }) : full(file)))));

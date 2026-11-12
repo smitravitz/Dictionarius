@@ -133,6 +133,7 @@ export async function rangeSource(
   return {
     size: probe.size,
     read: async (start, end) => {
+      if (start === 0 && end === HEADER_SIZE) return probe.body; // asked for already: no second trip
       if (!whole) {
         const got = await ranged(start, end); // no answer: the caller hears it
         if (got) return got.body;
@@ -297,13 +298,42 @@ export class DefinitionsFile {
    *  read through its source a block at a time. Throws if one isn't a definitions file,
    *  belongs to another word list, or is given as a kind it isn't. */
   static async open(core: ByteSource, index: WordKeys, layers: Partial<Record<Layer, ByteSource>> = {}): Promise<DefinitionsFile> {
-    const coreFile = await LayerFile.open(core, index);
+    // Every file at once: over a network, each opening is a round trip or two.
+    const [coreFile, ...files] = await Promise.all([LayerFile.open(core, index), ...LAYERS.map((kind) => openIf(layers[kind], index))]);
     const opened: Partial<Record<Layer, LayerFile>> = {};
-    for (const kind of LAYERS) {
-      const source = layers[kind];
-      if (source) opened[kind] = await LayerFile.open(source, index);
-    }
+    LAYERS.forEach((kind, i) => files[i] && (opened[kind] = files[i]));
     return DefinitionsFile.checked(index, coreFile, opened);
+  }
+
+  /** open(), leaving out a layer that can't be opened or doesn't fit the core (`leftOut`
+   *  hears which, and why): the page shows what there is. Every file is opened once, all at
+   *  the same time. A network that can't be reached (Unreachable) is an error for the
+   *  caller, not a layer that doesn't fit. */
+  static async openFitting(
+    core: ByteSource,
+    index: WordKeys,
+    layers: Partial<Record<Layer, ByteSource>> = {},
+    leftOut: (kind: Layer, why: unknown) => void = () => {},
+  ): Promise<DefinitionsFile> {
+    const settled = await Promise.allSettled([LayerFile.open(core, index), ...LAYERS.map((kind) => openIf(layers[kind], index))]);
+    const gone = settled.find((r): r is PromiseRejectedResult => r.status === "rejected" && r.reason instanceof Unreachable);
+    if (gone) throw gone.reason;
+    const [coreOpened, ...files] = settled;
+    if (coreOpened.status === "rejected") throw coreOpened.reason;
+    const coreFile = expectKind(coreOpened.value!, "core");
+    const opened: Partial<Record<Layer, LayerFile>> = {};
+    for (const [i, kind] of LAYERS.entries()) {
+      const file = files[i];
+      if (file.status === "rejected") leftOut(kind, file.reason);
+      else if (file.value) {
+        try {
+          opened[kind] = fitting(coreFile, kind, file.value);
+        } catch (error) {
+          leftOut(kind, error);
+        }
+      }
+    }
+    return new DefinitionsFile(index, coreFile, opened);
   }
 
   /** open() for bytes already in memory (tests, tools). */
@@ -320,9 +350,7 @@ export class DefinitionsFile {
     expectKind(core, "core");
     for (const kind of LAYERS) {
       const file = layers[kind];
-      if (!file) continue;
-      expectKind(file, kind);
-      if (file.perBlock !== core.perBlock) throw new Error(`${kind} isn't blocked like its core`);
+      if (file) fitting(core, kind, file);
     }
     return new DefinitionsFile(index, core, layers);
   }
@@ -339,6 +367,15 @@ export class DefinitionsFile {
     return unpack(this.index.key(id), lines, this.core.tables as unknown as PackingTables);
   }
 }
+
+/** `file`, if it's the `kind` of layer it's given as and blocked like `core`; else throws. */
+function fitting(core: LayerFile, kind: Layer, file: LayerFile): LayerFile {
+  expectKind(file, kind);
+  if (file.perBlock !== core.perBlock) throw new Error(`${kind} isn't blocked like its core`);
+  return file;
+}
+
+const openIf = (source: ByteSource | undefined, index: WordKeys) => (source ? LayerFile.open(source, index) : Promise.resolve(undefined));
 
 function expectKind(file: LayerFile, kind: string): LayerFile {
   if (file.kind !== kind) throw new Error(`that file holds ${file.kind}, not ${kind}`);
