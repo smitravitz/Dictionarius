@@ -23,7 +23,7 @@ export default defineConfig({
     // It must change nothing any other test relies on (e2e/tour.spec.ts tests the tour itself).
     {
       name: "first-run",
-      testIgnore: ["**/tour.spec.ts", "**/word-page-sample.spec.ts", "**/built/**"],
+      testIgnore: ["**/tour.spec.ts", "**/word-page-sample.spec.ts", "**/word-page-network.spec.ts", "**/built/**"],
       use: { ...devices["Pixel 7"], storageState: { cookies: [], origins: [] } },
     },
   ],
