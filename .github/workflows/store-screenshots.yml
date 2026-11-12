@@ -1,0 +1,37 @@
+name: Store screenshots
+
+# Takes the screenshots Google Play and the App Store ask for, from the real app on the
+# released word list, at each store's size (playwright.store.config.ts). Run it by hand
+# (Actions > Store screenshots > Run workflow) when the look changes; the pictures are this
+# run's "store-screenshots" artifact, to upload in each store's console (docs/stores.md).
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  screenshots:
+    name: Screenshots at each store's size
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - uses: ./.github/actions/release-data
+        with:
+          token: ${{ github.token }}
+      - run: npx playwright install --with-deps chromium
+      - run: npx playwright test --config playwright.store.config.ts
+        env:
+          DICTIONARIUS_SAMPLE_DATA: release-data
+      - uses: actions/upload-artifact@v7
+        with:
+          name: store-screenshots
+          path: store-screenshots/
+          if-no-files-found: error
+          retention-days: 30
