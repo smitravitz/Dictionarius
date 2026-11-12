@@ -72,7 +72,8 @@ export async function definitionsSource(url: string, file: DataFile | undefined)
 
 /** Keeps `urls` on the device, fetched in turn at low priority (others' requests go
  *  first), skipping those it has; then lets go of every other file but `alsoKeep`.
- *  `progress` hears the share of `bytes` in. Throws if a file can't be fetched or kept. */
+ *  `progress` hears the share of `bytes` in, while it's downloading: with every file kept
+ *  already it hears nothing. Throws if a file can't be fetched or kept. */
 export async function keepAll(
   files: readonly { url: string; bytes: number }[],
   alsoKeep: readonly string[],
@@ -97,9 +98,9 @@ export async function keepAll(
         }),
       );
       await store.put(url, new Response(counted, { headers: response.headers }));
+      progress(Math.min(1, (done + bytes) / total));
     }
     done += bytes;
-    progress(Math.min(1, done / total));
   }
   const wanted = new Set([...files.map((f) => f.url), ...alsoKeep]);
   for (const request of await store.keys()) {

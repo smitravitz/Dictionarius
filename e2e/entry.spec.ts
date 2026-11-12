@@ -208,7 +208,8 @@ test("a request for a word's definitions lost on the way is asked again: they co
   expect(lost).toBeGreaterThan(0);
 });
 
-const NO_SIGNAL = "Couldn’t download the definitions: no connection. They’ll show here once it’s back.";
+// A short note: the bar under the title says how the download and the connection are doing.
+const NO_SIGNAL = /^Waiting for a connection\.*$/;
 
 test("with no signal, a word's page says its definitions couldn't be downloaded, then shows them once the signal's back", async ({
   page,
@@ -247,7 +248,7 @@ test("with no signal, held on a word, the peek says its definitions couldn't be 
   const box = (await page.locator('li.word[aria-label="ingot"] .frag').boundingBox())!;
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
   await page.mouse.down();
-  await expect(page.locator("#peek")).toContainText("Couldn’t download its definitions: no connection.");
+  await expect(page.locator("#peek")).toContainText("Waiting for a connection.");
   await page.mouse.up();
 });
 

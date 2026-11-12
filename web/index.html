@@ -33,8 +33,16 @@
     </div>
     <main class="app" id="app">
       <header class="masthead">
-        <!-- The title, top left: a link to the start screen (main.ts keeps it in the page). -->
-        <h1 class="wordmark"><a class="wordmark-link" id="home-link" href="./">Dictionarius</a></h1>
+        <div class="title" id="masthead-title">
+          <!-- The title, top left: a link to the start screen (main.ts keeps it in the page). -->
+          <h1 class="wordmark"><a class="wordmark-link" id="home-link" href="./">Dictionarius</a></h1>
+          <!-- A browser: the dictionary downloading to be kept on this device (web/keep-on-device.ts).
+               Over the page, under the title: nothing moves when it comes or goes. -->
+          <div class="download" id="download" hidden>
+            <div class="download-track" role="progressbar" aria-label="Dictionary download" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div class="download-fill"></div></div>
+            <p class="download-text" id="download-text" aria-hidden="true"></p>
+          </div>
+        </div>
         <div class="masthead-end">
           <p class="status" id="status">Loading the word list…</p>
           <button class="cog" id="help-open" type="button" aria-label="How It Works" aria-haspopup="dialog" aria-controls="help">
@@ -168,7 +176,7 @@
         </div>
         <!-- A switch per filter in src/filters.ts (labels and help text live there). -->
         <div id="switches"></div>
-        <!-- A browser: whether the dictionary is kept on this device for offline use yet. -->
+        <!-- A browser: how keeping the dictionary on this device ended (the bar shows it under way). -->
         <p class="offline-note" id="offline" role="status" hidden></p>
         <!-- Where the browser offers it (web/install.ts): install as an app of its own. -->
         <div class="install" id="install" hidden>

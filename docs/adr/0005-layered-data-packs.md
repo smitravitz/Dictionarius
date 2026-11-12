@@ -175,7 +175,7 @@ three words; word page time is Enter to its meanings shown, median of eight word
   (34 MB of definitions), and never a wait without end. The worker answers such a word
   "unavailable", apart from "no definition"; a failed block isn't kept as a failure; and
   definitions that couldn't be opened at all are opened again at the next question. The page
-  says "Couldn’t download the definitions: no connection. They’ll show here once it’s back."
+  says "Waiting for a connection…" (the download bar under the title says more, ADR-0008)
   and asks again when the browser says it's online, or every 10 s. Coming back to a word (the
   installed app) waits 1.5 s at most for its definitions before showing its page. Before: on
   the real data, a lost request, a stalled signal or no signal each left the page "Still
