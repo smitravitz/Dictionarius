@@ -1,0 +1,1 @@
+Offline English dictionary that finds a word from any part of it, as you type.

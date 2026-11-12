@@ -1,0 +1,1 @@
+offline,english,words,definitions,meanings,wiktionary,crossword,word finder,spelling,etymology
