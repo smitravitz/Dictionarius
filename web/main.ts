@@ -33,6 +33,7 @@ import { placeToKeep, placeToRestore, type Place } from "./place";
 import { Capacitor } from "@capacitor/core";
 import { AS_APP } from "./shell";
 import { offerInstall } from "./install";
+import { setUpTheme } from "./theme";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const input = $<HTMLInputElement>("q");
@@ -821,6 +822,9 @@ for (const c of CONTROLS) {
   guide.append(how, does);
 }
 $("help-open").addEventListener("click", () => help.showModal());
+
+// Light or dark: the switch at the top right of Settings (web/theme.ts), kept on the device.
+setUpTheme($<HTMLButtonElement>("theme"), { read, write, forget });
 
 // Back, home and forward, for a mouse: over the top of the list or a word's page. Back and
 // forward step through the words followed, as a swipe does; back from the list, and home,

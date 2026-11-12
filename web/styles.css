@@ -28,7 +28,13 @@
     --proof-wash: #2a1630;
   }
 }
+/* A theme picked in Settings (web/theme.ts) holds whatever the system says, form controls and
+   scrollbars included. */
+:root[data-theme="light"] {
+  color-scheme: light;
+}
 :root[data-theme="dark"] {
+  color-scheme: dark;
   --paper: #0e1420;
   --ink: #e6eaf2;
   --pencil: #8e9ab0;
@@ -1128,6 +1134,48 @@ a:focus-visible {
 
 .settings::backdrop {
   background: rgb(8 10 13 / 0.35);
+}
+
+/* The sheet's title, and at its right the light/dark switch, level with it. */
+.settings-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: -0.5rem -0.75rem 0.5rem 0; /* the switch's tap area reaches into the padding */
+}
+
+.settings-head .settings-title {
+  margin: 0;
+}
+
+/* Light or dark: the sun or the moon, whichever shows now; turning it, one turns away as the
+   other turns in (opacity and turning only). */
+.theme svg > g {
+  transform-box: view-box;
+  transform-origin: center;
+  transition: opacity 0.24s ease-out, transform 0.36s cubic-bezier(0.3, 0.7, 0.2, 1);
+}
+
+.theme .moon,
+.theme[aria-checked="true"] .sun {
+  opacity: 0;
+  transform: rotate(-90deg) scale(0.6);
+}
+
+.theme[aria-checked="true"] .moon {
+  opacity: 1;
+  transform: none;
+}
+
+.theme:focus-visible {
+  outline: 2px solid var(--proof);
+  outline-offset: -2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .theme svg > g {
+    transition-duration: 0s;
+  }
 }
 
 .settings-title {

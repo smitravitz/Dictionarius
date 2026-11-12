@@ -151,6 +151,28 @@ describe("the Android app's build", () => {
   }, 120_000);
 });
 
+describe("the light or dark picked in Settings, before the first frame", () => {
+  // web/theme-boot.js: a plain script (a module would run only after the page is drawn) at the
+  // end of the <head>, after the theme-color tags it changes; in both builds.
+  for (const web of [true, false]) {
+    it(`is a plain script in the ${web ? "web" : "Android app's"} build's head, after the theme-color tags`, async () => {
+      const out = await built(web);
+      try {
+        const html = readFileSync(join(out, "index.html"), "utf8");
+        const head = html.slice(0, html.indexOf("</head>"));
+        const tag = /<script\b[^>]*src="\.\/theme-boot\.js"[^>]*><\/script>/.exec(head);
+        expect(tag, "linked in the head").not.toBeNull();
+        expect(tag![0]).not.toMatch(/type="module"|defer|async/);
+        expect(head.indexOf(tag![0])).toBeGreaterThan(head.lastIndexOf('name="theme-color"'));
+        expect(readFileSync(join(out, "theme-boot.js"), "utf8")).toBe(readFileSync("web/theme-boot.js", "utf8"));
+        if (web) expect(keptBy(readFileSync(join(out, "sw.js"), "utf8"))).toContain("theme-boot.js");
+      } finally {
+        rmSync(out, { recursive: true, force: true });
+      }
+    }, 120_000);
+  }
+});
+
 describe("the service worker's build name", () => {
   // A new build name is a new service worker, which keeps the new files; the same name keeps
   // serving the old ones. The manifest and icons keep their names from build to build, so the

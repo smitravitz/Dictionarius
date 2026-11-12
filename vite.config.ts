@@ -2,6 +2,7 @@ import { defineConfig } from "vite";
 import { preloadFonts } from "./tools/preload-fonts";
 import { webData } from "./tools/web-data";
 import { webApp } from "./tools/web-app";
+import { themeScript } from "./tools/theme-script";
 
 // The web app lives in web/. The headword index is served from dist/ (where
 // scripts/build_fm_index.py writes it), or from $DICTIONARIUS_PUBLIC.
@@ -13,8 +14,9 @@ export default defineConfig({
   publicDir: process.env.DICTIONARIUS_PUBLIC ?? "../dist",
   build: { outDir: "../build/web", emptyOutDir: true },
   worker: { format: "es" },
-  // The start screen's fonts, ready for its first frame (no jump when they swap in); for a
+  // The start screen's fonts, ready for its first frame (no jump when they swap in); the
+  // light or dark picked in Settings, from the first frame too (tools/theme-script.ts); for a
   // browser, each word list's starter and gzipped copy (tools/web-data.ts), and what makes
   // the page an app it can install: manifest, icons, service worker (tools/web-app.ts).
-  plugins: [preloadFonts(), webData(), webApp()],
+  plugins: [preloadFonts(), themeScript(), webData(), webApp()],
 });

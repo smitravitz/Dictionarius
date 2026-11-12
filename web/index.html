@@ -150,7 +150,21 @@
 
     <dialog class="settings" id="settings" aria-labelledby="settings-title">
       <form method="dialog">
-        <h2 class="settings-title" id="settings-title">Settings</h2>
+        <div class="settings-head">
+          <h2 class="settings-title" id="settings-title">Settings</h2>
+          <!-- Light or dark (web/theme.ts): the sun or the moon, whichever shows now. -->
+          <button class="cog theme" id="theme" type="button" role="switch" aria-checked="false" aria-label="Dark mode">
+            <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+              <g class="sun">
+                <circle cx="12" cy="12" r="4" />
+                <path d="M12 2.75v2M12 19.25v2M2.75 12h2M19.25 12h2M5.46 5.46l1.41 1.41M17.13 17.13l1.41 1.41M5.46 18.54l1.41-1.41M17.13 6.87l1.41-1.41" />
+              </g>
+              <g class="moon">
+                <path d="M19.5 14.2A7.75 7.75 0 0 1 9.8 4.5a7.75 7.75 0 1 0 9.7 9.7z" />
+              </g>
+            </svg>
+          </button>
+        </div>
         <!-- A switch per filter in src/filters.ts (labels and help text live there). -->
         <div id="switches"></div>
         <!-- A browser: whether the dictionary is kept on this device for offline use yet. -->
