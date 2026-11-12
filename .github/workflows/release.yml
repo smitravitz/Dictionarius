@@ -20,7 +20,7 @@ jobs:
   android:
     name: Signed Android APK
     runs-on: ubuntu-24.04 # comes with the Android SDK
-    timeout-minutes: 30
+    timeout-minutes: 40
     permissions:
       contents: write # to create the release
     steps:
@@ -70,6 +70,16 @@ jobs:
         env:
           DICTIONARIUS_SAMPLE_DATA: release-data
           SAMPLE_SIZE: "40"
+
+      # On a slow, lossy or dead connection, every part of a word's page (word classes and
+      # meanings, examples, origin, pronunciation) arrives together, never one late, and the
+      # page never waits for good: checked frame by frame, for each file on its own, on the
+      # real word list (e2e/word-page-network.spec.ts). No release, and so no Pages deploy,
+      # without it.
+      - name: Check every part of a word's page arrives at once, on a bad connection
+        run: npx playwright test e2e/word-page-network.spec.ts --project phone
+        env:
+          DICTIONARIUS_SAMPLE_DATA: release-data
 
       # The first-run tour on the real word list: each step shown and asked for, in order,
       # and nothing the tour acts out left behind (e2e/tour.spec.ts, its @release tests).

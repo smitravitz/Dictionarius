@@ -24,7 +24,7 @@ jobs:
   build:
     name: Build the web app
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 30
     outputs:
       tag: ${{ steps.tag.outputs.tag }}
     steps:
@@ -61,6 +61,20 @@ jobs:
       - uses: ./.workflow/.github/actions/release-data
         with:
           token: ${{ github.token }}
+      # Nothing is published whose word pages can arrive in parts, late, or never on a bad
+      # connection: e2e/word-page-network.spec.ts, on this release's own code and word list.
+      # A release from before that check has that fault, so it isn't published at all.
+      - name: Check every part of a word's page arrives at once, on a bad connection
+        env:
+          DICTIONARIUS_SAMPLE_DATA: release-data
+          tag: ${{ steps.tag.outputs.tag }}
+        run: |
+          if [ ! -f e2e/word-page-network.spec.ts ]; then
+            echo "::error::$tag predates the bad-connection check (e2e/word-page-network.spec.ts), and its word pages can load for ever on a bad connection: publish a newer release."
+            exit 1
+          fi
+          npx playwright install --with-deps chromium
+          npx playwright test e2e/word-page-network.spec.ts --project phone
       # Pages serves the site from /Dictionarius/, so its files must be named relative to
       # the page. vite.config.ts says so since v0.5.1; --base says it for older tags too.
       - name: Build the web app
