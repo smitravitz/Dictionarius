@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
+import { asInstalled, asTheApp } from "./as-the-app";
 
 /** Open the app on the fixture index and wait until it has loaded. */
 async function open(page: Page) {
@@ -118,4 +119,68 @@ test("only common words by default: phrases and names start hidden, and come bac
   await expect(page.locator("#loader")).toHaveCount(0); // a browser shows the app once all is in
   await page.locator("#q").fill("zorble");
   await expect.poll(() => shown(page)).toEqual(["zorble", "zorbles", "Zorbleton"]); // still off after a reload
+});
+
+// Every setting is remembered: kept on the device as it's changed, and there again on the next
+// start, in a browser tab and in each app.
+const shells = [
+  { name: "a browser tab", as: async (_page: Page) => {} },
+  { name: "the web app installed", as: asInstalled },
+  { name: "the Android app", as: asTheApp },
+];
+
+/** Each switch in Settings: its name and whether it's on. */
+const switchStates = (page: Page) =>
+  page
+    .getByRole("dialog", { name: "Settings" })
+    .getByRole("switch")
+    .evaluateAll((switches) =>
+      switches.map((el) => [
+        el.getAttribute("aria-label") ?? el.closest("label")?.querySelector(".setting-name")?.textContent ?? "",
+        el.getAttribute("aria-checked") ?? String((el as HTMLInputElement).checked),
+      ]),
+    );
+
+for (const shell of shells) {
+  test(`every setting is there again on the next start (${shell.name})`, async ({ page, context }) => {
+    await shell.as(page);
+    await open(page);
+    await page.getByRole("button", { name: "Settings" }).click();
+    const dialog = page.getByRole("dialog", { name: "Settings" });
+    const before = await switchStates(page);
+    expect(before.length).toBeGreaterThanOrEqual(4); // the filters, the navigation buttons, dark mode
+    for (let i = 0; i < before.length; i++) await dialog.getByRole("switch").nth(i).click(); // each from its default
+    const set = await switchStates(page);
+    expect(set.map(([, on]) => on)).toEqual(before.map(([, on]) => (on === "true" ? "false" : "true")));
+
+    // Closed, then started again on the same device.
+    const next = await context.newPage();
+    await page.close();
+    await shell.as(next);
+    await open(next);
+    await next.getByRole("button", { name: "Settings" }).click();
+    expect(await switchStates(next)).toEqual(set);
+  });
+}
+
+test("the installed app asks the browser to keep its storage for good; a tab and the Android app don't need to", async ({ browser }) => {
+  for (const shell of shells) {
+    const context = await browser.newContext({ storageState: "e2e/tour-done.json" });
+    const page = await context.newPage();
+    await page.addInitScript(() => {
+      const asked = { count: 0 };
+      (window as unknown as { persistAsked: typeof asked }).persistAsked = asked;
+      Object.defineProperty(navigator.storage, "persist", {
+        value: async () => {
+          asked.count++;
+          return true;
+        },
+      });
+    });
+    await shell.as(page);
+    await open(page);
+    const asked = await page.evaluate(() => (window as unknown as { persistAsked: { count: number } }).persistAsked.count);
+    expect(asked, shell.name).toBe(shell.as === asInstalled ? 1 : 0);
+    await context.close();
+  }
 });
