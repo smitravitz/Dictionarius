@@ -178,6 +178,79 @@ test("with reduced motion, the dots hold still: all three", async ({ page }) => 
   release();
 });
 
+/** A phone's network, for the definitions (the file and its layers): `answer` decides each
+ *  request: through, lost on the way, or held (no answer, as from a network that's gone).
+ *  `range` is the Range asked for; null for the whole file. */
+async function definitionsNetwork(page: Page, answer: (range: string | null) => "through" | "lost" | "held") {
+  await page.context().route(
+    (url) => /\.(definitions|examples|etymology|pronunciation)\.bin$/.test(url.pathname),
+    async (route) => {
+      const what = answer(route.request().headers()["range"] ?? null);
+      if (what === "lost") return route.abort("internetdisconnected");
+      if (what === "through") return route.continue().catch(() => {});
+    },
+  );
+}
+// The whole file (34 MB on the real data) would take minutes on a phone's network, and so does
+// the background save that downloads it: held, so a word's page can't be waiting on it.
+const wholeFileHeld = (range: string | null) => range === null;
+
+test("a request for a word's definitions lost on the way is asked again: they come, without downloading the whole file", async ({
+  page,
+}) => {
+  let armed = false;
+  let lost = 0;
+  await definitionsNetwork(page, (range) => (wholeFileHeld(range) ? "held" : armed && lost++ === 0 ? "lost" : "through"));
+  await open(page);
+  armed = true;
+  await openWord(page, "ingot", "ingot");
+  await expect(entry(page).locator(".meaning")).toHaveCount(3);
+  expect(lost).toBeGreaterThan(0);
+});
+
+const NO_SIGNAL = "Couldn’t download the definitions: no connection. They’ll show here once it’s back.";
+
+test("with no signal, a word's page says its definitions couldn't be downloaded, then shows them once the signal's back", async ({
+  page,
+}) => {
+  let signal = true;
+  await definitionsNetwork(page, (range) => (wholeFileHeld(range) ? "held" : signal ? "through" : "lost"));
+  await open(page);
+  signal = false;
+  await openWord(page, "ingot", "ingot");
+  const note = entry(page).locator(".entry-note");
+  await expect(note).toHaveText(NO_SIGNAL);
+  signal = true;
+  await page.evaluate(() => window.dispatchEvent(new Event("online"))); // the browser says it's back
+  await expect(entry(page).locator(".meaning")).toHaveCount(3);
+  await expect(note).toBeHidden();
+});
+
+test("opened with no signal, the definitions come once it's back, not 'no definition' for the rest of the visit", async ({ page }) => {
+  let signal = false;
+  await definitionsNetwork(page, (range) => (wholeFileHeld(range) ? "held" : signal ? "through" : "lost"));
+  await open(page);
+  await openWord(page, "ingot", "ingot");
+  await expect(entry(page).locator(".entry-note")).toHaveText(NO_SIGNAL);
+  signal = true;
+  await page.evaluate(() => window.dispatchEvent(new Event("online")));
+  await expect(entry(page).locator(".meaning")).toHaveCount(3);
+});
+
+test("with no signal, held on a word, the peek says its definitions couldn't be downloaded", async ({ page }) => {
+  let signal = true;
+  await definitionsNetwork(page, (range) => (wholeFileHeld(range) ? "held" : signal ? "through" : "lost"));
+  await open(page);
+  signal = false;
+  await page.locator("#q").fill("ingot");
+  await page.locator("#q").blur();
+  const box = (await page.locator('li.word[aria-label="ingot"] .frag').boundingBox())!;
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await expect(page.locator("#peek")).toContainText("Couldn’t download its definitions: no connection.");
+  await page.mouse.up();
+});
+
 test("the Android app, which downloads nothing, says its definitions are still loading", async ({ page }) => {
   await asTheApp(page);
   const release = await holdDefinitions(page);

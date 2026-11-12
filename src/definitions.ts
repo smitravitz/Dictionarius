@@ -98,54 +98,89 @@ export function bytesSource(bytes: Uint8Array): ByteSource {
  * If ranges stop working after that, it fetches the whole file once and reads from
  * memory: a fault in reading in place costs memory, never a word's definitions.
  */
-export async function rangeSource(url: string, fetchFn: typeof fetch = fetch): Promise<ByteSource | null> {
+export async function rangeSource(
+  url: string,
+  fetchFn: typeof fetch = fetch,
+  { timeoutMs = READ_TIMEOUT_MS, retryAfterMs = RETRY_AFTER_MS }: NetworkOptions = {},
+): Promise<ByteSource | null> {
+  // One range as asked; null when the server answered but not with exactly it. When no answer
+  // comes (lost on the way, or none by the deadline), it's asked once more, then that's an
+  // error for the caller: on a phone's network a lost request is no reason to download the
+  // whole file, and a request that never answers is no reason to wait for ever.
   const ranged = async (start: number, end: number) => {
-    const response = await fetchFn(url, { headers: { Range: `bytes=${start}-${end - 1}` } });
-    const body = new Uint8Array(await response.arrayBuffer());
-    const total = /^bytes (\d+)-(\d+)\/(\d+)$/.exec(response.headers.get("Content-Range") ?? "");
-    const exact = response.status === 206 && body.byteLength === end - start && total && Number(total[1]) === start;
-    return exact ? { body, size: Number(total[3]) } : null;
+    for (let attempt = 1; ; attempt++) {
+      try {
+        const response = await fetchFn(url, { headers: { Range: `bytes=${start}-${end - 1}` }, signal: AbortSignal.timeout(timeoutMs) });
+        const body = new Uint8Array(await response.arrayBuffer());
+        const total = /^bytes (\d+)-(\d+)\/(\d+)$/.exec(response.headers.get("Content-Range") ?? "");
+        const exact = response.status === 206 && body.byteLength === end - start && total && Number(total[1]) === start;
+        return exact ? { body, size: Number(total[3]) } : null;
+      } catch (error) {
+        if (attempt >= ATTEMPTS) throw new Unreachable(url, error);
+        await new Promise((resolve) => setTimeout(resolve, retryAfterMs));
+      }
+    }
   };
-  try {
-    const probe = await ranged(0, HEADER_SIZE);
-    if (!probe) return null;
-    let whole: Promise<Uint8Array> | null = null;
-    const wholeFile = async () => {
-      const response = await fetchFn(url);
-      const bytes = new Uint8Array(await response.arrayBuffer());
-      if (!response.ok || bytes.byteLength !== probe.size) throw new Error(`${url}: couldn't read it whole either`);
-      return bytes;
-    };
-    return {
-      size: probe.size,
-      read: async (start, end) => {
-        if (!whole) {
-          const got = await ranged(start, end).catch(() => null);
-          if (got) return got.body;
-          console.warn(`${url}: bytes ${start}-${end - 1} didn't come as asked; reading the file whole`);
-          whole = wholeFile();
-          whole.catch(() => (whole = null)); // a failed fetch is tried again next time
-        }
-        return (await whole).subarray(start, end);
-      },
-    };
-  } catch {
-    return null;
+  const probe = await ranged(0, HEADER_SIZE);
+  if (!probe) return null;
+  let whole: Promise<Uint8Array> | null = null;
+  const wholeFile = async () => {
+    const response = await fetchFn(url);
+    const bytes = new Uint8Array(await response.arrayBuffer());
+    if (!response.ok || bytes.byteLength !== probe.size) throw new Error(`${url}: couldn't read it whole either`);
+    return bytes;
+  };
+  return {
+    size: probe.size,
+    read: async (start, end) => {
+      if (!whole) {
+        const got = await ranged(start, end); // no answer: the caller hears it
+        if (got) return got.body;
+        console.warn(`${url}: bytes ${start}-${end - 1} didn't come as asked; reading the file whole`);
+        whole = wholeFile();
+        whole.catch(() => (whole = null)); // a failed fetch is tried again next time
+      }
+      return (await whole).subarray(start, end);
+    },
+  };
+}
+
+/** No answer from the network for a file (lost, or none by the deadline): not a file that
+ *  isn't there, nor one that's wrong. Asking again later may bring it. */
+export class Unreachable extends Error {
+  constructor(url: string, cause: unknown) {
+    super(`${url}: no answer from the network`, { cause });
+    this.name = "Unreachable";
   }
 }
+
+/** How long a read waits for the network, and before asking once more (rangeSource). */
+export interface NetworkOptions {
+  timeoutMs?: number;
+  retryAfterMs?: number;
+}
+/** A block of definitions is about 100 kB: 20 s is the slowest phone network's time for it,
+ *  and past that the page says the definitions couldn't be downloaded (and tries again). */
+const READ_TIMEOUT_MS = 20_000;
+const RETRY_AFTER_MS = 1_000;
+const ATTEMPTS = 2;
 
 /**
  * One of the files at `url`, as the app reads it: `inPlace`, a block at a time if the
  * server sends exact ranges (rangeSource), else held whole; null when it isn't there.
+ * Throws when the network can't be reached: that's not a missing file.
  */
-export async function openSource(url: string, { inPlace, fetchFn = fetch }: { inPlace: boolean; fetchFn?: typeof fetch }): Promise<ByteSource | null> {
+export async function openSource(
+  url: string,
+  { inPlace, fetchFn = fetch, ...network }: { inPlace: boolean; fetchFn?: typeof fetch } & NetworkOptions,
+): Promise<ByteSource | null> {
+  const ranged = inPlace ? await rangeSource(url, fetchFn, network) : null;
+  if (ranged) return ranged;
   try {
-    const ranged = inPlace ? await rangeSource(url, fetchFn) : null;
-    if (ranged) return ranged;
     const response = await fetchFn(url);
     return response.ok ? bytesSource(new Uint8Array(await response.arrayBuffer())) : null;
-  } catch {
-    return null;
+  } catch (error) {
+    throw new Unreachable(url, error);
   }
 }
 
@@ -206,7 +241,10 @@ export class LayerFile {
     if (lines) {
       this.cache.delete(b); // move to the front
     } else {
-      lines = this.source.read(this.offsets[b], this.offsets[b + 1]).then((packed) => utf8.decode(decompress(packed)).split("\n"));
+      const reading = this.source.read(this.offsets[b], this.offsets[b + 1]).then((packed) => utf8.decode(decompress(packed)).split("\n"));
+      // A block that couldn't be read (no network) isn't kept as a failure: it's read again next time.
+      reading.catch(() => this.cache.get(b) === reading && this.cache.delete(b));
+      lines = reading;
       if (this.cache.size >= CACHED_BLOCKS) this.cache.delete(this.cache.keys().next().value!);
     }
     this.cache.set(b, lines);

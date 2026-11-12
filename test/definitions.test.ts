@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { existsSync, readFileSync } from "node:fs";
 import { HeadwordIndex } from "../src/headword-index";
-import { DefinitionsFile, LAYERS, bytesSource, openSource, rangeSource, unpack, type ByteSource, type Definition, type Layer, type WordKeys } from "../src/definitions";
+import { DefinitionsFile, LAYERS, Unreachable, bytesSource, openSource, rangeSource, unpack, type ByteSource, type Definition, type Layer, type WordKeys } from "../src/definitions";
 import { Completer } from "../src/complete";
 import { defaultFilters } from "../src/filters";
 import { SAFE_SEARCH_OVERRIDES } from "../src/safe-search-overrides";
@@ -197,6 +197,57 @@ describe("reading in place, with Range requests (ADR-0005)", () => {
     const { fetchFn } = fetcher(() => ({ status: 200, body: core }));
     expect(await rangeSource("/d.definitions.bin", fetchFn)).toBeNull();
   });
+
+  // A phone's network: a request lost on the way, or one that never answers. Neither may
+  // leave a word's page waiting for ever, nor turn into downloading the whole file.
+  const header = (range: string) => range.startsWith("bytes=0-");
+  const meaningsOf = async (definitions: DefinitionsFile, id: number) => (await definitions.of(id))?.map((d) => d.meanings.map((m) => m.gloss));
+  const { id: someId, definitions: someExpected } = golden.definitions!.ids.find((d) => d.definitions)!;
+  const someMeanings = someExpected!.map((d) => d.meanings.map((m) => m.gloss));
+
+  it("asks again for a block lost on the way, and never downloads the whole file for it", async () => {
+    const { asked, fetchFn: honestFetch } = fetcher(honest);
+    let lose = 1;
+    const fetchFn = (async (url: string, init?: RequestInit) => {
+      const range = new Headers(init?.headers).get("Range");
+      if (!range) asked.push("whole");
+      if (range && !header(range) && lose-- > 0) throw new TypeError("Failed to fetch");
+      return honestFetch(url, init);
+    }) as typeof fetch;
+    const definitions = await DefinitionsFile.open((await rangeSource("/d.definitions.bin", fetchFn, { retryAfterMs: 0 }))!, index);
+    expect(await meaningsOf(definitions, someId)).toEqual(someMeanings);
+    expect(asked).not.toContain("whole");
+  });
+
+  it("gives up on a block that never comes, at its deadline, and reads it next time it's asked", async () => {
+    const { asked, fetchFn: honestFetch } = fetcher(honest);
+    let stalled = false;
+    const fetchFn = ((url: string, init?: RequestInit) => {
+      const range = new Headers(init?.headers).get("Range");
+      if (!range) asked.push("whole");
+      if (stalled && range) {
+        // No signal: no answer, until the reader stops waiting.
+        return new Promise((_, reject) => init?.signal?.addEventListener("abort", () => reject(init.signal!.reason)));
+      }
+      return honestFetch(url, init);
+    }) as typeof fetch;
+    const source = await rangeSource("/d.definitions.bin", fetchFn, { timeoutMs: 30, retryAfterMs: 0 });
+    const definitions = await DefinitionsFile.open(source!, index);
+    stalled = true; // opened; then the signal goes
+    await expect(definitions.of(someId)).rejects.toBeInstanceOf(Unreachable);
+    stalled = false; // the signal's back: the same word, asked again, isn't stuck on the failure
+    expect(await meaningsOf(definitions, someId)).toEqual(someMeanings);
+    expect(asked).not.toContain("whole");
+  });
+
+  it("tells a network it can't reach from a file that isn't there", async () => {
+    const unreachable = (async () => {
+      throw new TypeError("Failed to fetch");
+    }) as typeof fetch;
+    await expect(openSource("/d.definitions.bin", { inPlace: true, fetchFn: unreachable, retryAfterMs: 0 })).rejects.toBeInstanceOf(Unreachable);
+    const missing = (async () => new Response("Not Found", { status: 404 })) as typeof fetch;
+    expect(await openSource("/d.definitions.bin", { inPlace: true, fetchFn: missing })).toBeNull();
+  });
 });
 
 describe("reading in place: every word, whatever the server does", () => {
@@ -229,10 +280,10 @@ describe("reading in place: every word, whatever the server does", () => {
 
   const open = async (fetchFn: typeof fetch) => {
     const url = (n: string) => `/headwords-sample.${n}.bin`;
-    const core = await openSource(url("definitions"), { inPlace: true, fetchFn });
+    const core = await openSource(url("definitions"), { inPlace: true, fetchFn, retryAfterMs: 0 });
     const layers: Partial<Record<Layer, ByteSource>> = {};
     for (const k of LAYERS) {
-      const source = await openSource(url(k), { inPlace: true, fetchFn });
+      const source = await openSource(url(k), { inPlace: true, fetchFn, retryAfterMs: 0 });
       if (source) layers[k] = source;
     }
     return DefinitionsFile.open(core!, index, layers);

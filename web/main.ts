@@ -211,8 +211,11 @@ function ask(question: { type: "definitions"; id: number } | { type: "word"; tex
   send({ ...question, ask: n });
   return new Promise((resolve) => answers.set(n, resolve));
 }
+/** A word's definitions; null when it has none; "unavailable" when there was no network. */
 const definitionsOf = (id: number) =>
-  ask({ type: "definitions", id }).then((a): Definition[] | null => (a.type === "definitions" ? a.definitions : null));
+  ask({ type: "definitions", id }).then((a): Definition[] | null | "unavailable" =>
+    a.type !== "definitions" ? null : a.unavailable ? "unavailable" : a.definitions,
+  );
 const wordNamed = (text: string) =>
   ask({ type: "word", text }).then((a): Suggestion | null => (a.type === "word" ? a.suggestion : null));
 const safe = () => filters["safe-search"] === true;
@@ -584,20 +587,45 @@ document.addEventListener("keydown", (event) => {
  *  (the file is still on its way) rather than nothing happening. */
 const SLOW_MS = 300;
 
+/** With no network, a word's page asks for its definitions again this often, and as soon as
+ *  the browser says it's back online. */
+const RETRY_MS = 10_000;
+
 /** Show a word's page once its definitions are in (or with `known`, the ones already in
  *  hand), all of it at once, so nothing appears and then moves (top to bottom, in reading
- *  order). It turns in from the side it came from: forward from the right, back from the left. */
-function drawEntry(s: Suggestion, from: SwipeDirection, known?: Definition[] | null) {
+ *  order). It turns in from the side it came from: forward from the right, back from the left.
+ *  With no network it says so, and fills in by itself once they come. */
+function drawEntry(s: Suggestion, from: SwipeDirection, known?: Definition[] | null | "loading") {
   wordOnScreen = s.key;
   placeChanged(); // a word followed from another: kept too
   const seq = ++entrySeq;
-  if (known !== undefined) return paintEntry(seq, s, known ? entryView(known, { safe: safe() }) : null, from); // in hand: at once
-  const slow = setTimeout(() => seq === entrySeq && paintEntry(seq, s, "loading", from), SLOW_MS);
-  void definitionsOf(s.id).then((definitions) => {
-    clearTimeout(slow);
-    if (seq !== entrySeq) return;
-    paintEntry(seq, s, definitions ? entryView(definitions, { safe: safe() }) : null, from);
-  });
+  if (known !== undefined && known !== "loading") return paintEntry(seq, s, known ? entryView(known, { safe: safe() }) : null, from); // in hand: at once
+  // "loading": shown now, saying they're on their way (a page that must show at once).
+  if (known === "loading") paintEntry(seq, s, "loading", from);
+  const slow = known === "loading" ? undefined : setTimeout(() => seq === entrySeq && paintEntry(seq, s, "loading", from), SLOW_MS);
+  const fetchDefinitions = () =>
+    void definitionsOf(s.id).then((definitions) => {
+      clearTimeout(slow);
+      if (seq !== entrySeq) return;
+      if (definitions === "unavailable") {
+        paintEntry(seq, s, "unavailable", from);
+        return whenSignalMayBeBack(() => seq === entrySeq && fetchDefinitions());
+      }
+      paintEntry(seq, s, definitions ? entryView(definitions, { safe: safe() }) : null, from);
+    });
+  fetchDefinitions();
+}
+
+/** `then`, once the browser says it's online again or after RETRY_MS, whichever is first
+ *  (a phone's signal can come back without the browser noticing). */
+function whenSignalMayBeBack(then: () => void) {
+  const go = () => {
+    clearTimeout(timer);
+    window.removeEventListener("online", go);
+    then();
+  };
+  const timer = setTimeout(go, RETRY_MS);
+  window.addEventListener("online", go);
 }
 
 const source = $<HTMLAnchorElement>("source");
@@ -646,10 +674,16 @@ function peekAt(target: Element) {
   if (!s || !row) return;
   const seq = ++peekSeq;
   pulse();
-  void definitionsOf(s.id).then((definitions) => {
+  void definitionsOf(s.id).then((found) => {
     if (seq !== peekSeq) return; // let go already
+    const definitions = found === "unavailable" ? null : found;
     const view = definitions ? entryView(definitions, { safe: safe() }) : null;
-    const why = view ? "Its meanings are hidden by safe search." : "No definition for this word in the app yet.";
+    const why =
+      found === "unavailable"
+        ? "Couldn’t download its definitions: no connection."
+        : view
+          ? "Its meanings are hidden by safe search."
+          : "No definition for this word in the app yet.";
     peek.show(row, s.display, view ? peekView(view) : null, why);
     coach.did("peeked");
   });
@@ -978,11 +1012,19 @@ function restoreList(place: Place) {
  *  screen stays as the app started (a browser's loading screen, the app's start screen); then,
  *  in one block the browser paints once, the search is set up behind the page, for Back to
  *  find it as far down as it was. Anything the person does first wins. */
+/** How long coming back to a word waits for its definitions before showing its page. */
+const RESTORE_WAIT_MS = 1500;
+const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
 async function restoreWord(place: Place & { word: string }) {
   loaderWaits++;
   const started = seq;
   const s = await wordNamed(place.word);
-  const definitions = s ? await definitionsOf(s.id) : null;
+  // Its definitions, if they're in quickly (from the device, they are). If not (a phone with
+  // no signal and the dictionary not yet saved), the page opens without them and says
+  // they're on their way: the loading screen never waits on the network for them.
+  const found = s ? await Promise.race([definitionsOf(s.id), wait(RESTORE_WAIT_MS).then(() => undefined)]) : null;
+  const definitions = found === undefined || found === "unavailable" ? "loading" : found;
   if (seq === started && !s) restoreList({ ...place, word: null }); // that word's gone: the list
   if (seq === started && s) {
     input.value = place.query;

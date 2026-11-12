@@ -14,7 +14,7 @@ import { Completer, countsOf, type Matches, type Suggestion } from "../src/compl
 import { normalize } from "../src/normalize";
 import { SAFE_SEARCH_OVERRIDES } from "../src/safe-search-overrides";
 import { defaultFilters, filterKey, type FilterState } from "../src/filters";
-import { DefinitionsFile, LAYERS, layerUrl, openSource, type ByteSource, type Layer, type WordKeys } from "../src/definitions";
+import { DefinitionsFile, LAYERS, Unreachable, layerUrl, openSource, type ByteSource, type Layer, type WordKeys } from "../src/definitions";
 import { landingFrom, rowsFrom, starterKeys, type Starter } from "../src/starter";
 import { fetchStarter, fetchWordList, nameOf, versioned } from "./data-files";
 import { definitionsSource } from "./data-cache";
@@ -55,8 +55,26 @@ let aheadTimer: ReturnType<typeof setTimeout> | undefined;
 const AHEAD_PAUSE_MS = 4; // between slices: a search's own counting comes first
 // The definitions, loaded after the index: the core file and whichever layers are
 // there (examples, etymology, pronunciation); null when there's no core (or it doesn't fit the index).
+// Rejected when the network couldn't be reached: the next question loads them again.
 let found: (file: DefinitionsFile | null) => void = () => {};
-let definitions = new Promise<DefinitionsFile | null>((resolve) => (found = resolve));
+let lost: (error: unknown) => void = () => {};
+let definitions = expectDefinitions();
+let reloadDefinitions = () => {}; // set by loadDefinitions
+function expectDefinitions() {
+  const coming = new Promise<DefinitionsFile | null>((resolve, reject) => ((found = resolve), (lost = reject)));
+  coming.catch(() => {}); // heard by the next question
+  return coming;
+}
+/** The definitions file; if it couldn't be reached last time, tried again now. */
+async function definitionsFile() {
+  const tried = definitions;
+  try {
+    return await tried;
+  } catch {
+    if (definitions === tried) reloadDefinitions();
+    return definitions;
+  }
+}
 const DEFINITIONS_AFTER_MS = 1500;
 let startDefinitions = () => {}; // set once the index is in
 let definitionsTimer: ReturnType<typeof setTimeout> | undefined;
@@ -69,10 +87,12 @@ scope.onmessage = ({ data }) => {
     case "definitions": {
       startDefinitions(); // wanted now: no more waiting
       const { ask, id } = data;
-      void definitions
+      void definitionsFile()
         .then((file) => file?.of(id) ?? null)
-        .catch(() => null)
-        .then((answer) => scope.postMessage({ type: "definitions", ask, definitions: answer }));
+        .then(
+          (answer) => scope.postMessage({ type: "definitions", ask, definitions: answer }),
+          () => scope.postMessage({ type: "definitions", ask, definitions: null, unavailable: true }), // no network
+        );
       break;
     }
     case "word":
@@ -121,7 +141,7 @@ async function load(url: string, definitionsUrl: string, where: "browser" | "app
       // A starter from another word list (a deploy caught halfway): the word list's own.
       starter = null;
       early = null;
-      definitions = new Promise<DefinitionsFile | null>((resolve) => (found = resolve));
+      definitions = expectDefinitions();
       void loadDefinitions(definitionsUrl, loaded, true);
     }
     carryOn();
@@ -226,9 +246,20 @@ function answer(data: Extract<ToWorker, { type: "rows" | "seek" }>) {
  *  each file a block at a time with Range requests, where the server sends exact
  *  ranges (the app's does: RangedAssets.java), else hold it whole. */
 async function loadDefinitions(url: string, index: WordKeys, inPlace: boolean) {
+  const [done, failed] = [found, lost];
+  reloadDefinitions = () => {
+    definitions = expectDefinitions();
+    void loadDefinitions(url, index, inPlace);
+  };
   // In a browser with a starter: from the device when it has them, else a block at a time.
   const fetched = (at: string) => (starter ? definitionsSource(versioned(at, starter.files[nameOf(at)]), starter.files[nameOf(at)]) : openSource(at, { inPlace }));
-  const [core, ...layers] = await Promise.all([fetched(url), ...LAYERS.map((kind) => fetched(layerUrl(url, kind)))]);
+  let core: ByteSource | null, layers: (ByteSource | null)[];
+  try {
+    [core, ...layers] = await Promise.all([fetched(url), ...LAYERS.map((kind) => fetched(layerUrl(url, kind)))]);
+  } catch (error) {
+    console.warn("definitions out of reach:", error instanceof Error ? error.message : error);
+    return failed(error); // not "no definitions" (no network, or the device's copy unreadable): the next question tries again
+  }
   try {
     if (!core) throw new Error(`no ${url}`);
     const kept: Partial<Record<Layer, ByteSource>> = {};
@@ -238,13 +269,15 @@ async function loadDefinitions(url: string, index: WordKeys, inPlace: boolean) {
         await DefinitionsFile.open(core, index, { [kind]: layers[i] }); // fits this core? (reads headers only)
         kept[kind] = layers[i];
       } catch (error) {
+        if (error instanceof Unreachable) throw error; // no network: not a layer that doesn't fit
         console.warn(`left out ${kind}:`, error instanceof Error ? error.message : error);
       }
     }
-    found(await DefinitionsFile.open(core, index, kept));
+    done(await DefinitionsFile.open(core, index, kept));
   } catch (error) {
     console.warn("no definitions:", error instanceof Error ? error.message : error);
-    found(null);
+    if (error instanceof Unreachable) failed(error); // the next question tries again
+    else done(null);
   }
 }
 

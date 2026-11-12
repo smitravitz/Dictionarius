@@ -83,6 +83,24 @@ async function searchFor(page: Page, text: string) {
   await expect(page.locator("#scroller li.word:not(.pending)").first()).toBeVisible();
 }
 
+test("installed, coming back to a word whose definitions are slow to come: its page shows, saying so, not the loading screen for ever", async ({
+  page,
+}) => {
+  // The definitions never come: a phone on a signal too weak for them, the dictionary not
+  // yet saved on it (the save downloads them too).
+  await page.context().route((url) => /\.(definitions|examples|etymology|pronunciation)\.bin$/.test(url.pathname), () => {});
+  await asInstalled(page);
+  await openApp(page);
+  await searchFor(page, "ingot");
+  await page.locator('li.word[aria-label="ingot"]').click();
+  await expect(page.locator("#entry-word")).toHaveText("ingot");
+  await toBackground(page);
+  const app = await killAndReopen(page, asInstalled);
+  await expect(app.locator("#loader")).toHaveCount(0);
+  await expect(app.locator("#entry-word")).toHaveText("ingot");
+  await expect(app.locator("#entry-note")).toHaveText(/^Still downloading/);
+});
+
 for (const shell of apps) {
   test.describe(`as an app (${shell.name})`, () => {
     test("it comes back to the search, and how far down it was, after being killed", async ({ page }) => {
