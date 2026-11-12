@@ -24,7 +24,7 @@ Type `eren` and get *serene*, *coherent*, *adherence*: every word with your lett
 - 📚 **Full entries.** Tap a word for its meanings, an example of each in use, pronunciation and origin. Words inside a definition open their own entries, and a swipe (or the back and forward buttons) steps through the words you followed.
 - 🎚️ **Filters and settings.** Word length with two roller wheels; safe search, phrases and names in Settings (common words only by default).
 - 🧭 **Shows you how.** A five-step tour on first run, and **How It Works** behind the **?** any time.
-- 🌗 **Light or dark.** Follows your device, or pick one with the switch at the top of Settings.
+- 🌗 **Light or dark.** Dark by default; pick light with the switch at the top of Settings, and it's remembered.
 - 🔒 **Private by design.** The Android app requests no permissions at all: no network, no storage, no sensors. CI checks every build against [`privacy.toml`](privacy.toml).
 
 ## 📲 Install

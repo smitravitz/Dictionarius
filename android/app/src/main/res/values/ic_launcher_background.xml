@@ -2,6 +2,6 @@
 <resources>
     <!-- The icon's near-black background -->
     <color name="ic_launcher_background">#080A0D</color>
-    <!-- Launch screen: paper, the app's light background (values-night has the dark one) -->
-    <color name="splash_background">#F3F5F8</color>
+    <!-- Launch screen: the dark paper, as the app starts dark on every phone (web/theme-choice.ts) -->
+    <color name="splash_background">#0E1420</color>
 </resources>

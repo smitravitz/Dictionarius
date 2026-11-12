@@ -88,8 +88,9 @@ decision or module makes it load-bearing.
 - **Navigation buttons** — back, home (the start screen) and forward over the top corners
   of the list and of a word's page, in the cog's grey, for a mouse: back and forward step
   through the words followed, as a swipe does; back from the list goes home. The slider's
-  histogram covers them while it's open. On by default in a desktop browser, off on a phone
-  and in the app; a switch in Settings, kept (`dictionarius.nav`).
+  histogram covers them while it's open. On by default on every device, the app's too; a
+  switch in Settings turns them off, kept (`dictionarius.nav`). The title at the top left,
+  Dictionarius, is a link to the start screen too.
 - **Starter** — a small file beside a word list (`<list>.starter.json`, `src/starter.ts`)
   that a browser shows the app from before the word list is in: the word count, the filters,
   and each suggestion's counts and rows around 3 landing spots, worked out at build time by the
@@ -142,9 +143,9 @@ decision or module makes it load-bearing.
 - **Install** — Settings' button where the browser offers to install the page
   (`web/install.ts`); the manifest and icons are the web build's (`tools/web-app.ts`,
   `web/icons/` from `tools/make-icons.ts`).
-- **Theme** — light or dark: the system's, unless the person picks the other with the switch at
-  the top right of Settings (`web/theme.ts`, `web/theme-choice.ts`); only a pick against the
-  system is kept (`dictionarius.theme`), and `web/theme-boot.js` shows it from the first frame.
+- **Theme** — light or dark: dark on every device, unless the person picks light with the
+  switch at the top right of Settings (`web/theme.ts`, `web/theme-choice.ts`); only light is
+  kept (`dictionarius.theme`), and `web/theme-boot.js` shows the theme from the first frame.
 - **Still downloading** — what a word's page says while its definitions are on their way
   (after 300 ms), with dots coming and going (`web/dots.ts`; "Still loading" in the Android app,
   which downloads nothing).

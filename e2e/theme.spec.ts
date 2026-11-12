@@ -1,9 +1,10 @@
 import { test, expect, type Page } from "@playwright/test";
+import { asTheApp } from "./as-the-app";
 
-// Light or dark: a switch at the top right of Settings, above the other switches. The page
-// follows the system's setting until the person picks the other one; that pick is kept on the
-// device and the page opens in it from its very first frame; picking the system's own again
-// goes back to following the system. The browser's bars (theme-color) follow the page.
+// Light or dark: a switch at the top right of Settings, above the other switches. Dark on
+// every device from the very first frame, whatever the system's own setting, until the
+// person picks light; that pick is kept on the device, and the page opens in it from its
+// very first frame too. The browser's bars (theme-color) follow the page.
 
 const LIGHT_PAPER = "rgb(243, 245, 248)"; // styles.css --paper, light: #f3f5f8
 const DARK_PAPER = "rgb(14, 20, 32)"; // and dark: #0e1420
@@ -24,6 +25,25 @@ async function settings(page: Page) {
   await expect(page.locator("#settings")).toBeVisible();
 }
 
+/** The theme on the page at every frame from the first, as it opens, with its own scripts
+ *  slow to come (as on a slow phone): frames are drawn before they run. Read with frames(). */
+async function watchFrames(page: Page) {
+  await page.route(/\/main\.ts$|\/assets\/index-[\w-]+\.js$/, async (route) => {
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+    await route.continue();
+  });
+  await page.addInitScript(() => {
+    const seen: (string | undefined)[] = [];
+    (window as unknown as { frames_: typeof seen }).frames_ = seen;
+    const note = () => {
+      seen.push(document.documentElement.dataset.theme);
+      if (seen.length < 30) requestAnimationFrame(note);
+    };
+    requestAnimationFrame(note);
+  });
+}
+const frames = (page: Page) => page.evaluate(() => (window as unknown as { frames_: (string | undefined)[] }).frames_);
+
 test("Settings has a light/dark switch at its top right, above the other switches", async ({ page }) => {
   await open(page);
   await settings(page);
@@ -39,90 +59,71 @@ test("Settings has a light/dark switch at its top right, above the other switche
   expect(toggle.height).toBeGreaterThanOrEqual(44);
 });
 
-test("it starts as the system is, and turning it turns the page and the browser's bars at once", async ({ page }) => {
+for (const system of ["light", "dark"] as const) {
+  test(`dark from the very first frame, on a ${system} system too`, async ({ page }) => {
+    await page.emulateMedia({ colorScheme: system });
+    await watchFrames(page);
+    await open(page);
+    const seen = await frames(page);
+    expect(seen.length).toBeGreaterThan(0);
+    expect(seen.filter((theme) => theme !== "dark")).toStrictEqual([]); // toEqual would let undefined through
+    expect(await paper(page)).toBe(DARK_PAPER);
+    expect(await barColours(page)).toEqual(["#0e1420", "#0e1420"]); // whichever the system asks for
+    await settings(page);
+    await expect(darkMode(page)).toHaveAttribute("aria-checked", "true");
+  });
+}
+
+test("the Android app starts dark too", async ({ page }) => {
   await page.emulateMedia({ colorScheme: "light" });
+  await asTheApp(page);
   await open(page);
-  await settings(page);
-  await expect(darkMode(page)).toHaveAttribute("aria-checked", "false");
-  expect(await paper(page)).toBe(LIGHT_PAPER);
-
-  await darkMode(page).click();
-  await expect(darkMode(page)).toHaveAttribute("aria-checked", "true");
   expect(await paper(page)).toBe(DARK_PAPER);
-  expect(await barColours(page)).toEqual(["#0e1420", "#0e1420"]); // whichever the system asks for
-
-  await darkMode(page).click();
-  await expect(darkMode(page)).toHaveAttribute("aria-checked", "false");
-  expect(await paper(page)).toBe(LIGHT_PAPER);
-  expect(await barColours(page)).toEqual(["#f3f5f8", "#0e1420"]); // each for its own system setting again
 });
 
-test("on a dark system it starts dark, and the switch can make it light", async ({ page }) => {
+test("turning it to light turns the page and the browser's bars at once, and back to dark", async ({ page }) => {
   await page.emulateMedia({ colorScheme: "dark" });
   await open(page);
   await settings(page);
-  await expect(darkMode(page)).toHaveAttribute("aria-checked", "true");
-  expect(await paper(page)).toBe(DARK_PAPER);
   await darkMode(page).click();
+  await expect(darkMode(page)).toHaveAttribute("aria-checked", "false");
   expect(await paper(page)).toBe(LIGHT_PAPER);
   expect(await barColours(page)).toEqual(["#f3f5f8", "#f3f5f8"]);
+
+  await darkMode(page).click();
+  await expect(darkMode(page)).toHaveAttribute("aria-checked", "true");
+  expect(await paper(page)).toBe(DARK_PAPER);
+  expect(await barColours(page)).toEqual(["#0e1420", "#0e1420"]);
+  // Dark is the default: nothing to keep.
+  expect(await page.evaluate(() => localStorage.getItem("dictionarius.theme"))).toBeNull();
 });
 
-test("the pick is kept: the page opens in it from its very first frame", async ({ page }) => {
-  await page.emulateMedia({ colorScheme: "light" });
+test("light, once picked, is kept: the page opens light from its very first frame", async ({ page }) => {
   await open(page);
   await settings(page);
   await darkMode(page).click();
-
-  // Every frame from the first, as the page opens again, its own scripts slow to come (as on a
-  // slow phone): frames are drawn before they run, and those must be dark already.
-  await page.route(/\/main\.ts$|\/assets\/index-[\w-]+\.js$/, async (route) => {
-    await new Promise((resolve) => setTimeout(resolve, 1500));
-    await route.continue();
-  });
-  await page.addInitScript(() => {
-    const frames: (string | undefined)[] = [];
-    (window as unknown as { frames_: typeof frames }).frames_ = frames;
-    const note = () => {
-      frames.push(document.documentElement.dataset.theme);
-      if (frames.length < 30) requestAnimationFrame(note);
-    };
-    requestAnimationFrame(note);
-  });
+  await watchFrames(page);
   await page.reload();
   await expect(page.locator("#status")).toHaveText(/^[\d,]+ words$/);
-  const frames = await page.evaluate(() => (window as unknown as { frames_: (string | undefined)[] }).frames_);
-  expect(frames.length).toBeGreaterThan(0);
-  expect(frames.filter((theme) => theme !== "dark")).toStrictEqual([]); // toEqual would let undefined (no theme) through
-  expect(await paper(page)).toBe(DARK_PAPER);
-  expect(await barColours(page)).toEqual(["#0e1420", "#0e1420"]);
-  await settings(page);
-  await expect(darkMode(page)).toHaveAttribute("aria-checked", "true");
-});
-
-test("picking the system's own again follows the system from then on", async ({ page }) => {
-  await page.emulateMedia({ colorScheme: "light" });
-  await open(page);
-  await settings(page);
-  await darkMode(page).click(); // dark, against the system: kept
-  await darkMode(page).click(); // light, the system's own: nothing to keep
-  expect(await page.evaluate(() => localStorage.getItem("dictionarius.theme"))).toBeNull();
-  await page.emulateMedia({ colorScheme: "dark" }); // the system turns dark (at night, say)
-  await expect.poll(() => paper(page)).toBe(DARK_PAPER);
-  await expect(darkMode(page)).toHaveAttribute("aria-checked", "true");
-});
-
-test("a pick against the system holds when the system changes", async ({ page }) => {
-  await page.emulateMedia({ colorScheme: "light" });
-  await open(page);
+  const seen = await frames(page);
+  expect(seen.length).toBeGreaterThan(0);
+  expect(seen.filter((theme) => theme !== "light")).toStrictEqual([]);
+  expect(await paper(page)).toBe(LIGHT_PAPER);
+  expect(await barColours(page)).toEqual(["#f3f5f8", "#f3f5f8"]);
   await settings(page);
   await expect(darkMode(page)).toHaveAttribute("aria-checked", "false");
+});
+
+test("the system turning light or dark changes nothing", async ({ page }) => {
   await page.emulateMedia({ colorScheme: "dark" });
-  await expect(darkMode(page)).toHaveAttribute("aria-checked", "true"); // following the system
-  await darkMode(page).click(); // light, against the dark system: kept
+  await open(page);
   await page.emulateMedia({ colorScheme: "light" });
+  expect(await paper(page)).toBe(DARK_PAPER);
+  await settings(page);
+  await darkMode(page).click(); // light, picked
   await page.emulateMedia({ colorScheme: "dark" });
   expect(await paper(page)).toBe(LIGHT_PAPER);
+  await expect(darkMode(page)).toHaveAttribute("aria-checked", "false");
 });
 
 test("the switch changes by opacity and turning only, and not at all with reduced motion", async ({ page }) => {

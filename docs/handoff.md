@@ -3,7 +3,7 @@
 Read this first in a new chat, then `.claude/CLAUDE.md`. Update it at the end of any
 session that changes what's below (newest state only; history lives in git).
 
-_Last updated: 2026-11-12, at v0.7.1 (v0.7.0 and v0.7.1 shipped the web start in layers, ADR-0008, and place restore); on main, unreleased: the installable web app with light/dark and "Still downloading" (ADR-0009)._
+_Last updated: 2026-11-12, at v0.7.2 (the installable web app, ADR-0009); unreleased: opening from the device at once, back straight to a word, dark by default, navigation buttons on everywhere, the title as a link home._
 
 ## What it is
 
@@ -57,10 +57,12 @@ built from the English Wiktionary dump by `scripts/build_fm_index.py`.
 
 ## State
 
-- Latest release **v0.7.1** (2026-11-11), on the format-3 data pinned in
+- Latest release **v0.7.2** (2026-11-12), on the format-3 data pinned in
   `data/headwords.sha256` (a core file plus examples, etymology and pronunciation layers).
-- Navigation buttons (back, home, forward) over the list and word pages, on by default in a
-  desktop browser, a switch in Settings; the funnel's filters are no longer kept between starts.
+- Navigation buttons (back, home, forward) over the list and word pages, on by default on
+  every device, a switch in Settings; the title (top left) also goes home. The funnel's filters
+  are no longer kept between starts; Settings' switches are, and the installed app asks for
+  persistent storage.
 - A first-run tour (5 steps, in order: search, scrub, peek, filters, settings; each shown,
   then asked for, what to touch lit in place, the slider shown by a touch) and How It Works behind the "?" (`web/guide.ts`,
   `web/coach.ts`, `web/tour-shows.ts`, `web/hands.ts`).
@@ -87,7 +89,7 @@ built from the English Wiktionary dump by `scripts/build_fm_index.py`.
   (Back word → results → start screen → out, place kept, straight back to a word that was open),
   decided in `web/shell.ts`; once kept, the page opens from the device at once and a new build
   from the next start. Also for every build: a light/dark switch
-  at the top right of Settings (kept only when against the system's), and "Still downloading"
+  at the top right of Settings (dark by default everywhere; light kept once picked), and "Still downloading"
   with dots on a word's page whose definitions are on their way ("Still loading" in the app).
   The Android app's Back now steps through the same history (its clear-the-search case is gone).
   After the next release: install from Pages on a phone and check that Back closes Settings
