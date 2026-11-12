@@ -55,8 +55,9 @@ function fromPage(html: string, what: "title" | { name: string; media?: string }
  *  which sits beside the page: the app opens the page itself, wherever it's published. */
 export function manifestFor(html: string): Record<string, unknown> {
   const name = fromPage(html, "title");
-  // The light paper colour: the splash a phone shows while the page starts, and the bars'.
-  const paper = fromPage(html, { name: "theme-color", media: "(prefers-color-scheme: light)" });
+  // The dark paper colour, the page's own by default (web/theme-choice.ts): the splash a
+  // phone shows while the page starts, and the bars'.
+  const paper = fromPage(html, { name: "theme-color", media: "(prefers-color-scheme: dark)" });
   return {
     id: "./",
     name,

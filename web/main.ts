@@ -31,7 +31,7 @@ import { tourShows } from "./tour-shows";
 import { Hands } from "./hands";
 import { placeToKeep, placeToRestore, type Place } from "./place";
 import { Capacitor } from "@capacitor/core";
-import { AS_APP } from "./shell";
+import { AS_APP, SHELL } from "./shell";
 import { offerInstall } from "./install";
 import { setUpTheme } from "./theme";
 
@@ -250,6 +250,11 @@ function keepOnDevice() {
 if (import.meta.env.PROD && !Capacitor.isNativePlatform() && "serviceWorker" in navigator) {
   navigator.serviceWorker.register("./sw.js").catch(() => {}); // a build without one: online only
 }
+// Installed, it asks the browser to keep its storage for good: the settings, the place and
+// the dictionary kept on the device aren't cleared when the device runs short of space.
+// (Chromium grants it to an installed app without asking; Firefox may ask once.) A tab
+// doesn't ask: the person never chose to keep it; the Android app's storage is its own.
+if (SHELL === "installed") void navigator.storage?.persist?.().catch(() => false);
 // And where the browser offers to install it, Settings has Install (web/install.ts).
 offerInstall($("install"), $<HTMLButtonElement>("install-button"), AS_APP);
 
@@ -840,13 +845,12 @@ setUpTheme($<HTMLButtonElement>("theme"), { read, write, forget });
 
 // Back, home and forward, for a mouse: over the top of the list or a word's page. Back and
 // forward step through the words followed, as a swipe does; back from the list, and home,
-// go to the start screen. On by default in a desktop browser, off on a phone and in the app;
-// a switch in Settings, kept on the device.
+// go to the start screen. On by default on every device, the app's too; a switch in
+// Settings turns them off, and that's kept on the device.
 const NAV_KEY = "dictionarius.nav";
 const nav = $("nav");
 const navForward = $<HTMLButtonElement>("nav-forward");
-const navByDefault = () => !Capacitor.isNativePlatform() && !matchMedia("(pointer: coarse)").matches;
-let navOn = (read(NAV_KEY) ?? (navByDefault() ? "on" : "off")) === "on";
+let navOn = read(NAV_KEY) !== "off";
 function updateNav() {
   const hide = !navOn || !intro.hidden || (frame.hidden && entry.hidden);
   // Only when it changes: the screen watcher below hears every "hidden" set inside the app.
@@ -859,6 +863,13 @@ function goToStart() {
 }
 $("nav-back").addEventListener("click", () => (entry.hidden ? goToStart() : step("back")));
 $("nav-home").addEventListener("click", goToStart);
+// The title, top left, is a link to the start screen: in the page, at once. A click that asks
+// for a new tab or window is the browser's.
+$("home-link").addEventListener("click", (event) => {
+  if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+  event.preventDefault();
+  goToStart();
+});
 navForward.addEventListener("click", () => step("forward"));
 addSwitch("nav-buttons", "Navigation buttons", "Back, forward and the start screen, at the top.", navOn, (on) => {
   navOn = on;

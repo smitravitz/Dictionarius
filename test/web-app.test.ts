@@ -99,12 +99,13 @@ describe("the web build, as a browser installs it", () => {
     expect(manifest.description).toBe(meta(html, "description"));
   });
 
-  it("starts in the page's own paper colour, so the splash gives way to the page without a flash", () => {
-    // The paper colour is styles.css's --paper; the page's theme-color says the same for the
-    // browser's bars. Read here from both, so the manifest can't drift from either.
+  it("starts in the dark paper colour, the page's own by default, so the splash gives way to it without a flash", () => {
+    // The dark paper is styles.css's --paper for :root[data-theme="dark"]; the page's dark
+    // theme-color says the same for the browser's bars. Read here from both, so the manifest
+    // can't drift from either.
     const css = readFileSync("web/styles.css", "utf8");
-    const paper = /:root\s*\{[^}]*--paper:\s*(#[0-9a-f]{6})/i.exec(css)![1];
-    expect(meta(html, "theme-color", "(prefers-color-scheme: light)")).toBe(paper);
+    const paper = /:root\[data-theme="dark"\]\s*\{[^}]*--paper:\s*(#[0-9a-f]{6})/i.exec(css)![1];
+    expect(meta(html, "theme-color", "(prefers-color-scheme: dark)")).toBe(paper);
     expect(manifest.background_color).toBe(paper);
     expect(manifest.theme_color).toBe(paper);
   });
@@ -196,5 +197,24 @@ describe("the web app's icons", () => {
   it("were drawn from the brand icon as it is now (else: node tools/make-icons.ts)", () => {
     const brand = createHash("sha256").update(readFileSync("docs/brand/icon.svg")).digest("hex");
     expect(readFileSync("web/icons/source.sha256", "utf8").trim()).toBe(brand);
+  });
+});
+
+describe("the Android app, dark from launch", () => {
+  // Dark is the default theme (web/theme-choice.ts) on every device: the app's launch screen
+  // and status bar are dark before the page has run, whatever the phone's own setting.
+  const css = readFileSync("web/styles.css", "utf8");
+  const darkPaper = /:root\[data-theme="dark"\]\s*\{[^}]*--paper:\s*(#[0-9a-f]{6})/i.exec(css)![1].toLowerCase();
+  const colour = (file: string, name: string) =>
+    new RegExp(`<color name="${name}">(#[0-9A-Fa-f]{6})</color>`).exec(readFileSync(file, "utf8"))?.[1].toLowerCase();
+
+  it("launches on the dark paper, with no lighter one for a light phone", () => {
+    expect(colour("android/app/src/main/res/values/ic_launcher_background.xml", "splash_background")).toBe(darkPaper);
+    const night = "android/app/src/main/res/values-night/colors.xml";
+    expect(existsSync(night) ? colour(night, "splash_background") : undefined).toBeUndefined();
+  });
+
+  it("starts its status bar with light icons, for a dark page", () => {
+    expect(readFileSync("capacitor.config.ts", "utf8")).toMatch(/SystemBars:\s*\{[^}]*style:\s*"DARK"/);
   });
 });

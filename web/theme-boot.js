@@ -1,18 +1,17 @@
-// Before the page's first frame: the light or dark picked in Settings, if any, so the page
-// never shows the system's theme first and then turns. A plain script in the page's <head>
-// (tools/theme-script.ts puts it there), so it runs before anything is drawn; the page's
-// modules run only later. web/theme.ts does the same when the switch is turned, and keeps the
-// pick (under the key below; see web/theme-choice.ts).
+// Before the page's first frame: dark, or light if that was picked in Settings, so the page
+// never shows anything else first. A plain script in the page's <head> (tools/theme-script.ts
+// puts it there), so it runs before anything is drawn; the page's modules run only later.
+// web/theme.ts does the same when the switch is turned, and keeps the pick (under the key
+// below; see web/theme-choice.ts, whose default this is).
 (function () {
-  var theme = null;
+  var theme = "dark";
   try {
-    theme = localStorage.getItem("dictionarius.theme");
+    if (localStorage.getItem("dictionarius.theme") === "light") theme = "light";
   } catch (e) {
-    return; // no storage: the system's theme
+    // no storage: the default
   }
-  if (theme !== "light" && theme !== "dark") return;
   document.documentElement.dataset.theme = theme;
-  // The browser's bars: the picked theme's colour, whatever the system asks for.
+  // The browser's bars: the theme's colour, whatever the system asks for.
   var bars = document.querySelectorAll('meta[name="theme-color"]');
   var colour = null;
   for (var i = 0; i < bars.length; i++) {
