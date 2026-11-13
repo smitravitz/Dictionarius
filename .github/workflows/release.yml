@@ -20,7 +20,7 @@ defaults:
 
 jobs:
   android:
-    name: Signed Android APK and app bundle
+    name: Signed Android APK
     runs-on: ubuntu-24.04 # comes with the Android SDK
     timeout-minutes: 40
     permissions:
@@ -111,9 +111,7 @@ jobs:
           fi
           export ANDROID_KEYSTORE_PATH="$RUNNER_TEMP/release.p12"
           echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$ANDROID_KEYSTORE_PATH"
-          # The APK for GitHub and Obtainium, and the same build as an app bundle (.aab),
-          # which is what Google Play takes (docs/stores.md).
-          ./gradlew assembleRelease bundleRelease --no-daemon \
+          ./gradlew assembleRelease --no-daemon \
             -PversionCode=${{ steps.version.outputs.code }} \
             -PversionName=${{ steps.version.outputs.name }}
           rm "$ANDROID_KEYSTORE_PATH"
@@ -136,11 +134,25 @@ jobs:
       - name: Check the APK against the privacy budget (privacy.toml)
         run: python3 scripts/audit_privacy.py --apk "${{ steps.apk.outputs.file }}"
 
-      # For Google Play: signed with the same key (Play calls it the upload key), and with the
-      # definitions left uncompressed in the APKs Play makes from it, so they're read in place.
-      - name: Check the app bundle for Google Play
+      # For Google Play, which takes an app bundle (.aab), not an APK (docs/stores.md): the
+      # same build, signed with the same key (Play calls it the upload key), with the
+      # definitions left uncompressed in the APKs Play makes from it. A step of its own that
+      # may fail without stopping the release: the APK goes out exactly as it did before.
+      - name: Build, sign and check the app bundle for Google Play
         id: bundle
+        continue-on-error: true
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
+          export ANDROID_KEYSTORE_PATH="$RUNNER_TEMP/release.p12"
+          echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$ANDROID_KEYSTORE_PATH"
+          (cd android && ./gradlew bundleRelease --no-daemon \
+            -PversionCode=${{ steps.version.outputs.code }} \
+            -PversionName=${{ steps.version.outputs.name }})
+          rm "$ANDROID_KEYSTORE_PATH"
           bundle="dictionarius-$GITHUB_REF_NAME.aab"
           cp android/app/build/outputs/bundle/release/app-release.aab "$bundle"
           jarsigner -verify "$bundle" | tee bundle-signature.txt
@@ -149,6 +161,7 @@ jobs:
           echo "file=$bundle" >> "$GITHUB_OUTPUT"
       # Kept with this run, not on the release: Obtainium and people take the APK from there.
       - name: Keep the app bundle for uploading to Google Play
+        if: steps.bundle.outcome == 'success'
         uses: actions/upload-artifact@v7
         with:
           name: play-app-bundle
