@@ -1,7 +1,7 @@
 # Dictionary data — license & attribution
 
 Dictionary content in this folder (and in any data bundle or download Dictionarius
-ships) is **not** covered by the GPL that applies to the code. It keeps the
+ships) is **not** covered by the MPL-2.0 license that applies to the code. It keeps the
 license of its source.
 
 ## Source
@@ -47,7 +47,7 @@ and share your adaptations under the same license.
 
 ## Separate works
 
-The application code (GPL-3.0-or-later, see [`LICENSE`](../LICENSE)) and this
+The application code (MPL-2.0, see [`LICENSE`](../LICENSE)) and this
 data (CC BY-SA 4.0) are separate works distributed together. Each keeps its own
 license.
 

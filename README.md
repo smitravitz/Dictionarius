@@ -4,7 +4,7 @@ A free, fully offline English dictionary that finds a word from any part of it, 
 
 [![CI](https://img.shields.io/github/actions/workflow/status/smitravitz/Dictionarius/ci.yml?branch=main&label=CI)](https://github.com/smitravitz/Dictionarius/actions/workflows/ci.yml)
 [![Latest release](https://img.shields.io/github/v/release/smitravitz/Dictionarius?sort=semver&display_name=tag)](https://github.com/smitravitz/Dictionarius/releases/latest)
-[![License: GPL-3.0-or-later](https://img.shields.io/badge/license-GPL--3.0--or--later-blue)](LICENSE)
+[![License: MPL-2.0](https://img.shields.io/badge/license-MPL--2.0-blue)](LICENSE)
 
 Type `eren` and get *serene*, *coherent*, *adherence*: every word with your letters anywhere inside, not just at the start, on screen in about a millisecond. All 1,357,380 English words and their definitions from Wiktionary live on your device. No account, no network, no permissions.
 
@@ -101,7 +101,7 @@ DICTIONARIUS_PUBLIC="$PWD/release-data" npm run dev
 
 ## 📄 License
 
-- **Code:** [GPL-3.0-or-later](LICENSE).
+- **Code:** [MPL-2.0](LICENSE). Releases v0.1.0 through v0.7.4 were published under GPL-3.0-or-later; as sole copyright holder, I also license every one of them, and all earlier commits, under MPL-2.0, so you may use any past version under either license.
 - **Dictionary data:** from [English Wiktionary](https://en.wiktionary.org) via [wiktextract](https://github.com/tatuylonen/wiktextract), redistributed under [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/) with attribution; see [`data/README.md`](data/README.md).
 - **Fonts:** [Literata](https://www.npmjs.com/package/@fontsource-variable/literata) and [Atkinson Hyperlegible Next](https://www.npmjs.com/package/@fontsource/atkinson-hyperlegible-next), both under the SIL Open Font License 1.1.
 
