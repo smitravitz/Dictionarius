@@ -86,10 +86,9 @@ in Safari's engine, which the browser tests don't cover.
 
 ## The license and the App Store
 
-Dictionarius's code is GPL-3.0-or-later, and the App Store's terms add restrictions the GPL
-doesn't allow a *licensee* to add; that is why VLC was withdrawn in 2011. A copyright holder
-isn't bound by their own license, so while every line is yours, you can publish it there.
-Before accepting someone else's code, either get their agreement to App Store distribution
-or add an App Store exception to the license. The dictionary data is CC BY-SA 4.0, which
-forbids adding technical restrictions to the *data*; it stays freely downloadable from this
+Dictionarius's code is MPL-2.0 (since v0.7.5; earlier releases are offered under it too),
+chosen so the app can be on the App Store with no exception to write: unlike the GPL, it
+doesn't forbid the store's own terms on the copy people download, and contributions from
+others come under the same license. The dictionary data is CC BY-SA 4.0, which forbids
+adding technical restrictions to the *data*; it stays freely downloadable from this
 repository's data releases. This is a summary, not legal advice.

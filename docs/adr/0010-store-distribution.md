@@ -58,7 +58,7 @@ layered data (ADR-0005), letter search (ADR-0006) and derived pronunciations (AD
   hand) and the iOS build (TestFlight, submitted by hand).
 - The iOS app runs in Safari's engine, which no test here covers; the first TestFlight build
   must be checked on a phone (`docs/stores.md`).
-- The App Store's terms and the GPL only fit while the owner holds all the copyright
+- The code's license (MPL-2.0 since v0.7.5) fits the App Store's terms as it is
   (`docs/stores.md`, "The license and the App Store").
 - F-Droid can read the same listing folder when that build is made.
 

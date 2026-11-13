@@ -24,6 +24,6 @@ PRIVATE BY DESIGN
 • Links to Wiktionary open in your browser, only when you tap them.
 
 OPEN SOURCE
-The app's code is free software under the GPL, version 3 or later: https://github.com/smitravitz/Dictionarius
+The source code is public, under the Mozilla Public License 2.0: https://github.com/smitravitz/Dictionarius
 
 Definitions come from English Wiktionary (https://en.wiktionary.org), written by its contributors and shared under the Creative Commons Attribution-ShareAlike 4.0 license.
