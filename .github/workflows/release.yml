@@ -1,8 +1,10 @@
 name: Release
 
 # Pushing a tag like v1.2.3 builds a signed Android APK and publishes it as a
-# GitHub release (which Obtainium picks up), then puts the same version's web app on
-# GitHub Pages (pages.yml; only the latest release is online).
+# GitHub release (which Obtainium picks up), keeps the same build as an app bundle for
+# Google Play (this run's "play-app-bundle" artifact; docs/stores.md), then puts the same
+# version's web app on GitHub Pages (pages.yml; only the latest release is online).
+# The iOS app is built from the same tag by ios-release.yml.
 # One-time setup: scripts/setup-release.sh, and Settings > Pages > Source: GitHub Actions.
 # Release notes come from the tag's message: git tag -a v1.2.3 -m "What's new"
 on:
@@ -131,6 +133,41 @@ jobs:
 
       - name: Check the APK against the privacy budget (privacy.toml)
         run: python3 scripts/audit_privacy.py --apk "${{ steps.apk.outputs.file }}"
+
+      # For Google Play, which takes an app bundle (.aab), not an APK (docs/stores.md): the
+      # same build, signed with the same key (Play calls it the upload key), with the
+      # definitions left uncompressed in the APKs Play makes from it. A step of its own that
+      # may fail without stopping the release: the APK goes out exactly as it did before.
+      - name: Build, sign and check the app bundle for Google Play
+        id: bundle
+        continue-on-error: true
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          export ANDROID_KEYSTORE_PATH="$RUNNER_TEMP/release.p12"
+          echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$ANDROID_KEYSTORE_PATH"
+          (cd android && ./gradlew bundleRelease --no-daemon \
+            -PversionCode=${{ steps.version.outputs.code }} \
+            -PversionName=${{ steps.version.outputs.name }})
+          rm "$ANDROID_KEYSTORE_PATH"
+          bundle="dictionarius-$GITHUB_REF_NAME.aab"
+          cp android/app/build/outputs/bundle/release/app-release.aab "$bundle"
+          jarsigner -verify "$bundle" | tee bundle-signature.txt
+          grep -q "jar verified" bundle-signature.txt
+          bash scripts/check-bundle.sh "$bundle"
+          echo "file=$bundle" >> "$GITHUB_OUTPUT"
+      # Kept with this run, not on the release: Obtainium and people take the APK from there.
+      - name: Keep the app bundle for uploading to Google Play
+        if: steps.bundle.outcome == 'success'
+        uses: actions/upload-artifact@v7
+        with:
+          name: play-app-bundle
+          path: ${{ steps.bundle.outputs.file }}
+          if-no-files-found: error
+          retention-days: 90
 
       - name: Publish the release
         env:

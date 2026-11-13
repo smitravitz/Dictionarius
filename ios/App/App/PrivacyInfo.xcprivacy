@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  What Apple reads about the app's privacy. Dictionarius tracks nobody, collects nothing and
+  contacts no server (privacy.toml; scripts/audit_privacy.py checks this file against it).
+  The app's own Swift uses none of the "required reason" APIs, and neither does Capacitor
+  (its own PrivacyInfo.xcprivacy lists none); add one here, with its reason, if that changes.
+-->
+<plist version="1.0">
+<dict>
+	<key>NSPrivacyTracking</key>
+	<false/>
+	<key>NSPrivacyTrackingDomains</key>
+	<array/>
+	<key>NSPrivacyCollectedDataTypes</key>
+	<array/>
+	<key>NSPrivacyAccessedAPITypes</key>
+	<array/>
+</dict>
+</plist>

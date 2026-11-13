@@ -1,0 +1,29 @@
+Dictionarius is an English dictionary that works with no connection at all, and finds a word from any part of it.
+
+Type "eren" and get serene, coherent, adherence: every word with your letters anywhere inside it, not only at the start. Results appear as you type. All 1,357,380 English words and their definitions from Wiktionary are on your device.
+
+SEARCH INSIDE WORDS
+• Any piece of a word finds every word that contains it, lined up on your letters: the exact word, then words that start with it, then those with one letter before it, two, and so on.
+• A summary counts how many words start with, end with and contain your letters.
+• Hold beside a word and slide to jump to words where your letters come later or earlier. A small graph shows how many there are at each place.
+
+READ THE WORD
+• Hold a word for a peek at its first meanings.
+• Tap it for the full entry: meanings, an example of each in use, pronunciation and origin.
+• Words inside a definition open their own entries. Swipe to step back and forward through the words you followed.
+
+MAKE IT YOURS
+• Set a word length with two roller wheels.
+• Safe search is on to begin with and hides vulgar and offensive words. Phrases and names are left out until you ask for them in Settings.
+• Light or dark.
+• A short tour shows you how on first run.
+
+PRIVATE BY DESIGN
+• No account, no ads, no tracking.
+• The app asks for no permissions and never connects to the internet. Everything it needs is inside it.
+• Links to Wiktionary open in your browser, only when you tap them.
+
+OPEN SOURCE
+The source code is public, under the Mozilla Public License 2.0: https://github.com/smitravitz/Dictionarius
+
+Definitions come from English Wiktionary (https://en.wiktionary.org), written by its contributors and shared under the Creative Commons Attribution-ShareAlike 4.0 license.

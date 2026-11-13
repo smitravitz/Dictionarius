@@ -86,9 +86,9 @@ jobs:
         env:
           DICTIONARIUS_PUBLIC: ../test/fixtures
       - run: npx cap sync android
-      - name: Build a debug APK and run the Java unit tests
+      - name: Build a debug APK and app bundle, and run the Java unit tests
         working-directory: android
-        run: ./gradlew assembleDebug testDebugUnitTest --no-daemon
+        run: ./gradlew assembleDebug bundleDebug testDebugUnitTest --no-daemon
       # RangedAssets reads a block of the definitions where it lies in the APK, which
       # only works for files stored as they are (noCompress in build.gradle).
       - name: Check the definitions are stored uncompressed (read in place)
@@ -102,6 +102,10 @@ jobs:
               exit 1
             fi
           done
+      # Google Play makes its APKs from the app bundle, compressing what the bundle doesn't
+      # tell it to leave alone.
+      - name: Check the app bundle keeps the definitions uncompressed too
+        run: bash scripts/check-bundle.sh android/app/build/outputs/bundle/debug/app-debug.aab
       - name: Check the APK against the privacy budget (privacy.toml)
         run: python3 scripts/audit_privacy.py --apk android/app/build/outputs/apk/debug/app-debug.apk
 

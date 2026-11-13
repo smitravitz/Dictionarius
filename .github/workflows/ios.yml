@@ -1,0 +1,87 @@
+name: iOS
+
+# The iOS app (ios/) and the Swift half of plugins/haptic-tick, built for the simulator with
+# no signing: that they compile, and that the app is what privacy.toml says. It needs a macOS
+# runner, which GitHub sometimes can't supply for a while (capacity), so it runs only when
+# something the iOS app is made of changes, not on every commit.
+on:
+  push:
+    branches: [main]
+    paths: &ios
+      - ios/**
+      - plugins/haptic-tick/ios/**
+      - plugins/haptic-tick/Package.swift
+      - plugins/haptic-tick/*.podspec
+      - capacitor.config.ts
+      - package.json
+      - package-lock.json
+      - .github/workflows/ios.yml
+  pull_request:
+    paths: *ios
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash # -eo pipefail, so xcodebuild's failure isn't hidden behind `tail`
+
+jobs:
+  ios-plugin:
+    name: iOS haptic plugin compiles (Swift)
+    runs-on: macos-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - name: List what the Swift package builds
+        working-directory: plugins/haptic-tick
+        run: xcodebuild -list
+      - name: Build it for the iOS simulator
+        working-directory: plugins/haptic-tick
+        run: |
+          xcodebuild build -scheme DictionariusHapticTick \
+            -destination 'generic/platform=iOS Simulator' \
+            -skipPackagePluginValidation | tail -25
+
+  ios-app:
+    name: iOS app builds
+    runs-on: macos-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Build the web app (with the small sample word list)
+        run: npm run build
+        env:
+          DICTIONARIUS_PUBLIC: ../test/fixtures
+      - run: npx cap sync ios
+      # cap sync rewrites this file; a difference means a plugin was added or removed
+      # without committing what that does to the iOS app.
+      - name: Check the committed package list is the one cap sync writes
+        run: git diff --exit-code -- ios/App/CapApp-SPM/Package.swift
+      - name: Which Xcode
+        run: xcodebuild -version
+      - name: Build the app for the iOS simulator (unsigned)
+        working-directory: ios/App
+        run: |
+          xcodebuild build -project App.xcodeproj -scheme App -configuration Debug \
+            -destination 'generic/platform=iOS Simulator' \
+            -skipPackagePluginValidation CODE_SIGNING_ALLOWED=NO | tail -40
+      # The privacy manifest only counts if it is inside the app that was built.
+      - name: Check the privacy manifest is in the built app
+        run: |
+          app=$(find ~/Library/Developer/Xcode/DerivedData -type d -name App.app -path '*Debug-iphonesimulator*' | head -1)
+          test -n "$app"
+          test -f "$app/PrivacyInfo.xcprivacy"
+          echo "PrivacyInfo.xcprivacy is in $app"
+      - name: Check the app against the privacy budget (privacy.toml)
+        run: python3 scripts/audit_privacy.py

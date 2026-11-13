@@ -25,7 +25,7 @@ Type `eren` and get *serene*, *coherent*, *adherence*: every word with your lett
 - 🎚️ **Filters and settings.** Word length with two roller wheels; safe search, phrases and names in Settings (common words only by default).
 - 🧭 **Shows you how.** A five-step tour on first run, and **How It Works** behind the **?** any time.
 - 🌗 **Light or dark.** Dark by default; pick light with the switch at the top of Settings, and it's remembered.
-- 🔒 **Private by design.** The Android app requests no permissions at all: no network, no storage, no sensors. CI checks every build against [`privacy.toml`](privacy.toml).
+- 🔒 **Private by design.** The Android app requests no permissions at all: no network, no storage, no sensors. CI checks every build against [`privacy.toml`](privacy.toml). The [privacy policy](PRIVACY.md) is short: it collects nothing.
 
 ## 📲 Install
 
@@ -67,7 +67,8 @@ The formats are documented in [`docs/index-format.md`](docs/index-format.md) and
 
 Actively developed: Android and web releases ship from this repository ([releases](https://github.com/smitravitz/Dictionarius/releases)). Planned, not built yet:
 
-- iOS and F-Droid builds
+- Google Play and the App Store: the builds, listings and privacy policy are ready ([`docs/stores.md`](docs/stores.md), [ADR-0010](docs/adr/0010-store-distribution.md)); not published yet
+- An F-Droid build
 - Translations, French first ([ADR-0005](docs/adr/0005-layered-data-packs.md))
 - Search by letter pattern, such as a letter in a given place ([ADR-0006](docs/adr/0006-letter-and-position-bitmaps.md))
 - Pronunciations for words that don't have one yet, worked out from their parts where that's reliable ([ADR-0007](docs/adr/0007-derived-pronunciations.md))

@@ -3,20 +3,21 @@
 Read this first in a new chat, then `.claude/CLAUDE.md`. Update it at the end of any
 session that changes what's below (newest state only; history lives in git).
 
-_Last updated: 2026-11-12, at v0.7.2 (the installable web app, ADR-0009); unreleased: opening from the device at once, back straight to a word, dark by default, navigation buttons on everywhere, the title as a link home._
+_Last updated: 2026-11-13, at v0.7.5 (code relicensed to MPL-2.0; the place kept when the app is killed mid-tour); unreleased: a suggestion opening straight to its list, and the store work (ADR-0010: the iOS app, the Play app bundle, listings, privacy policy), which no CI has run yet and no store has._
 
 ## What it is
 
 Dictionarius: an offline, open-source English dictionary that finds a word from any part
-of it. TypeScript web app (no framework, Vite 7) wrapped for Android with Capacitor 8.
+of it. TypeScript web app (no framework, Vite 7) wrapped for Android and iOS with Capacitor 8.
 Search is an FM-index in a Web Worker; definitions are a brotli-blocked file. Data is
 built from the English Wiktionary dump by `scripts/build_fm_index.py`.
 
 - Data formats: `docs/index-format.md`, `docs/definitions-format.md`
 - Decisions: `docs/adr/` (ADR-0005, layered data packs: Proposed, its step 1 built;
   ADR-0006, letter and position conditions as bitmaps: Proposed; ADR-0009, the installable
-  web app: Accepted)
+  web app: Accepted; ADR-0010, Google Play and the App Store: Accepted, built, unpublished)
 - Build, test, release: `docs/development.md`
+- The stores, step by step: `docs/stores.md`
 
 ## Where things are
 
@@ -28,7 +29,9 @@ built from the English Wiktionary dump by `scripts/build_fm_index.py`.
 | `scripts/` | Python data pipeline, `setup-release.sh`, privacy audit |
 | `e2e/` | Playwright tests (desktop + phone) against `test/fixtures` sample data |
 | `android/` | Capacitor Android shell, `EdgeGesturesPlugin.java` |
-| `.github/workflows/` | `ci.yml`, `release.yml` (tag → signed APK), `pages.yml` (web app on Pages) |
+| `ios/` | Capacitor iOS shell (Swift Package Manager), its privacy manifest; iPhone only, iOS 16+ |
+| `fastlane/metadata/` | Store listings: Play (`android/en-US/`) and App Store (`en-US/`); `PRIVACY.md` is the policy they link to |
+| `.github/workflows/` | `ci.yml`, `release.yml` (tag → signed APK and Play app bundle), `pages.yml` (web app on Pages), `ios.yml` (iOS builds), `ios-release.yml` (tag → TestFlight), `store-screenshots.yml` (by hand) |
 
 ## Shipping
 
@@ -61,7 +64,15 @@ built from the English Wiktionary dump by `scripts/build_fm_index.py`.
 
 ## State
 
-- Latest release **v0.7.2** (2026-11-12), on the format-3 data pinned in
+- Licenses: code MPL-2.0 since v0.7.5, and every earlier release is offered under it as well
+  as GPL-3.0-or-later (README, "License"); data CC BY-SA 4.0; fonts SIL OFL 1.1. MPL was
+  picked so the App Store needs no exception.
+- Stores (ADR-0010): built on the branch `store-ready`, handed to the owner as a patch
+  (the session that wrote it couldn't push). Until it's merged, `main` has no `ios/`, no app
+  bundle and no listings. Play's closed-test period for newer personal accounts doesn't
+  apply to the owner's account. Nothing iOS has been compiled or run: the first TestFlight
+  build needs a hands-on check on an iPhone.
+- Latest release **v0.7.5** (2026-11-13), on the format-3 data pinned in
   `data/headwords.sha256` (a core file plus examples, etymology and pronunciation layers).
 - Navigation buttons (back, home, forward) over the list and word pages, on by default on
   every device, a switch in Settings; the title (top left) also goes home. The funnel's filters
@@ -105,6 +116,21 @@ built from the English Wiktionary dump by `scripts/build_fm_index.py`.
 
 ## Open items
 
+0. **Stores (ADR-0010), first release as the app is; ADR-0005, 0006 and 0007 are not needed
+   for it.** In order:
+   1. Merge `store-ready` and fix what the first runs of `ios.yml` and the bundle check in
+      `ci.yml` show (written with no Mac, Android SDK or browser to hand).
+   2. Google Play first, since the Android app is already proven on phones: choose the app
+      signing key (permanent), fill in the console forms, run `store-screenshots.yml`, tag a
+      release, try its `play-app-bundle` on Play's internal test track (that Play's own APKs
+      read definitions in place has only been checked by script), then production.
+   3. Before paying for Apple's program: a WebKit project in the browser tests, so Safari's
+      engine is covered in CI. Not built.
+   4. Apple: the account, its key as four secrets, the first `ios-release.yml` run (expect
+      signing to need a fix), then the iPhone checklist in `docs/stores.md`.
+   Not built: iPad; uploads to the stores from CI. Undecided: Capacitor's iOS code ships as
+   ionic-team's prebuilt framework (Swift Package Manager), not built from source (ADR-0010,
+   open questions).
 1. ADR-0005: next, links and "plural of" as ids, then translations (French first). A
    core-only APK flavour is now possible (33.8 MB of definitions instead of 56.9).
 2. The 102 MB installed vs 73.3 MB APK gap: get Android's storage breakdown (app/data/cache).

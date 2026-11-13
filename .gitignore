@@ -25,3 +25,5 @@ playwright-report/
 playwright-report-built/
 test-results-built/
 low-ram-results/
+test-results-store/
+store-screenshots/

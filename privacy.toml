@@ -10,7 +10,9 @@
 permissions = []
 
 [ios]
-# Info.plist NS*UsageDescription keys. None.
+# Info.plist NS*UsageDescription keys. None. (iOS has no network permission to refuse:
+# the page's Content-Security-Policy and App Transport Security keep it offline, and
+# ios/App/App/PrivacyInfo.xcprivacy tells Apple so.)
 usage_descriptions = []
 
 [network]
