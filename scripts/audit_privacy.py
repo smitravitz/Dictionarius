@@ -17,7 +17,8 @@ It looks for:
     cleartext traffic, Google's dependency-info block);
   - in the iOS app: permission prompts (NS...UsageDescription keys) beyond the budget, App
     Transport Security switched off, and a privacy manifest (PrivacyInfo.xcprivacy) that is
-    missing, left out of the Xcode project, or says the app tracks or collects.
+    missing, left out of the Xcode project, or says the app tracks or collects, and app
+    data left to be copied to iCloud backups.
 
 Exits with 1 when anything breaks the budget, so CI can stop the build. Standard library
 only (Python 3.11+); reading an APK needs aapt2 (Android build-tools) or androguard.
@@ -194,6 +195,12 @@ def check_ios(root, budget):
     if not os.path.exists(project) or "PrivacyInfo.xcprivacy in Resources" not in read(project):
         findings.append(Finding("error", "the privacy manifest isn't in the Xcode project, so it isn't in the app",
                                 rel(root, project), "add PrivacyInfo.xcprivacy to the App target's resources"))
+    # The twin of android:allowBackup="false": iOS copies an app's data to iCloud backups
+    # unless the app marks it as left out.
+    swift = "".join(read(path) for path in sorted(glob.glob(os.path.join(app, "*.swift"))))
+    if "isExcludedFromBackup = true" not in swift:
+        findings.append(Finding("error", "the iOS app's data would be copied to iCloud backups", rel(root, app),
+                                "mark the app's data folder isExcludedFromBackup, as AppDelegate.swift does"))
     manifest = read_plist(manifest_path)
     for key, what in (("NSPrivacyTracking", "says the app tracks people"),
                       ("NSPrivacyCollectedDataTypes", "says the app collects data"),

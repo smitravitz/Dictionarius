@@ -7,8 +7,21 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     var window: UIWindow?
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
-        // Override point for customization after application launch.
+        keepAppDataOutOfBackups()
         return true
+    }
+
+    /// Keeps what the app stores (settings, where you were) out of iCloud and computer
+    /// backups, as the Android app does with allowBackup="false". The page keeps it all
+    /// under Library/WebKit; the folder is made first, so the mark is there before the
+    /// page writes anything. scripts/audit_privacy.py fails if this goes.
+    private func keepAppDataOutOfBackups() {
+        guard let library = FileManager.default.urls(for: .libraryDirectory, in: .userDomainMask).first else { return }
+        var pageData = library.appendingPathComponent("WebKit", isDirectory: true)
+        try? FileManager.default.createDirectory(at: pageData, withIntermediateDirectories: true)
+        var values = URLResourceValues()
+        values.isExcludedFromBackup = true
+        try? pageData.setResourceValues(values)
     }
 
     func applicationWillResignActive(_ application: UIApplication) {

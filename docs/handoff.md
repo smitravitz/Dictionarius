@@ -128,7 +128,9 @@ built from the English Wiktionary dump by `scripts/build_fm_index.py`.
       engine is covered in CI. Not built.
    4. Apple: the account, its key as four secrets, the first `ios-release.yml` run (expect
       signing to need a fix), then the iPhone checklist in `docs/stores.md`.
-   Not built: iPad; uploads to the stores from CI.
+   Not built: iPad; uploads to the stores from CI. Undecided: Capacitor's iOS code ships as
+   ionic-team's prebuilt framework (Swift Package Manager), not built from source (ADR-0010,
+   open questions).
 1. ADR-0005: next, links and "plural of" as ids, then translations (French first). A
    core-only APK flavour is now possible (33.8 MB of definitions instead of 56.9).
 2. The 102 MB installed vs 73.3 MB APK gap: get Android's storage breakdown (app/data/cache).

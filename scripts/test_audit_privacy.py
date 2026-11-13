@@ -65,12 +65,14 @@ class Project:
         with open(full, "w") as f:
             f.write(textwrap.dedent(text))
 
-    def add_ios(self, info="", manifest=PRIVACY_MANIFEST, project="PrivacyInfo.xcprivacy in Resources"):
+    def add_ios(self, info="", manifest=PRIVACY_MANIFEST, project="PrivacyInfo.xcprivacy in Resources",
+                swift="values.isExcludedFromBackup = true"):
         """The iOS app: its Info.plist, its privacy manifest and the Xcode project that packs it."""
         self.write("ios/App/App/Info.plist", PLIST.format(keys="<key>CFBundleName</key><string>x</string>" + info))
         if manifest is not None:
             self.write("ios/App/App/PrivacyInfo.xcprivacy", manifest)
         self.write("ios/App/App.xcodeproj/project.pbxproj", f"// {project}\n")
+        self.write("ios/App/App/AppDelegate.swift", swift)
 
     def errors(self):
         return [f.what for f in audit_privacy.audit(self.root) if f.level == "error"]
@@ -197,6 +199,11 @@ class Audit(unittest.TestCase):
             "<key>NSPrivacyTrackingDomains</key><array/>",
             "<key>NSPrivacyTrackingDomains</key><array><string>example.org</string></array>"))
         self.assertEqual(self.p.errors(), ["the privacy manifest lists tracking domains (NSPrivacyTrackingDomains)"])
+
+    def test_ios_app_data_stays_out_of_backups(self):
+        # The twin of android:allowBackup="false": iOS copies an app's data to iCloud unless told not to.
+        self.p.add_ios(swift="// nothing about backups")
+        self.assertEqual(self.p.errors(), ["the iOS app's data would be copied to iCloud backups"])
 
     def test_reading_aapt2_output(self):
         text = ("package: io.example\n"

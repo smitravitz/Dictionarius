@@ -71,6 +71,11 @@ layered data (ADR-0005), letter search (ADR-0006) and derived pronunciations (AD
 
 ## Open questions
 
+- Capacitor arrives through Swift Package Manager as a prebuilt framework (checksummed,
+  from ionic-team's GitHub releases), not built from the source in `node_modules`. Its
+  source is MIT and was read for this decision, but what ships is the binary. CocoaPods
+  would build it from source; it is the owner's call whether that is worth a second
+  package manager.
 - A WebKit project in the browser tests, so Safari's engine is covered before a phone is.
 - iPad, with its own screenshots and all four orientations.
 - Uploading to Play and submitting to Apple from CI.

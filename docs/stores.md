@@ -18,6 +18,7 @@ every year: the dates below were checked on 2026-11-12.
 | Android app bundle (`.aab`), signed, targeting Android 16 (API 36, required since 31 August 2026) | `release.yml` builds it with every `v*` tag; it's that run's `play-app-bundle` artifact | CI builds a debug bundle; `scripts/check-bundle.sh` |
 | iOS app, built with Xcode 26 (required since 28 April 2026) | `ios/`; `ios-release.yml` uploads every `v*` tag to App Store Connect once the secrets below are set | `ios.yml` builds it for the simulator |
 | Privacy manifest, no permission prompts, export-compliance answer (`ITSAppUsesNonExemptEncryption`: no) | `ios/App/App/PrivacyInfo.xcprivacy`, `Info.plist` | `scripts/audit_privacy.py`, on every push |
+| App data kept out of iCloud backups (the twin of Android's `allowBackup="false"`) | `ios/App/App/AppDelegate.swift` | `scripts/audit_privacy.py`; on a phone, see the list below |
 | Listing text: name, descriptions, keywords | `fastlane/metadata/android/en-US/` (Play), `fastlane/metadata/en-US/` (App Store) | `test/store-listing.test.ts` holds each to its store's limit |
 | Play's 512 px icon and 1024 × 500 feature graphic | `fastlane/metadata/android/en-US/images/` (the icon is `web/icons/maskable-512.png` without transparency; the graphic is `rsvg-convert docs/brand/feature-graphic.svg`) | the same test |
 | Privacy policy, at a public address | [`PRIVACY.md`](../PRIVACY.md): `https://github.com/smitravitz/Dictionarius/blob/main/PRIVACY.md` | |
@@ -83,6 +84,8 @@ in Safari's engine, which the browser tests don't cover.
 - A Wiktionary link opens in Safari, not inside the app.
 - Leave the app, open others until iOS closes it, come back: it returns to where you were.
 - With Airplane Mode on, everything still works.
+- After an iCloud backup (Settings → your name → iCloud → iCloud Backup → Back Up Now),
+  Dictionarius isn't among the apps with data in it (Manage Account Storage → Backups).
 
 ## The license and the App Store
 
