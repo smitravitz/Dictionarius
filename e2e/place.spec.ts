@@ -204,22 +204,27 @@ for (const shell of apps) {
       await expect(app.locator("#entry-word")).toHaveText("ingot");
     });
 
-    test("killed while the tour shows the list's slider, it comes back to where the person left the list, not where the show had it", async ({
-      page,
-    }) => {
-      await shell.as(page);
-      await openApp(page);
-      await searchFor(page, "ate");
-      await page.locator("#scroller").evaluate((el) => (el.scrollTop = 900));
-      await expect.poll(() => page.locator("#scroller li.word:not(.pending)").count()).toBeGreaterThan(5);
-      const top = await page.locator("#scroller").evaluate((el) => el.scrollTop);
-      // Left still, the tour shows the slider on the real list, which moves it; killed then.
-      await expect.poll(() => page.locator("#scroller").evaluate((el) => el.scrollTop), { timeout: 10_000 }).not.toBe(top);
-      await page.waitForTimeout(600); // longer than the place takes to settle
+    test.describe("on a first run", () => {
+      // The tour must be on to show the slider: every project but first-run starts past it.
+      test.use({ storageState: { cookies: [], origins: [] } });
 
-      const app = await killHardAndReopen(page, shell.as);
-      await expect(app.locator("#q")).toHaveValue("ate");
-      await expect.poll(() => app.locator("#scroller").evaluate((el) => el.scrollTop)).toBe(top);
+      test("killed while the tour shows the list's slider, it comes back to where the person left the list, not where the show had it", async ({
+        page,
+      }) => {
+        await shell.as(page);
+        await openApp(page);
+        await searchFor(page, "ate");
+        await page.locator("#scroller").evaluate((el) => (el.scrollTop = 900));
+        await expect.poll(() => page.locator("#scroller li.word:not(.pending)").count()).toBeGreaterThan(5);
+        const top = await page.locator("#scroller").evaluate((el) => el.scrollTop);
+        // Left still, the tour shows the slider on the real list, which moves it; killed then.
+        await expect.poll(() => page.locator("#scroller").evaluate((el) => el.scrollTop), { timeout: 10_000 }).not.toBe(top);
+        await page.waitForTimeout(600); // longer than the place takes to settle
+
+        const app = await killHardAndReopen(page, shell.as);
+        await expect(app.locator("#q")).toHaveValue("ate");
+        await expect.poll(() => app.locator("#scroller").evaluate((el) => el.scrollTop)).toBe(top);
+      });
     });
 
     test("after half an hour away, or from the start screen, it starts fresh", async ({ page }) => {
