@@ -50,6 +50,63 @@ test("the app shows before the word list is in, and its suggestions open landed"
   list.release();
 });
 
+// The Android app has no starter: its worker counts a suggestion's words first, so the wait
+// between the tap and the list is longer there.
+for (const starter of [true, false]) {
+  const how = starter ? "from the starter" : "counted, as in the Android app";
+  test(`a suggestion goes straight from the start screen to its list: the box never fills in ahead of it (${how})`, async ({
+    page,
+  }) => {
+    await page.emulateMedia({ reducedMotion: "reduce" }); // a still start screen, to tap reliably
+    if (!starter)
+      await page.route((url) => url.pathname.endsWith(".starter.json"), (route) => route.fulfill({ status: 404, body: "" }));
+    await page.goto("/?index=headwords-sample.bin");
+    await expect(page.locator("#status")).toHaveText("17,082 words");
+    // A mid-range phone: a CPU four times slower, so a frame in between has time to be painted.
+    const cdp = await page.context().newCDPSession(page);
+    await cdp.send("Emulation.setCPUThrottlingRate", { rate: 4 });
+
+    // From the tap on, what every painted frame shows: the screen, and the text in the box.
+    await page.evaluate(() => {
+      const seen: string[] = [];
+      (window as unknown as { frames: string[] }).frames = seen;
+      const box = document.getElementById("q") as HTMLInputElement;
+      const shown = (id: string) => !document.getElementById(id)!.hidden;
+      const look = () => {
+        const frame = `${shown("frame") ? "list" : shown("intro") ? "start" : "other"} "${box.value}"`;
+        if (seen.at(-1) !== frame) seen.push(frame);
+        if (seen.length < 50) requestAnimationFrame(look);
+      };
+      requestAnimationFrame(look);
+    });
+    await page.locator("#examples button[data-query='ing']").first().click();
+    await expect(page.locator("#scroller li.word:not(.pending)").first()).toBeVisible();
+    await page.evaluate(() => new Promise(requestAnimationFrame));
+
+    const frames = await page.evaluate(() => (window as unknown as { frames: string[] }).frames);
+    expect(frames).toEqual(['start ""', 'list "ing"']);
+    await cdp.send("Emulation.setCPUThrottlingRate", { rate: 1 });
+  });
+}
+
+test("a search typed while a suggestion's list is on its way takes over: the suggestion never fills the box", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto("/?index=headwords-sample.bin");
+  await expect(page.locator("#status")).toHaveText("17,082 words");
+  const tile = page.locator("#examples button[data-query='ing']").first();
+  // The tap, then typing, before the worker can answer the tap: both in one task.
+  await tile.evaluate((button: HTMLElement) => {
+    button.click();
+    const box = document.getElementById("q") as HTMLInputElement;
+    box.value = "ate";
+    box.dispatchEvent(new Event("input"));
+  });
+  await expect(page.locator("#summary")).toHaveText(/ in all$/);
+  await expect(page.locator("#q")).toHaveValue("ate");
+  await expect(page.locator("#scroller li.word:not(.pending)").first()).toContainText("ate");
+  await expect(tile).not.toHaveAttribute("aria-busy", "true");
+});
+
 test("a search typed before the word list is in says how far along it is, then shows its words", async ({ page }) => {
   const list = await holdWordList(page);
   await page.goto("/?index=headwords-sample.bin");

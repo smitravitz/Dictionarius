@@ -66,7 +66,17 @@ let ready = false;
 let query = ""; // the normalized query on screen
 let counts: Counts | null = null; // for `query`
 let seeking = -1; // the position a seek is on its way to
-let landing: string | null = null; // a suggestion's query: its list shows once it can open at its landing row
+// A suggestion tapped and on its way: its list, and its text in the box, show together once
+// the list can open at its landing row (reveal()); until then the start screen stays as it
+// was, the tile marked as pressed.
+let landing: { query: string; text: string; tile: HTMLElement } | null = null;
+function setLanding(next: typeof landing) {
+  landing?.tile.removeAttribute("aria-busy");
+  landing = next;
+  landing?.tile.setAttribute("aria-busy", "true");
+}
+/** The search's text: the box's, or a suggestion's on its way (the box fills in with its list). */
+const searchText = () => landing?.text ?? input.value;
 
 const list = new ResultsList(scroller, $("results"), {
   needRows: (from, to) => send({ type: "rows", seq, from, to }),
@@ -114,7 +124,7 @@ function setFilter(id: string, value: (typeof filters)[string]) {
   saveFilter(id, value);
   send({ type: "settings", filters });
   counts = null; // counted under the old filters
-  if (query) search(input.value);
+  if (query) search(searchText());
   else showActiveFilters();
 }
 
@@ -271,7 +281,7 @@ worker.onmessage = ({ data }: MessageEvent<FromWorker>) => {
       ready = true;
       show(data.words, data.filters);
       if (toKeep) keepOnDevice(toKeep, $("download"), $("offline")); // the rest, now the word list is in: nothing it needs is held up
-      if (normalize(input.value) && !counts) summary.textContent = "Searching…";
+      if (normalize(searchText()) && !counts) summary.textContent = "Searching…";
       break;
     case "failed":
       status.textContent = "Word list unavailable";
@@ -372,13 +382,15 @@ clear.addEventListener("click", () => {
 
 /**
  * A suggestion's list arrived: every word counted, and the rows around where it opens
- * (src/landing.ts). Until now the start screen stayed up; the switch to the list, its
- * position, its words and the summary all happen here, before the next frame is drawn,
- * so the list is never seen at its top first and then jumping.
+ * (src/landing.ts). Until now the start screen stayed up, its box empty; the switch to the
+ * list, the text in the box, the list's position, its words and the summary all happen
+ * here, before the next frame is drawn, so nothing is seen half-way: not the box filled in
+ * over the start screen, nor the list at its top and then jumping.
  */
 function reveal(data: Extract<FromWorker, { type: "rows" }>) {
-  if (landing !== query) return; // typed over meanwhile
-  landing = null;
+  if (landing?.query !== query) return; // typed over meanwhile
+  input.value = landing.text;
+  setLanding(null);
   intro.hidden = true;
   frame.hidden = false;
   input.setAttribute("aria-expanded", "true");
@@ -392,7 +404,7 @@ function reveal(data: Extract<FromWorker, { type: "rows" }>) {
 function search(text: string) {
   leaveEntry();
   const next = normalize(text);
-  if (next !== landing) landing = null; // typed over it
+  if (next !== landing?.query) setLanding(null); // typed over it
   if (next !== query) {
     counts = null;
     trail.clear(); // the words followed from the old results
@@ -411,7 +423,7 @@ function search(text: string) {
     return;
   }
   input.removeAttribute("aria-activedescendant");
-  if (landing === query) {
+  if (landing?.query === query) {
     // A suggestion: the start screen stays until its list can open where it lands (reveal()).
     send({ type: "search", seq, query: text, land: true });
     return;
@@ -831,11 +843,13 @@ for (const type of ["pointerup", "pointercancel"])
 examples.addEventListener("click", (event) => {
   const button = (event.target as Element).closest<HTMLButtonElement>("button[data-query]");
   if (!button) return;
-  input.value = button.dataset.query ?? "";
+  const text = button.dataset.query ?? "";
   // Leave the keyboard closed, so the results have the whole screen to explore.
   input.blur();
-  landing = normalize(input.value);
-  search(input.value);
+  // The box stays as it is until the list shows (reveal()): filled in now, it would be
+  // painted over the start screen a frame or more before the list.
+  setLanding({ query: normalize(text), text, tile: button });
+  search(text);
 });
 
 // Browser storage for settings and the tour. It can be missing or blocked; then
@@ -990,7 +1004,7 @@ function keepPlace() {
   const onWord = !entry.hidden;
   const kept = placeToKeep(
     {
-      query: onWord ? (returnTo?.text ?? "") : input.value,
+      query: onWord ? (returnTo?.text ?? "") : searchText(),
       scrollTop: onWord ? (returnTo?.scrollTop ?? 0) : (heldTop ?? scroller.scrollTop),
       word: onWord ? wordOnScreen : null,
     },
