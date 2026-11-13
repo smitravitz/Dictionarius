@@ -71,8 +71,10 @@ every year: the dates below were checked on 2026-11-12.
 
 ### Check on a real iPhone before submitting
 
-Nothing here has run on an iPhone yet. The iOS app is the same page as the Android app, but
-in Safari's engine, which the browser tests don't cover.
+Nothing here has run on an iPhone yet. Two things come close, and both should be green
+first: the browser tests in Safari's engine (`npm run test:e2e:safari`), and the app opened
+in a simulated iPhone by `ios.yml`, whose `ios-simulator-screens` artifact shows the start
+screen, a search and a word's page. Neither has a finger, a notch or a phone's memory limits.
 
 - It opens dark, with no white flash, and the status bar's icons are light.
 - A search shows results as you type; a word's page shows meanings, examples, origin and

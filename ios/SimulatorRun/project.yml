@@ -1,0 +1,25 @@
+# A test that drives the installed iOS app in a simulator (Sources/SimulatorRun.swift).
+# It is its own small Xcode project, so the app's project stays as Capacitor made it; XcodeGen
+# writes the project from this file in CI (ios.yml), and it is not kept in the repository.
+name: SimulatorRun
+options:
+  bundleIdPrefix: io.github.smitravitz.dictionarius
+  deploymentTarget:
+    iOS: "16.0"
+targets:
+  SimulatorRun:
+    type: bundle.ui-testing
+    platform: iOS
+    sources: [Sources]
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: io.github.smitravitz.dictionarius.simulator-run
+        SWIFT_VERSION: "5.0"
+schemes:
+  SimulatorRun:
+    build:
+      targets:
+        SimulatorRun: [test]
+    test:
+      targets: [SimulatorRun]
