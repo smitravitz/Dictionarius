@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "description": "Haptic ticks without any permission: View.performHapticFeedback on Android, UIFeedbackGenerator on iOS",
-  "license": "GPL-3.0-or-later",
+  "license": "MPL-2.0",
   "author": "Dictionarius contributors",
   "files": ["android/src/main/", "android/build.gradle", "ios/Sources", "Package.swift", "DictionariusHapticTick.podspec"],
   "capacitor": {

@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "description": "Fully offline, open-source dictionary with instant mid-word search, powered by an FM-index. Web, PWA, iOS, Android, F-Droid.",
-  "license": "GPL-3.0-or-later",
+  "license": "MPL-2.0",
   "type": "module",
   "repository": {
     "type": "git",
