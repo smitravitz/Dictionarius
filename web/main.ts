@@ -29,6 +29,7 @@ import { CONTROLS, Tour } from "./guide";
 import { Coach, type Screen } from "./coach";
 import { tourShows } from "./tour-shows";
 import { Hands } from "./hands";
+import { TapOff } from "./tap-off";
 import { placeToKeep, placeToRestore, type Place } from "./place";
 import { Capacitor } from "@capacitor/core";
 import { AS_APP, SHELL } from "./shell";
@@ -378,6 +379,30 @@ clear.addEventListener("click", () => {
   input.value = "";
   input.focus();
   input.dispatchEvent(new Event("input"));
+});
+
+// A tap off the box puts the keyboard away, as Chromium does by itself and Safari doesn't on
+// plain text (tap-off.ts). Heard as it bubbles, so what was tapped has had its say: the clear
+// button above stops its press, to keep the keyboard up.
+const tapOff = new TapOff();
+document.addEventListener("pointerdown", (event) => {
+  const target = event.target instanceof Element ? event.target : null;
+  tapOff.down({
+    pointerId: event.pointerId,
+    pointerType: event.pointerType,
+    primary: event.isPrimary,
+    x: event.clientX,
+    y: event.clientY,
+    at: event.timeStamp,
+    outside: !!target && target !== input && !scroller.contains(target),
+    claimed: event.defaultPrevented,
+    typing: document.activeElement === input,
+  });
+});
+document.addEventListener("pointermove", (event) => tapOff.move(event.pointerId, event.clientX, event.clientY), { passive: true });
+document.addEventListener("pointercancel", (event) => tapOff.cancel(event.pointerId));
+document.addEventListener("pointerup", (event) => {
+  if (tapOff.up(event.pointerId, event.timeStamp)) input.blur();
 });
 
 /**
