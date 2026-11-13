@@ -65,6 +65,30 @@ jobs:
             playwright-report-built/
           retention-days: 7
 
+  # The same browser tests in Safari's engine (WebKit) at an iPhone's size: the engine the
+  # iOS app runs in. A job of its own, so what it finds doesn't hide the Chromium results.
+  e2e-safari:
+    name: Browser tests (Safari's engine, iPhone)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    container:
+      image: mcr.microsoft.com/playwright:v1.63.0-noble # as for the job above
+      options: --user 1001
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run test:e2e:safari
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: playwright-report-safari
+          path: playwright-report/
+          retention-days: 7
+
   android:
     name: Android app builds
     runs-on: ubuntu-24.04 # comes with the Android SDK

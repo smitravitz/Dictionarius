@@ -118,14 +118,20 @@ built from the English Wiktionary dump by `scripts/build_fm_index.py`.
 
 0. **Stores (ADR-0010), first release as the app is; ADR-0005, 0006 and 0007 are not needed
    for it.** In order:
-   1. Merge `store-ready` and fix what the first runs of `ios.yml` and the bundle check in
-      `ci.yml` show (written with no Mac, Android SDK or browser to hand).
+   1. Done: `store-ready` is merged, and the iOS app compiles and the bundle check passes in CI.
    2. Google Play first, since the Android app is already proven on phones: choose the app
       signing key (permanent), fill in the console forms, run `store-screenshots.yml`, tag a
       release, try its `play-app-bundle` on Play's internal test track (that Play's own APKs
       read definitions in place has only been checked by script), then production.
-   3. Before paying for Apple's program: a WebKit project in the browser tests, so Safari's
-      engine is covered in CI. Not built.
+   3. Before paying for Apple's program: get the two iOS checks green. `npm run
+      test:e2e:safari` runs the browser tests in Safari's engine at an iPhone's size (CI job
+      "Browser tests (Safari's engine, iPhone)"; four files that drive Chromium's devtools
+      are left out, `playwright.config.ts` says which), and `ios.yml`'s "iOS app runs in a
+      simulator" opens the real app, searches and reads a word (`ios/SimulatorRun`), keeping a
+      picture of each screen; it taps by on-screen position, since XCUITest can't work out
+      where to tap inside a web view. Both were written with no WebKit, Mac or simulator to hand:
+      what their first runs show is either a mistake in the test or a real iPhone bug, and
+      each failure needs telling apart.
    4. Apple: the account, its key as four secrets, the first `ios-release.yml` run (expect
       signing to need a fix), then the iPhone checklist in `docs/stores.md`.
    Not built: iPad; uploads to the stores from CI. Undecided: Capacitor's iOS code ships as

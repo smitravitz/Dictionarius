@@ -18,6 +18,7 @@ npm install
 npm test            # unit tests
 npm run typecheck   # strict TypeScript check
 npm run test:e2e    # browser tests (desktop + phone) on a small sample index
+npm run test:e2e:safari  # the same in Safari's engine at an iPhone's size (needs: npx playwright install webkit)
 python -m unittest scripts/test_build_fm_index.py   # the index builder's safe-search rule and list
 python scripts/audit_privacy.py                      # the code against privacy.toml (add --apk path/to.apk for a build)
 ```

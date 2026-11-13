@@ -3,6 +3,19 @@ import { defineConfig, devices } from "@playwright/test";
 
 // End-to-end tests run the real app (Vite dev server, Web Worker, virtual list)
 // against the small public-domain fixture index, on a desktop and a phone.
+
+// The same tests in Safari's engine (WebKit), at an iPhone's size: the engine the iOS app
+// runs in, which the projects below (all Chromium) never touch. Asked for by name
+// (`npm run test:e2e:safari`), so a plain `playwright test` runs what it always has.
+// Left out: the files whose gestures or slow-phone timing go through Chromium's own devtools
+// (a swipe, a touch that holds and slides, a throttled CPU), which WebKit doesn't have.
+const SAFARI = !!process.env.DICTIONARIUS_SAFARI;
+const safari = {
+  name: "iphone-safari",
+  testIgnore: ["**/back.spec.ts", "**/dropdown.spec.ts", "**/positions.spec.ts", "**/start.spec.ts", "**/built/**"],
+  use: { ...devices["iPhone 15"] },
+};
+
 export default defineConfig({
   testDir: "e2e",
   testIgnore: ["**/built/**"], // the published build's own tests: playwright.built.config.ts
@@ -16,7 +29,7 @@ export default defineConfig({
     storageState: "e2e/tour-done.json",
     trace: "retain-on-failure",
   },
-  projects: [
+  projects: SAFARI ? [safari] : [
     { name: "desktop", use: { ...devices["Desktop Chrome"] } },
     { name: "phone", use: { ...devices["Pixel 7"] } },
     // Everything again, on a first run: the tour on, acting its steps out on the same screens.
