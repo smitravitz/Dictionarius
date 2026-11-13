@@ -101,7 +101,7 @@ DICTIONARIUS_PUBLIC="$PWD/release-data" npm run dev
 
 ## 📄 License
 
-- **Code:** [MPL-2.0](LICENSE).
+- **Code:** [MPL-2.0](LICENSE). Releases v0.1.0 through v0.7.4 were published under GPL-3.0-or-later; as sole copyright holder, I also license every one of them, and all earlier commits, under MPL-2.0, so you may use any past version under either license.
 - **Dictionary data:** from [English Wiktionary](https://en.wiktionary.org) via [wiktextract](https://github.com/tatuylonen/wiktextract), redistributed under [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/) with attribution; see [`data/README.md`](data/README.md).
 - **Fonts:** [Literata](https://www.npmjs.com/package/@fontsource-variable/literata) and [Atkinson Hyperlegible Next](https://www.npmjs.com/package/@fontsource/atkinson-hyperlegible-next), both under the SIL Open Font License 1.1.
 
