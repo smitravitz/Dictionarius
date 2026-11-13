@@ -36,7 +36,7 @@ final class SimulatorRun: XCTestCase {
         // Type a piece of a word.
         let box = searchBox()
         XCTAssertTrue(box.waitForExistence(timeout: 20), "no search box")
-        box.tap()
+        tapOnScreen(box)
         box.typeText(piece)
         skipTheTour(waiting: 3)
         let row = anything(labelled: word)
@@ -44,7 +44,7 @@ final class SimulatorRun: XCTestCase {
         keep("2-search")
 
         // Open the word: its meaning comes from the definitions file, read in place.
-        row.tap()
+        tapOnScreen(row)
         XCTAssertTrue(anything(containing: fromItsMeaning).waitForExistence(timeout: 30), "the word's meaning never showed")
         keep("3-word")
     }
@@ -52,7 +52,19 @@ final class SimulatorRun: XCTestCase {
     /// A first start shows the tour, and this isn't about the tour: Skip ends it, once it offers to.
     private func skipTheTour(waiting seconds: TimeInterval) {
         let skip = app.buttons["Skip"]
-        if skip.waitForExistence(timeout: seconds) && skip.isHittable { skip.tap() }
+        if skip.waitForExistence(timeout: seconds) { tapOnScreen(skip) }
+    }
+
+    /// Taps the middle of where `element` is on the screen. Every tap here goes this way:
+    /// XCUITest's own tap first works out a "hit point" inside the element, which it often
+    /// can't do for the page inside a web view (it finds the result row, then reports it
+    /// "not hittable"). Where the element is drawn is what a finger goes by anyway.
+    private func tapOnScreen(_ element: XCUIElement) {
+        let frame = element.frame
+        XCTAssertFalse(frame.isEmpty, "\(element) has no place on the screen")
+        app.coordinate(withNormalizedOffset: .zero)
+            .withOffset(CGVector(dx: frame.midX, dy: frame.midY))
+            .tap()
     }
 
     /// The search box, whichever kind of field iOS takes it for.

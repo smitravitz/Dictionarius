@@ -128,7 +128,8 @@ built from the English Wiktionary dump by `scripts/build_fm_index.py`.
       "Browser tests (Safari's engine, iPhone)"; four files that drive Chromium's devtools
       are left out, `playwright.config.ts` says which), and `ios.yml`'s "iOS app runs in a
       simulator" opens the real app, searches and reads a word (`ios/SimulatorRun`), keeping a
-      picture of each screen. Both were written with no WebKit, Mac or simulator to hand:
+      picture of each screen; it taps by on-screen position, since XCUITest can't work out
+      where to tap inside a web view. Both were written with no WebKit, Mac or simulator to hand:
       what their first runs show is either a mistake in the test or a real iPhone bug, and
       each failure needs telling apart.
    4. Apple: the account, its key as four secrets, the first `ios-release.yml` run (expect
