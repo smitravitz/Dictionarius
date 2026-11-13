@@ -111,9 +111,8 @@ built from the English Wiktionary dump by `scripts/build_fm_index.py`.
 0. **Stores (ADR-0010), first release as the app is; ADR-0005, 0006 and 0007 are not needed
    for it.** In the repository: done, but `ios.yml`, `ios-release.yml`, the bundle check and
    `store-screenshots.yml` have never run (written with no Mac, Android SDK or browser to
-   hand): fix what their first runs show. The owner's part is `docs/stores.md`: Play's
-   12 testers for 14 days (start first), the Apple account and its key, the app-signing
-   choice on Play, the console forms, and a check of the first TestFlight build on an iPhone.
+   hand): fix what their first runs show. The owner's part is `docs/stores.md`: the Apple
+   account and its key, the app-signing choice on Play, the console forms, and a check of the first TestFlight build on an iPhone.
    Not built: a WebKit project in the browser tests; iPad; uploads to the stores from CI.
 1. ADR-0005: next, links and "plural of" as ids, then translations (French first). A
    core-only APK flavour is now possible (33.8 MB of definitions instead of 56.9).

@@ -4,11 +4,10 @@ What the repository does for each store, and what only you can do, in each store
 The decisions behind it are in [ADR-0010](adr/0010-store-distribution.md). Store rules change
 every year: the dates below were checked on 2026-11-12.
 
-## Start these first: they take weeks
+## Start these first: they take the longest
 
 | What | Why it's slow |
 |---|---|
-| **Google Play: 12 testers for 14 days.** A personal developer account made after 13 November 2023 can't publish to production until a closed test has had at least 12 testers opted in for 14 days running. | Finding 12 people, then two weeks, then Google's review of the request. An organisation account is exempt but needs a D-U-N-S number, which also takes weeks. |
 | **Apple Developer Program** (US$99 a year). | Enrolment and identity checks can take days. |
 | **Screenshots.** Both stores refuse a listing without them. | Run *Actions → Store screenshots → Run workflow* and download its `store-screenshots` artifact. |
 
@@ -44,8 +43,8 @@ every year: the dates below were checked on 2026-11-12.
    - Target audience: pick the ages you intend; choosing children brings Families rules.
 4. Store listing: paste the three texts from `fastlane/metadata/android/en-US/`, upload
    `images/icon.png`, `images/featureGraphic.png` and the `google-play-phone` screenshots.
-5. Push a release tag, download `play-app-bundle` from the run, and upload the `.aab` to a
-   **closed testing** track. Invite 12 testers; after 14 days apply for production access.
+5. Push a release tag, download `play-app-bundle` from the run, and upload the `.aab` to
+   the production track.
 6. Later releases: upload each new `.aab` to production. (Uploading can be automated with a
    service account once the first release has been made by hand; not set up.)
 
