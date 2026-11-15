@@ -43,7 +43,13 @@ final class SimulatorRun: XCTestCase {
         XCTAssertTrue(row.waitForExistence(timeout: 30), "no results for \(piece)")
         keep("2-search")
 
-        // Open the word: its meaning comes from the definitions file, read in place.
+        // Open the word: its meaning comes from the definitions file, read in place. While
+        // the box has the focus, a tap on a word only puts the keyboard away (the app's rule:
+        // the list moves as the keyboard closes, so the tap could land on another word), so
+        // a person taps it again once the keyboard has gone.
+        tapOnScreen(row)
+        let keyboardGone = XCTNSPredicateExpectation(predicate: NSPredicate(format: "count == 0"), object: app.keyboards)
+        XCTAssertEqual(XCTWaiter().wait(for: [keyboardGone], timeout: 10), .completed, "the keyboard stayed up")
         tapOnScreen(row)
         XCTAssertTrue(anything(containing: fromItsMeaning).waitForExistence(timeout: 30), "the word's meaning never showed")
         keep("3-word")
