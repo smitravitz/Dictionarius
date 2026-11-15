@@ -69,8 +69,10 @@ built from the English Wiktionary dump by `scripts/build_fm_index.py`.
   picked so the App Store needs no exception.
 - Stores (ADR-0010): merged to `main`, in no store yet. CI builds the Play app bundle and
   the iOS app, runs the browser tests in Safari's engine, and opens the iOS app in a
-  simulator. v0.7.6's release run has the first `play-app-bundle` (kept 90 days). Play's closed-test period for newer personal accounts doesn't apply to the
-  owner's account. `ios-release.yml` has never run, and nothing has run on a real iPhone:
+  simulator. v0.7.6's release run has the first `play-app-bundle` (kept 90 days). The owner's
+  Play developer account is new (made 2026-11-15; the 2021 one was closed), so Play's rule
+  for personal accounts made after 13 November 2023 applies: a closed test with 12 testers
+  opted in for 14 days running, then an application for production access. `ios-release.yml` has never run, and nothing has run on a real iPhone:
   the owner has none, so the first TestFlight build needs a borrowed iPhone or a tester.
 - Latest release **v0.7.6** (2026-11-15), on the format-3 data pinned in
   `data/headwords.sha256` (a core file plus examples, etymology and pronunciation layers).
@@ -123,7 +125,9 @@ built from the English Wiktionary dump by `scripts/build_fm_index.py`.
       (`docs/stores.md`, steps 5 to 7): choose the app signing key (permanent) while making
       the first release, upload v0.7.6's `play-app-bundle` to the internal test track and
       try it on a phone with the Play Store (that Play's own APKs read definitions in place
-      has only been checked by script), fill in the console forms, then production.
+      has only been checked by script), fill in the console forms, then the closed test
+      (12 testers, 14 days: finding them is the slow part, start now), apply for production
+      access, then production.
       Screenshots: `store-screenshots.yml` failed on its first run ("No tests found"):
       `tools/store-screenshots/screens.spec.ts` had never been committed, hidden by a
       `.gitignore` line. It's written now (branch `store-screenshots-spec`; CI runs it on

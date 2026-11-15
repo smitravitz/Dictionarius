@@ -9,6 +9,7 @@ every year: the dates below were checked on 2026-11-12.
 | What | Why it's slow |
 |---|---|
 | **Apple Developer Program** (US$99 a year). | Enrolment and identity checks can take days. |
+| **Twelve testers for Google Play.** A personal Play account made after 13 November 2023 can't publish until 12 people have been opted in to a closed test for 14 days running. | Finding 12 people with Android phones and Google accounts, then two weeks. |
 | **Screenshots.** Both stores refuse a listing without them. | Run *Actions → Store screenshots → Run workflow* and download its `store-screenshots` artifact. |
 
 ## What's in the repository
@@ -53,9 +54,13 @@ every year: the dates below were checked on 2026-11-12.
    to that Google account. Internal testing needs no review and not the forms of steps 3
    and 4. On the phone: a word's page shows its meanings at once (Play's own APKs reading
    definitions in place has only been checked by script).
-7. Production: with steps 3 and 4 done, Production → Create new release → Add from
-   library (the same bundle), and send it for review.
-8. Later releases: upload each new `.aab` to production. (Uploading can be automated with a
+7. The closed test (needs steps 3 and 4 done, and Google's review): Testing → Closed
+   testing → Create new release → Add from library (the same bundle); add the 12 testers'
+   Google addresses and send them the opt-in link. Leave the build alone for the 14 days,
+   and ask the testers to keep opening the app: all 12 must stay opted in throughout.
+8. Dashboard → Apply for production access (questions about the test and the app). Once
+   granted: Production → Create new release → Add from library, and send it for review.
+9. Later releases: upload each new `.aab` to production. (Uploading can be automated with a
    service account once the first release has been made by hand; not set up.)
 
 ## App Store, step by step
