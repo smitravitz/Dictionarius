@@ -1,14 +1,17 @@
 name: iOS
 
-# The iOS app (ios/) and the Swift half of plugins/haptic-tick, built for the simulator with
-# no signing: that they compile, and that the app is what privacy.toml says. It needs a macOS
-# runner, which GitHub sometimes can't supply for a while (capacity), so it runs only when
-# something the iOS app is made of changes, not on every commit.
+# The iOS app (ios/) and the Swift half of plugins/haptic-tick: that they compile, unsigned,
+# that the app is what privacy.toml says, and that the app really runs: opened in a simulated
+# iPhone, a word searched for and its page read, with a picture of each screen kept
+# (the "ios-simulator-screens" artifact). It needs macOS runners, which GitHub sometimes
+# can't supply for a while (capacity), so it runs only when the app or its page changes.
 on:
   push:
     branches: [main]
     paths: &ios
       - ios/**
+      - web/**
+      - src/**
       - plugins/haptic-tick/ios/**
       - plugins/haptic-tick/Package.swift
       - plugins/haptic-tick/*.podspec
@@ -85,3 +88,74 @@ jobs:
           echo "PrivacyInfo.xcprivacy is in $app"
       - name: Check the app against the privacy budget (privacy.toml)
         run: python3 scripts/audit_privacy.py
+
+  # The only run of the real iOS app before a phone: installed in a simulator, opened, a word
+  # searched for and its page read (ios/SimulatorRun). Not on a phone, though: no haptics, and
+  # iOS never closes the app for want of memory here.
+  ios-simulator:
+    name: iOS app runs in a simulator
+    runs-on: macos-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      # The app opens headwords.bin, so the sample list goes in under the real one's names.
+      - name: Build the web app on the sample word list, named as the real one is
+        run: |
+          mkdir sample-public
+          for file in test/fixtures/headwords-sample.*.bin test/fixtures/headwords-sample.bin; do
+            name=$(basename "$file")
+            cp "$file" "sample-public/${name/headwords-sample/headwords}"
+          done
+          ls -l sample-public
+          DICTIONARIUS_PUBLIC="$PWD/sample-public" npm run build
+      - run: npx cap sync ios
+      - name: Build the app for the iOS simulator (unsigned)
+        working-directory: ios/App
+        run: |
+          xcodebuild build -project App.xcodeproj -scheme App -configuration Debug \
+            -destination 'generic/platform=iOS Simulator' -derivedDataPath "$RUNNER_TEMP/app-build" \
+            -skipPackagePluginValidation CODE_SIGNING_ALLOWED=NO | tail -20
+      - name: Start a simulated iPhone and install the app
+        run: |
+          # The newest iPhone this runner has.
+          phone=$(xcrun simctl list devices available --json | python3 -c "
+          import json, sys
+          runtimes = json.load(sys.stdin)['devices']
+          phones = [(runtime, device) for runtime, devices in runtimes.items() if 'iOS' in runtime
+                    for device in devices if device['name'].startswith('iPhone')]
+          runtime, device = sorted(phones, key=lambda pair: [int(n) for n in pair[0].split('iOS-')[1].split('-')])[-1]
+          print(device['udid'], device['name'], runtime.split('.')[-1], file=sys.stderr)
+          print(device['udid'])")
+          echo "PHONE=$phone" >> "$GITHUB_ENV"
+          xcrun simctl boot "$phone"
+          xcrun simctl bootstatus "$phone" -b
+          xcrun simctl install "$phone" "$RUNNER_TEMP/app-build/Build/Products/Debug-iphonesimulator/App.app"
+      - name: Open the app, search for a word and read its page
+        working-directory: ios/SimulatorRun
+        run: |
+          brew install xcodegen
+          xcodegen generate
+          xcodebuild test -project SimulatorRun.xcodeproj -scheme SimulatorRun \
+            -destination "platform=iOS Simulator,id=$PHONE" \
+            -resultBundlePath "$RUNNER_TEMP/simulator-run.xcresult" | tail -60
+      # Pass or fail, the pictures say more than the log.
+      - name: Pull the pictures of each screen out of the result
+        if: always()
+        run: |
+          mkdir -p simulator-screens
+          xcrun simctl io "$PHONE" screenshot simulator-screens/at-the-end.png || true
+          xcrun xcresulttool export attachments --path "$RUNNER_TEMP/simulator-run.xcresult" \
+            --output-path simulator-screens || true
+          ls -l simulator-screens
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: ios-simulator-screens
+          path: simulator-screens/
+          retention-days: 14
+

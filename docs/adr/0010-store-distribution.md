@@ -56,8 +56,9 @@ layered data (ADR-0005), letter search (ADR-0006) and derived pronunciations (AD
 
 - A release tag now makes three things: the APK (GitHub), the bundle (Play, uploaded by
   hand) and the iOS build (TestFlight, submitted by hand).
-- The iOS app runs in Safari's engine, which no test here covers; the first TestFlight build
-  must be checked on a phone (`docs/stores.md`).
+- The iOS app runs in Safari's engine. The browser tests run there too (`npm run
+  test:e2e:safari`) and CI opens the app in a simulator (`ios/SimulatorRun`), but the first
+  TestFlight build must still be checked on a phone (`docs/stores.md`).
 - The code's license (MPL-2.0 since v0.7.5) fits the App Store's terms as it is
   (`docs/stores.md`, "The license and the App Store").
 - F-Droid can read the same listing folder when that build is made.
@@ -76,6 +77,7 @@ layered data (ADR-0005), letter search (ADR-0006) and derived pronunciations (AD
   source is MIT and was read for this decision, but what ships is the binary. CocoaPods
   would build it from source; it is the owner's call whether that is worth a second
   package manager.
-- A WebKit project in the browser tests, so Safari's engine is covered before a phone is.
+- The four browser-test files that drive gestures through Chromium's devtools don't run in
+  Safari's engine: swipes, the slider and the dropdown are untested there.
 - iPad, with its own screenshots and all four orientations.
 - Uploading to Play and submitting to Apple from CI.

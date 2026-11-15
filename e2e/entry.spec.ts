@@ -395,8 +395,9 @@ async function followThree(page: Page) {
   await expect(page.locator("#entry-word")).toHaveText("wobble");
 }
 
-test("swiping steps back and forward along the words followed, back to the results", async ({ page, isMobile }) => {
+test("swiping steps back and forward along the words followed, back to the results", async ({ page, isMobile, browserName }) => {
   test.skip(!isMobile, "touch swipes on the phone project");
+  test.skip(browserName !== "chromium", "the swipe is sent through Chromium's devtools");
   await followThree(page);
   const word = page.locator("#entry-word");
   await swipe(page, "right");
@@ -415,8 +416,9 @@ test("swiping steps back and forward along the words followed, back to the resul
   await expect(page.locator("#q")).toHaveValue("zorbles");
 });
 
-test("Back goes straight to the results; a swipe forward takes up the same words again", async ({ page, isMobile }) => {
+test("Back goes straight to the results; a swipe forward takes up the same words again", async ({ page, isMobile, browserName }) => {
   test.skip(!isMobile, "touch swipes on the phone project");
+  test.skip(browserName !== "chromium", "the swipe is sent through Chromium's devtools");
   await followThree(page);
   await page.goBack();
   await expect(entry(page)).toBeHidden();

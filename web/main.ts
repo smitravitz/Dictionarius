@@ -10,6 +10,7 @@ import type { Counts, FromWorker, ToWorker } from "./protocol";
 import { ResultsList } from "./results-list";
 import { OffsetSlider } from "./offset-slider";
 import { ScrollerGestures } from "./scroller-gestures";
+import { TapAway } from "./tap-away";
 import { setUpNativeShell } from "./native";
 import { LANES, PIECES, lanesOf, tileWeight } from "./examples";
 import { FILTERS, describeRange, filterKey, type FilterInfo, type Range } from "../src/filters";
@@ -111,6 +112,14 @@ new ScrollerGestures(scroller, {
     peekSeq++; // an answer still on its way is for a peek that's over
     peek.hide();
   },
+});
+
+// Anywhere else, a finger's tap off the box puts the keyboard away (tap-away.ts): Safari's
+// engine doesn't when the tap lands on something that takes no focus.
+new TapAway(document, {
+  typing: () => document.activeElement === input,
+  ownRule: (target) => target instanceof Node && (input.contains(target) || scroller.contains(target)),
+  dismissKeyboard: () => input.blur(),
 });
 
 // Which words to leave out (src/filters.ts), as saved on this device. Settings
