@@ -159,3 +159,7 @@ built from the English Wiktionary dump by `scripts/build_fm_index.py`.
 6. ADR-0007 (planning only, nothing started): pronunciations for the 92.7% of words
    without one, worked out from their parts where measured safe; first step would be
    keeping the accent labels the builder drops.
+7. F-Droid: a build recipe for v0.7.6 is drafted (`docs/fdroid/`, steps and open points in
+   `docs/stores.md`); F-Droid's scanner passes on it, the build itself hasn't been run, and
+   nothing has been sent. The owner decides first how a release records its version in a
+   file, which F-Droid's update check needs.

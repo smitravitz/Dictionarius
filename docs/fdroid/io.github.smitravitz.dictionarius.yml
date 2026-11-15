@@ -1,0 +1,51 @@
+Categories:
+  - Translation & Dictionary
+License: MPL-2.0
+AuthorName: smitravitz
+WebSite: https://smitravitz.github.io/Dictionarius/
+SourceCode: https://github.com/smitravitz/Dictionarius
+IssueTracker: https://github.com/smitravitz/Dictionarius/issues
+Changelog: https://github.com/smitravitz/Dictionarius/releases
+
+AutoName: Dictionarius
+
+RepoType: git
+Repo: https://github.com/smitravitz/Dictionarius.git
+
+Builds:
+  - versionName: 0.7.6
+    versionCode: 706
+    commit: c45f46a3c99aecd5ecfe8a0c913889e0bb644dc3
+    subdir: android/app
+    sudo:
+      - curl -Lo node.tar.gz https://nodejs.org/download/release/v22.21.1/node-v22.21.1-linux-x64.tar.gz
+      - echo "219a152ea859861d75adea578bdec3dce8143853c13c5187f40c40e77b0143b2 node.tar.gz"
+        | sha256sum -c -
+      - tar xzf node.tar.gz --strip-components=1 -C /usr/local/
+    gradle:
+      - yes
+    prebuild:
+      - cd ../..
+      - npm ci
+    scanignore:
+      - node_modules/@esbuild
+      - node_modules/esbuild/bin/esbuild
+      - node_modules/@capacitor/cli/assets
+    scandelete:
+      - test/fixtures
+      - node_modules/playwright-core
+    build:
+      - cd ../..
+      - sum=$(sha256sum data/headwords.sha256 | cut -c1-8)
+      - mkdir release-data
+      - while read -r _ name; do curl -fL -o "release-data/${name#\*}" "https://github.com/smitravitz/Dictionarius/releases/download/data-$sum/${name#\*}";
+        done < data/headwords.sha256
+      - (cd release-data && sha256sum --check ../data/headwords.sha256)
+      - DICTIONARIUS_PUBLIC=../release-data npm run build
+      - npx cap sync android
+    gradleprops:
+      - versionCode=706
+      - versionName=0.7.6
+
+AutoUpdateMode: None
+UpdateCheckMode: None

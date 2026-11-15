@@ -89,6 +89,50 @@ screen, a search and a word's page. Neither has a finger, a notch or a phone's m
 - After an iCloud backup (Settings → your name → iCloud → iCloud Backup → Back Up Now),
   Dictionarius isn't among the apps with data in it (Manage Account Storage → Backups).
 
+## F-Droid, step by step
+
+F-Droid builds the app itself, from this repository, on its own servers, and signs it with
+its own key. There is no account, fee or tester rule: inclusion is a merge request to
+[fdroiddata](https://gitlab.com/fdroid/fdroiddata) that its maintainers review. The build
+recipe they need is drafted in
+[`docs/fdroid/io.github.smitravitz.dictionarius.yml`](fdroid/io.github.smitravitz.dictionarius.yml),
+for v0.7.6.
+
+What has been checked: F-Droid's scanner (`fdroid scanner`, fdroidserver 2.4.5) finds
+nothing in v0.7.6 with the recipe's `scanignore` and `scandelete` lines, and without them
+only the test fixtures and build tools inside `node_modules`; `fdroid lint` passes apart from
+the category. What hasn't: the build itself (`fdroid build`), which their merge request
+pipeline runs.
+
+Settle before sending it:
+
+1. **Updates.** F-Droid finds a new version by reading the version from a file at each tag.
+   Here it exists only in the tag's name (release.yml works it out), so the draft has update
+   checks off and every release would need a line added by hand. Reviewers will ask for
+   better: write the version into a file as part of tagging (`versionCode` and `versionName`
+   in `android/app/build.gradle`, say), then set `AutoUpdateMode: Version` and
+   `UpdateCheckMode: Tags`.
+2. **The word list is downloaded while building** (the `data-<sum>` release, checked against
+   `data/headwords.sha256`), not built from source: building it needs the Wiktionary dump.
+   It's data, CC BY-SA 4.0, with its builder in `scripts/`; expect the question.
+3. **Signature.** F-Droid's copy is signed with F-Droid's key: a phone can't update it over
+   the GitHub or Obtainium copy, or the other way round. Only a reproducible build
+   (`Binaries:` and `AllowedAPKSigningKeys:` in the recipe) would let F-Droid ship the copy
+   signed here; not tried.
+4. **Category.** `Translation & Dictionary` is from memory: check it against
+   `config/categories.yml` in fdroiddata.
+5. **Screenshots** (optional): F-Droid shows the ones in
+   `fastlane/metadata/android/en-US/images/phoneScreenshots/`; none are committed. The
+   `google-play-phone` pictures from the *Store screenshots* workflow fit.
+
+Then:
+
+1. Make a GitLab account, fork fdroiddata, and add the recipe as
+   `metadata/io.github.smitravitz.dictionarius.yml` on a new branch.
+2. Open the merge request with their "App inclusion" template; its pipeline builds the app.
+3. Answer the review. Once merged, the app appears on F-Droid with the next index, usually
+   within a few days.
+
 ## The license and the App Store
 
 Dictionarius's code is MPL-2.0 (since v0.7.5; earlier releases are offered under it too),
