@@ -70,7 +70,7 @@ built from the English Wiktionary dump by `scripts/build_fm_index.py`.
 - Stores (ADR-0010): merged to `main`, in no store yet. CI builds the Play app bundle and
   the iOS app, runs the browser tests in Safari's engine, and opens the iOS app in a
   simulator. v0.7.6's release run has the first `play-app-bundle` (kept 90 days). The owner's
-  Play developer account is new (made 2026-11-15; the 2021 one was closed), so Play's rule
+  Play developer account is new (November 2026), so Play's rule
   for personal accounts made after 13 November 2023 applies: a closed test with 12 testers
   opted in for 14 days running, then an application for production access. `ios-release.yml` has never run, and nothing has run on a real iPhone:
   the owner has none, so the first TestFlight build needs a borrowed iPhone or a tester.
