@@ -298,8 +298,12 @@ test("the highlight is smooth: it only fades and pulses, eased, and never jumps"
       if (hand && shown(hand)) seen.set(hand, parseFloat(getComputedStyle(hand).opacity));
       return seen;
     };
-    // And the touch glides: no faster than its drag, never a jump while it's showing.
+    // And the touch glides: no faster than its drag, never a jump while it's showing. The
+    // show places it from its own frame callback, which began after this one and so runs
+    // after it in every frame: what's read here is where the last frame put it, at that
+    // frame's time. Timing it by this frame's would turn uneven frames into false jumps.
     let lastAt: { x: number; y: number; o: number } | null = null;
+    let lastAtTime = 0; // the frame lastAt was placed in
     const touchAt = () => {
       const hand = document.getElementById("coach-touch");
       if (!hand || !shown(hand)) return null;
@@ -314,12 +318,13 @@ test("the highlight is smooth: it only fades and pulses, eased, and never jumps"
     const watch = (time: number) => {
       if (record.stop) return;
       const seen = sample();
-      const at = touchAt();
-      if (at && lastAt && lastAt.o > 0.05 && at.o > 0.05 && time > lastTime) {
-        record.glide = Math.max(record.glide, Math.hypot(at.x - lastAt.x, at.y - lastAt.y) / (time - lastTime));
+      const at = touchAt(); // placed in the last frame, at lastTime
+      if (at && lastAt && lastAt.o > 0.05 && at.o > 0.05 && lastAtTime && lastTime > lastAtTime) {
+        record.glide = Math.max(record.glide, Math.hypot(at.x - lastAt.x, at.y - lastAt.y) / (lastTime - lastAtTime));
         record.touchFrames++;
       }
       lastAt = at;
+      lastAtTime = lastTime;
       if (lastTime && time > lastTime) {
         for (const el of new Set([...seen.keys(), ...last.keys()])) {
           if (!seen.has(el) && !shown(el)) continue; // went with its row or its screen
