@@ -56,6 +56,9 @@ jobs:
       - run: npm run test:e2e
       # The web app as published (a production build, as pages.yml makes it): offline use.
       - run: npm run test:e2e:built
+      # The store screenshots' own file, on the sample list: it must exist and still run
+      # (it was once left out of the repository by a .gitignore line, unnoticed).
+      - run: npx playwright test --config playwright.store.config.ts
       - uses: actions/upload-artifact@v7
         if: failure()
         with:
