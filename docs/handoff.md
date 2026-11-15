@@ -134,8 +134,10 @@ built from the English Wiktionary dump by `scripts/build_fm_index.py`.
       each failure needs telling apart. The first runs found one of each kind, and a third:
       a tap on text that takes no focus left the keyboard up (a real bug, fixed by
       `web/tap-away.ts`); the tour's smoothness test timed the touch by the wrong frame, so
-      uneven frames looked like jumps (the test); and the simulator run tapped a word once
-      while typing, which by the app's rule only puts the keyboard away (the test).
+      uneven frames looked like jumps (the test); and the simulator run took the text in
+      the search box for a result (the word was typed in full, so both are named alike) and
+      tapped the box; it now takes the row below the box, and taps twice, since by the app's
+      rule a tap on a word while typing only puts the keyboard away (the test).
    4. Apple: the account, its key as four secrets, the first `ios-release.yml` run (expect
       signing to need a fix), then the iPhone checklist in `docs/stores.md`.
    Not built: iPad; uploads to the stores from CI. Undecided: Capacitor's iOS code ships as
