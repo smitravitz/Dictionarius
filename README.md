@@ -39,6 +39,16 @@ To install it as an app, use **Install** in Settings or your browser's own Insta
 
 Needs Android 7.0 or later. Add `https://github.com/smitravitz/Dictionarius` to [Obtainium](https://obtainium.imranr.dev) to install and get updates, or download the APK (about 73 MB) from the [latest release](https://github.com/smitravitz/Dictionarius/releases/latest). Everything is inside it: nothing is downloaded later.
 
+### Help test on Google Play
+
+Dictionarius isn't on Google Play yet. Google asks a new developer for at least 12 people who stay in a test of the app for 14 days in a row before it may be published there, so every tester counts. If you have an Android phone with the Play Store:
+
+1. Join the testers' group: [dictionarius-testers](https://groups.google.com/g/dictionarius-testers), with the Google account your phone's Play Store uses. The group is only the list of who may install the test: it sends one message, when the test opens.
+2. When that message comes, open its link on your phone, choose *Become a tester*, and install Dictionarius from the Play Store.
+3. Keep it installed for the 14 days, and open it now and then. Anything odd you notice is welcome as an [issue](https://github.com/smitravitz/Dictionarius/issues).
+
+The Play copy is the same app as the APK above, with the same promise: no permissions, nothing collected. Google itself sees who joins the group and who installs from its store. If you installed the APK from here, uninstall it first: Play may sign its copy with another key.
+
 ## ⚙️ How it works
 
 Search runs on an **FM-index**, a compressed index that *is* the word list, so finding a piece anywhere in a word costs no more than finding its start. There's no server and no database to wait for:

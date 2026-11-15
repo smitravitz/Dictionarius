@@ -184,3 +184,23 @@ test("the installed app asks the browser to keep its storage for good; a tab and
     await context.close();
   }
 });
+
+test("on the web, Settings asks for Android testers, linking to how in the README; the app never does", async ({ page, browser }) => {
+  await open(page);
+  await page.getByRole("button", { name: "Settings" }).click();
+  const row = page.locator("#android-testers");
+  await expect(row).toBeVisible();
+  await expect(row).toContainText("Have an Android phone?");
+  const link = row.getByRole("link", { name: "How" });
+  await expect(link).toHaveAttribute("href", "https://github.com/smitravitz/Dictionarius#help-test-on-google-play");
+  expect((await link.boundingBox())!.height).toBeGreaterThanOrEqual(44); // big enough for a thumb
+
+  const app = await browser.newPage();
+  await asTheApp(app);
+  await app.goto("/?index=headwords-sample.bin");
+  await expect(app.locator("#status")).toHaveText(/^[\d,]+ words$/);
+  await app.getByRole("button", { name: "Settings" }).click();
+  await expect(app.getByRole("dialog", { name: "Settings" })).toBeVisible();
+  await expect(app.locator("#android-testers")).toBeHidden();
+  await app.close();
+});

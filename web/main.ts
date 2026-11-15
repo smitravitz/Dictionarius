@@ -258,6 +258,9 @@ if (import.meta.env.PROD && !Capacitor.isNativePlatform() && "serviceWorker" in 
 if (SHELL === "installed") void navigator.storage?.persist?.().catch(() => false);
 // And where the browser offers to install it, Settings has Install (web/install.ts).
 offerInstall($("install"), $<HTMLButtonElement>("install-button"), AS_APP);
+// On the web only, Settings asks for testers of the Android app on Google Play (the README
+// says how); the Android and iOS apps never show it.
+$("android-testers").hidden = SHELL === "app";
 
 let shown = false; // the word count and filters, from the starter or the word list
 let arrived = 0; // how much of the word list is in, 0 to 1 (a browser, while it comes)

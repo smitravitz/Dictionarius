@@ -94,6 +94,12 @@ built from the English Wiktionary dump by `scripts/build_fm_index.py`.
   taken on the released data); retake them when the look changes. The repo's About should
   read "A free, fully offline English dictionary that finds a word from any part of it."
   with the Pages link as its website (settings writes are blocked from agent sessions).
+- A call for Android testers, for Google Play's closed test: a section in the README
+  ("Help test on Google Play") and, on the web only, a row in Settings that links to it
+  (`#android-testers`, never in the Android or iOS app; `e2e/settings.spec.ts`). The README
+  names the Google Group `dictionarius-testers`, which the owner makes (anyone may join; only
+  the owner posts) and adds under the closed test's Testers. Take both out once Play grants
+  production access.
 - Web app on Pages (ADR-0008, released in v0.7.0): the loading screen waits only for the
   starter (`<list>.starter.json`, ~93 KB gzipped); suggestions, peeks and word pages work at
   once; the word list comes gzipped (13.7 MB) behind it; a data worker then keeps every file

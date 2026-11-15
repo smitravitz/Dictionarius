@@ -1370,6 +1370,13 @@ a:focus-visible {
   cursor: pointer;
 }
 
+/* The same button as a link (the testers' row). */
+a.install-button {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+}
+
 .install-button:hover {
   background: var(--proof-wash);
 }

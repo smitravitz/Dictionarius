@@ -186,6 +186,15 @@
           </span>
           <button class="install-button" id="install-button" type="button" aria-describedby="install-help">Install</button>
         </div>
+        <!-- Web only, and for now: Google Play asks a new developer for twelve testers before
+             the Android app can be published there (README, "Help test on Google Play"). -->
+        <div class="install" id="android-testers" hidden>
+          <span class="setting-text">
+            <span class="setting-name">Have an Android phone?</span>
+            <span class="setting-help" id="android-testers-help">Help test Dictionarius for Google Play.</span>
+          </span>
+          <a class="install-button" id="android-testers-link" href="https://github.com/smitravitz/Dictionarius#help-test-on-google-play" aria-describedby="android-testers-help">How</a>
+        </div>
         <button class="settings-done" value="done">Done</button>
       </form>
     </dialog>
