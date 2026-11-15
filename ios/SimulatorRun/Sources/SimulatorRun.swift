@@ -47,9 +47,13 @@ final class SimulatorRun: XCTestCase {
         // the box has the focus, a tap on a word only puts the keyboard away (the app's rule:
         // the list moves as the keyboard closes, so the tap could land on another word), so
         // a person taps it again once the keyboard has gone.
+        let tapped = "\(row.elementType.rawValue) '\(row.label)' at \(row.frame); the box at \(box.frame)"
         tapOnScreen(row)
         let keyboardGone = XCTNSPredicateExpectation(predicate: NSPredicate(format: "count == 0"), object: app.keyboards)
-        XCTAssertEqual(XCTWaiter().wait(for: [keyboardGone], timeout: 10), .completed, "the keyboard stayed up")
+        let gone = XCTWaiter().wait(for: [keyboardGone], timeout: 10)
+        keep("2b-first-tap")
+        let focused = (box.value(forKey: "hasKeyboardFocus") as? Bool).map(String.init) ?? "unknown"
+        XCTAssertEqual(gone, .completed, "the keyboard stayed up after a tap on \(tapped); the box focused: \(focused)")
         tapOnScreen(row)
         XCTAssertTrue(anything(containing: fromItsMeaning).waitForExistence(timeout: 30), "the word's meaning never showed")
         keep("3-word")
