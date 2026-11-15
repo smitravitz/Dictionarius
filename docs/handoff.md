@@ -140,7 +140,8 @@ built from the English Wiktionary dump by `scripts/build_fm_index.py`.
       tapped the box; it now takes the row below the box, and taps twice, since by the app's
       rule a tap on a word while typing only puts the keyboard away (the test).
    4. Apple, which can start alongside Play (enrolment takes days): the account, its key as
-      four secrets, the first `ios-release.yml` run (expect signing to need a fix), then the
+      four secrets, the first `ios-release.yml` run (the archive is unsigned and checked in
+      CI; the export, signed in Apple's cloud, and the upload have never run), then the
       iPhone checklist in `docs/stores.md`. Settle who runs that checklist, and on which
       iPhone, before paying for the program: the owner has no iPhone.
    Not built: iPad; uploads to the stores from CI. Undecided: Capacitor's iOS code ships as

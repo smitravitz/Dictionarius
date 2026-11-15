@@ -61,8 +61,12 @@ every year: the dates below were checked on 2026-11-12.
    Identifiers), then create the app in App Store Connect with it: name *Dictionarius:
    Dictionary*, primary language English, SKU of your choice.
 4. Run *Actions → iOS release → Run workflow* with the latest tag (or push a new tag). The
-   build appears under TestFlight some minutes after the run ends. **This workflow has not
-   run yet**: expect to fix something on its first run, most likely signing.
+   build appears under TestFlight some minutes after the run ends. The app is archived
+   unsigned (CI does that half on every iOS change) and signed once, at the export, with the
+   distribution certificate Apple keeps in its cloud: no iPhone has to be registered in the
+   account. **The export and upload have not run yet.** If they fail: "Cloud signing
+   permission error" means the key isn't a team key with the Admin role; "No suitable
+   application records" means step 3's app isn't made yet.
 5. Install it from TestFlight on an iPhone and go through the list below.
 6. Fill in the listing from `fastlane/metadata/en-US/`, the `app-store-iphone` screenshots,
    the privacy policy address, *App Privacy: Data Not Collected*, the age rating

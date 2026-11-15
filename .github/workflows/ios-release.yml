@@ -109,19 +109,32 @@ jobs:
           TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
           xcodebuild -version
-          key="$RUNNER_TEMP/AuthKey_$KEY_ID.p8"
-          echo "$KEY_BASE64" | base64 --decode > "$key"
-          # The key lets Xcode make the signing certificate and profile itself, in Apple's
-          # cloud: nothing to create, export or renew by hand, and no Mac of your own.
-          sign=(-allowProvisioningUpdates -authenticationKeyPath "$key"
-                -authenticationKeyID "$KEY_ID" -authenticationKeyIssuerID "$ISSUER_ID")
+          for name in KEY_ID ISSUER_ID TEAM_ID; do
+            if [ -z "${!name}" ]; then
+              echo "::error::The secret for $name is empty: all four at the top of ios-release.yml are needed."
+              exit 1
+            fi
+          done
 
+          # The archive is built unsigned. Signed here, automatic signing would sign it for
+          # development, which needs a development certificate and an iPhone registered in
+          # the account (there is none), and Apple's key only signs exports anyway. The app
+          # has no entitlements file, so nothing is lost by signing once, at the export.
           xcodebuild archive -project App.xcodeproj -scheme App -configuration Release \
             -destination 'generic/platform=iOS' -archivePath "$RUNNER_TEMP/Dictionarius.xcarchive" \
-            -skipPackagePluginValidation "${sign[@]}" \
-            DEVELOPMENT_TEAM="$TEAM_ID" CODE_SIGN_STYLE=Automatic \
+            -skipPackagePluginValidation \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
             MARKETING_VERSION=${{ steps.version.outputs.name }} \
             CURRENT_PROJECT_VERSION=${{ steps.version.outputs.code }} | tail -40
+
+          # The export signs it for the App Store and uploads it. The key lets Xcode use the
+          # distribution certificate Apple keeps in its cloud and make the App Store profile
+          # itself (no device needed): nothing to create, export or renew by hand, and no Mac
+          # of your own. "Cloud signing permission error" here means the key isn't Admin.
+          key="$RUNNER_TEMP/AuthKey_$KEY_ID.p8"
+          echo "$KEY_BASE64" | base64 --decode > "$key"
+          sign=(-allowProvisioningUpdates -authenticationKeyPath "$key"
+                -authenticationKeyID "$KEY_ID" -authenticationKeyIssuerID "$ISSUER_ID")
 
           cat > "$RUNNER_TEMP/export.plist" <<PLIST
           <?xml version="1.0" encoding="UTF-8"?>

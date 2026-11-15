@@ -79,6 +79,19 @@ jobs:
           xcodebuild build -project App.xcodeproj -scheme App -configuration Debug \
             -destination 'generic/platform=iOS Simulator' \
             -skipPackagePluginValidation CODE_SIGNING_ALLOWED=NO | tail -40
+      # The first half of ios-release.yml, which needs no Apple account: the Release app
+      # built for a real iPhone and archived unsigned (the release signs it at the export).
+      - name: Archive the app for an iPhone, as a release does (unsigned)
+        working-directory: ios/App
+        run: |
+          xcodebuild archive -project App.xcodeproj -scheme App -configuration Release \
+            -destination 'generic/platform=iOS' -archivePath "$RUNNER_TEMP/Dictionarius.xcarchive" \
+            -skipPackagePluginValidation \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
+            MARKETING_VERSION=0.0.1 CURRENT_PROJECT_VERSION=1 | tail -40
+          app="$RUNNER_TEMP/Dictionarius.xcarchive/Products/Applications/App.app"
+          test -f "$app/PrivacyInfo.xcprivacy"
+          /usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' -c 'Print :CFBundleShortVersionString' "$app/Info.plist"
       # The privacy manifest only counts if it is inside the app that was built.
       - name: Check the privacy manifest is in the built app
         run: |
