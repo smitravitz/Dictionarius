@@ -3,7 +3,7 @@
 Read this first in a new chat, then `.claude/CLAUDE.md`. Update it at the end of any
 session that changes what's below (newest state only; history lives in git).
 
-_Last updated: 2026-11-13, at v0.7.5 (code relicensed to MPL-2.0; the place kept when the app is killed mid-tour); unreleased: a suggestion opening straight to its list, and the store work (ADR-0010: the iOS app, the Play app bundle, listings, privacy policy), which no CI has run yet and no store has._
+_Last updated: 2026-11-15, at v0.7.5; unreleased, on `main`: a suggestion opening straight to its list, the keyboard put away by a tap off the search box, and the store work (ADR-0010: the iOS app, the Play app bundle, listings, privacy policy), green in CI and in no store yet. Next: Google Play._
 
 ## What it is
 
@@ -67,11 +67,12 @@ built from the English Wiktionary dump by `scripts/build_fm_index.py`.
 - Licenses: code MPL-2.0 since v0.7.5, and every earlier release is offered under it as well
   as GPL-3.0-or-later (README, "License"); data CC BY-SA 4.0; fonts SIL OFL 1.1. MPL was
   picked so the App Store needs no exception.
-- Stores (ADR-0010): built on the branch `store-ready`, handed to the owner as a patch
-  (the session that wrote it couldn't push). Until it's merged, `main` has no `ios/`, no app
-  bundle and no listings. Play's closed-test period for newer personal accounts doesn't
-  apply to the owner's account. Nothing iOS has been compiled or run: the first TestFlight
-  build needs a hands-on check on an iPhone.
+- Stores (ADR-0010): merged to `main`, in no store yet. CI builds the Play app bundle and
+  the iOS app, runs the browser tests in Safari's engine, and opens the iOS app in a
+  simulator. v0.7.5 is from before all of it: the first `play-app-bundle` comes with the
+  next tag. Play's closed-test period for newer personal accounts doesn't apply to the
+  owner's account. `ios-release.yml` has never run, and nothing has run on a real iPhone:
+  the owner has none, so the first TestFlight build needs a borrowed iPhone or a tester.
 - Latest release **v0.7.5** (2026-11-13), on the format-3 data pinned in
   `data/headwords.sha256` (a core file plus examples, etymology and pronunciation layers).
 - Navigation buttons (back, home, forward) over the list and word pages, on by default on
@@ -119,11 +120,11 @@ built from the English Wiktionary dump by `scripts/build_fm_index.py`.
 0. **Stores (ADR-0010), first release as the app is; ADR-0005, 0006 and 0007 are not needed
    for it.** In order:
    1. Done: `store-ready` is merged, and the iOS app compiles and the bundle check passes in CI.
-   2. Google Play first, since the Android app is already proven on phones: choose the app
-      signing key (permanent), fill in the console forms, run `store-screenshots.yml`, tag a
-      release, try its `play-app-bundle` on Play's internal test track (that Play's own APKs
+   2. **Next.** Google Play first, since the Android app is already proven on phones: choose
+      the app signing key (permanent), fill in the console forms, run `store-screenshots.yml`,
+      tag a release (v0.7.5 has no bundle), try its `play-app-bundle` on Play's internal test track (that Play's own APKs
       read definitions in place has only been checked by script), then production.
-   3. Before paying for Apple's program: get the two iOS checks green. `npm run
+   3. Done: the two iOS checks are green on `main`. `npm run
       test:e2e:safari` runs the browser tests in Safari's engine at an iPhone's size (CI job
       "Browser tests (Safari's engine, iPhone)"; four files that drive Chromium's devtools
       are left out, `playwright.config.ts` says which), and `ios.yml`'s "iOS app runs in a
@@ -138,8 +139,10 @@ built from the English Wiktionary dump by `scripts/build_fm_index.py`.
       the search box for a result (the word was typed in full, so both are named alike) and
       tapped the box; it now takes the row below the box, and taps twice, since by the app's
       rule a tap on a word while typing only puts the keyboard away (the test).
-   4. Apple: the account, its key as four secrets, the first `ios-release.yml` run (expect
-      signing to need a fix), then the iPhone checklist in `docs/stores.md`.
+   4. Apple, which can start alongside Play (enrolment takes days): the account, its key as
+      four secrets, the first `ios-release.yml` run (expect signing to need a fix), then the
+      iPhone checklist in `docs/stores.md`. Settle who runs that checklist, and on which
+      iPhone, before paying for the program: the owner has no iPhone.
    Not built: iPad; uploads to the stores from CI. Undecided: Capacitor's iOS code ships as
    ionic-team's prebuilt framework (Swift Package Manager), not built from source (ADR-0010,
    open questions).
