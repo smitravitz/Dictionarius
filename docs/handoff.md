@@ -131,7 +131,11 @@ built from the English Wiktionary dump by `scripts/build_fm_index.py`.
       picture of each screen; it taps by on-screen position, since XCUITest can't work out
       where to tap inside a web view. Both were written with no WebKit, Mac or simulator to hand:
       what their first runs show is either a mistake in the test or a real iPhone bug, and
-      each failure needs telling apart.
+      each failure needs telling apart. The first runs found one of each kind, and a third:
+      a tap on text that takes no focus left the keyboard up (a real bug, fixed by
+      `web/tap-away.ts`); the tour's smoothness test timed the touch by the wrong frame, so
+      uneven frames looked like jumps (the test); and the simulator run tapped a word once
+      while typing, which by the app's rule only puts the keyboard away (the test).
    4. Apple: the account, its key as four secrets, the first `ios-release.yml` run (expect
       signing to need a fix), then the iPhone checklist in `docs/stores.md`.
    Not built: iPad; uploads to the stores from CI. Undecided: Capacitor's iOS code ships as
