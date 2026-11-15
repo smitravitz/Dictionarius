@@ -28,8 +28,10 @@ every year: the dates below were checked on 2026-11-12.
 
 1. Create the app in [Play Console](https://play.google.com/console): name *Dictionarius*, app, free.
 2. **App signing: decide before the first upload; it can't be changed after.**
-   - *Give Play your own key* (Setup → App signing → use an existing key; the key is
-     `~/.dictionarius/release.p12`, alias `dictionarius`): Play's copies and the APKs on
+   - *Give Play your own key* (while making the first release, in its *App integrity*
+     section: Change signing key → provide a copy of your app signing key; Play has you
+     encrypt it with its PEPK tool first. The key is `~/.dictionarius/release.p12`, alias
+     `dictionarius`): Play's copies and the APKs on
      GitHub carry the same signature, so a phone can update one over the other.
    - *Let Play make a key* (its default): Play's copies are signed differently, so someone
      who installed from GitHub or Obtainium must uninstall before installing from Play.
@@ -44,9 +46,16 @@ every year: the dates below were checked on 2026-11-12.
    - Target audience: pick the ages you intend; choosing children brings Families rules.
 4. Store listing: paste the three texts from `fastlane/metadata/android/en-US/`, upload
    `images/icon.png`, `images/featureGraphic.png` and the `google-play-phone` screenshots.
-5. Push a release tag, download `play-app-bundle` from the run, and upload the `.aab` to
-   the production track.
-6. Later releases: upload each new `.aab` to production. (Uploading can be automated with a
+5. Push a release tag (or take the latest one's run) and download its `play-app-bundle`.
+6. Try it first: Test and release → Testing → Internal testing → Create new release,
+   upload the `.aab` (the signing choice of step 2 is made here), add yourself under
+   Testers, and open the opt-in link on a phone that has the Play Store and is signed in
+   to that Google account. Internal testing needs no review and not the forms of steps 3
+   and 4. On the phone: a word's page shows its meanings at once (Play's own APKs reading
+   definitions in place has only been checked by script).
+7. Production: with steps 3 and 4 done, Production → Create new release → Add from
+   library (the same bundle), and send it for review.
+8. Later releases: upload each new `.aab` to production. (Uploading can be automated with a
    service account once the first release has been made by hand; not set up.)
 
 ## App Store, step by step

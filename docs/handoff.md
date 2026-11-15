@@ -3,7 +3,7 @@
 Read this first in a new chat, then `.claude/CLAUDE.md`. Update it at the end of any
 session that changes what's below (newest state only; history lives in git).
 
-_Last updated: 2026-11-15, at v0.7.5; unreleased, on `main`: a suggestion opening straight to its list, the keyboard put away by a tap off the search box, and the store work (ADR-0010: the iOS app, the Play app bundle, listings, privacy policy), green in CI and in no store yet. Next: Google Play._
+_Last updated: 2026-11-15, at v0.7.6, the first release with a Play app bundle (its run's `play-app-bundle`) and the store work (ADR-0010); in no store yet. Next: Google Play's internal test track._
 
 ## What it is
 
@@ -69,11 +69,10 @@ built from the English Wiktionary dump by `scripts/build_fm_index.py`.
   picked so the App Store needs no exception.
 - Stores (ADR-0010): merged to `main`, in no store yet. CI builds the Play app bundle and
   the iOS app, runs the browser tests in Safari's engine, and opens the iOS app in a
-  simulator. v0.7.5 is from before all of it: the first `play-app-bundle` comes with the
-  next tag. Play's closed-test period for newer personal accounts doesn't apply to the
+  simulator. v0.7.6's release run has the first `play-app-bundle` (kept 90 days). Play's closed-test period for newer personal accounts doesn't apply to the
   owner's account. `ios-release.yml` has never run, and nothing has run on a real iPhone:
   the owner has none, so the first TestFlight build needs a borrowed iPhone or a tester.
-- Latest release **v0.7.5** (2026-11-13), on the format-3 data pinned in
+- Latest release **v0.7.6** (2026-11-15), on the format-3 data pinned in
   `data/headwords.sha256` (a core file plus examples, etymology and pronunciation layers).
 - Navigation buttons (back, home, forward) over the list and word pages, on by default on
   every device, a switch in Settings; the title (top left) also goes home. The funnel's filters
@@ -120,10 +119,15 @@ built from the English Wiktionary dump by `scripts/build_fm_index.py`.
 0. **Stores (ADR-0010), first release as the app is; ADR-0005, 0006 and 0007 are not needed
    for it.** In order:
    1. Done: `store-ready` is merged, and the iOS app compiles and the bundle check passes in CI.
-   2. **Next.** Google Play first, since the Android app is already proven on phones: choose
-      the app signing key (permanent), fill in the console forms, run `store-screenshots.yml`,
-      tag a release (v0.7.5 has no bundle), try its `play-app-bundle` on Play's internal test track (that Play's own APKs
-      read definitions in place has only been checked by script), then production.
+   2. **Next.** Google Play first, since the Android app is already proven on phones
+      (`docs/stores.md`, steps 5 to 7): choose the app signing key (permanent) while making
+      the first release, upload v0.7.6's `play-app-bundle` to the internal test track and
+      try it on a phone with the Play Store (that Play's own APKs read definitions in place
+      has only been checked by script), fill in the console forms, then production.
+      Screenshots: `store-screenshots.yml` failed on its first run ("No tests found"):
+      `tools/store-screenshots/screens.spec.ts` had never been committed, hidden by a
+      `.gitignore` line. It's written now (branch `store-screenshots-spec`; CI runs it on
+      the sample list); run the workflow once that's merged.
    3. Done: the two iOS checks are green on `main`. `npm run
       test:e2e:safari` runs the browser tests in Safari's engine at an iPhone's size (CI job
       "Browser tests (Safari's engine, iPhone)"; four files that drive Chromium's devtools
