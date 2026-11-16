@@ -9,11 +9,14 @@ import { defineConfig, devices } from "@playwright/test";
 // (`npm run test:e2e:safari`), so a plain `playwright test` runs what it always has.
 // Left out: the files whose gestures or slow-phone timing go through Chromium's own devtools
 // (a swipe, a touch that holds and slides, a throttled CPU), which WebKit doesn't have; and
-// kept-copy.spec.ts, which plants a wrong file in the device's store from the page and looks
-// for the right one afterwards: in Playwright's WebKit the page sees that store empty after a
-// reload while the app's workers still read from it (CI, 2026-11-16: Settings said saved, the
-// page listed no files), so the test can't look. No test of the kept dictionary runs in
-// Safari's engine yet (start.spec.ts and built/ are out too): an open item.
+// kept-copy.spec.ts, which needs what's in the device's store (Cache Storage) to still be
+// there after a reload. In Playwright's WebKit it isn't. Measured in CI on 2026-11-16 with a
+// page that never touched the app's code paths under test: after a reload every store was
+// still named but empty, a store the test itself had written to included; the app then
+// downloaded every file again on each visit, and the page still listed none. So nothing
+// about a second visit can be tested in this engine, whatever the app does. Whether Safari
+// itself keeps the dictionary between visits can only be checked on a real iPhone or Mac
+// (docs/stores.md's iPhone checklist); start.spec.ts and built/ are out of this run too.
 const SAFARI = !!process.env.DICTIONARIUS_SAFARI;
 const safari = {
   name: "iphone-safari",
