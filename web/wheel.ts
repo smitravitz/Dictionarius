@@ -62,6 +62,15 @@ export class Wheel {
     this.describe();
   }
 
+  /** Drawn turned `rows` from its choice, as a drag would turn it (0 puts it back): for the
+   *  tour's show (web/tour-shows.ts). It chooses nothing, ticks nothing, and leaves a wheel
+   *  the person is turning alone. */
+  preview(rows: number): void {
+    if (this.drag) return;
+    const last = this.options.length - 1;
+    this.draw(Math.min(last + 0.4, Math.max(-0.4, this.index + rows)), false);
+  }
+
   private down(e: PointerEvent) {
     if (!e.isPrimary || (e.pointerType === "mouse" && e.button !== 0)) return;
     e.preventDefault(); // no text selection, no focus fight

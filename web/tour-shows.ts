@@ -11,8 +11,12 @@
  *   was. Not done within 5 still seconds: shown again.
  * - peeked: whole words lit in turn, in no particular order, each once before any again
  *   (ShuffleBag), until the person holds one.
- * - filtered, set: the funnel (or the cog) lit; once its sheet is open, its options lit in
- *   turn, top to bottom, until it's closed.
+ * - filtered: the funnel lit; once its sheet is open, its wheels in turn, left then right:
+ *   each lit (the wheel with its label, not the whole section) while a touch swipes it up a
+ *   row or two and back, the real wheel turning with the touch frame by frame and choosing
+ *   nothing; then round again until the sheet is closed, which is what the step asks for.
+ * - set: the cog lit; once its sheet is open, its options lit in turn, top to bottom, until
+ *   it's closed.
  *
  * None of it is the person's go: main.ts reports only their own actions to the coach. A
  * highlight takes no touch. A demonstration only starts on a still screen (web/hands.ts),
@@ -21,6 +25,7 @@
  * touch just stands where to hold.
  */
 import type { Show, Stage } from "./coach";
+import type { TourWheel } from "./filters-panel";
 import { ShuffleBag, type TourEvent } from "./guide";
 import type { Hands } from "./hands";
 import { wordLetters } from "./scroller-gestures";
@@ -35,6 +40,10 @@ export interface ShowParts {
   scroller: HTMLElement;
   funnel: HTMLElement;
   filters: HTMLDialogElement;
+  /** The Filters sheet's wheels, in the order they're shown: left, then right. */
+  wheels(): readonly TourWheel[];
+  /** The touch that turns them: inside the sheet, which is drawn over the page's own touch. */
+  wheelTouch: HTMLElement;
   cog: HTMLElement;
   settings: HTMLDialogElement;
   slider: { open(x: number, quiet: boolean): boolean; slideTo(x: number): void; close(): void };
@@ -64,6 +73,13 @@ const OUT = 1000;
 const PAUSE = 350;
 const BACK = 800;
 const LIFT = 250; // the touch letting go
+// A wheel's show, briefly: press, swipe up a row and a half, pause, back, let go (ms).
+const WHEEL_PRESS = 350;
+const WHEEL_UP = 650;
+const WHEEL_PAUSE = 200;
+const WHEEL_BACK = 550;
+const WHEEL_ROWS = 1.5; // how far it turns
+const WHEEL_TURN_MS = 2600; // each wheel's turn: its show, then a moment lit and still
 const BESIDE = 40; // where a hold beside the words goes: this far in from the list's right edge
 const ROOM = 96; // a word ending this close to the edge leaves no room beside it
 
@@ -171,10 +187,10 @@ class Touch {
     }, () => {});
   }
 
-  /** With reduced motion: standing still where to hold. */
-  stand(x: number, y: number) {
+  /** With reduced motion: standing still where to hold, an arrow saying which way it goes. */
+  stand(x: number, y: number, way: "across" | "upright" = "across") {
     this.at(x, y);
-    this.el.dataset.still = "";
+    this.el.dataset.still = way === "upright" ? "upright" : "";
     this.el.hidden = false;
   }
 
@@ -394,13 +410,14 @@ export function tourShows(parts: ShowParts): Record<TourEvent, Show> {
     }
   };
 
-  /** How far out the scrubber's show has dragged (0 to 1), `t` ms into the drag. */
-  function dragged(t: number): number {
+  /** How far out a show has dragged (0 to 1), `t` ms into the drag: out, a pause, back
+   *  (the scrubber's times, unless given a wheel's). */
+  function dragged(t: number, out = OUT, pause = PAUSE, back = BACK): number {
     const ease = (u: number) => (u < 0.5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2);
     if (t <= 0) return 0;
-    if (t < OUT) return ease(t / OUT);
-    if (t < OUT + PAUSE) return 1;
-    if (t < OUT + PAUSE + BACK) return 1 - ease((t - OUT - PAUSE) / BACK);
+    if (t < out) return ease(t / out);
+    if (t < out + pause) return 1;
+    if (t < out + pause + back) return 1 - ease((t - out - pause) / back);
     return 0;
   }
 
@@ -409,16 +426,86 @@ export function tourShows(parts: ShowParts): Record<TourEvent, Show> {
     lightInTurn(stage.signal, lines, lettersOf);
   };
 
-  /** The button lit; once its sheet is open, the sheet's options lit in turn, top to bottom. */
-  const sheet = (button: () => HTMLElement, dialog: () => HTMLDialogElement, options: string): Show => (stage) => {
+  const wheelTouch = new Touch(parts.wheelTouch);
+
+  /** The Filters sheet's wheels in turn, left then right, round and round until stopped:
+   *  each lit, and (with motion) turned a little by a touch, unless the person is at them. */
+  function wheelsInTurn(signal: AbortSignal) {
+    let next = 0;
+    let light: Light | null = null;
+    let endSwipe: (() => void) | null = null;
+    let handsOnAt = -Infinity; // when the person last touched anything with the sheet open
+    for (const type of HANDS_ON) {
+      window.addEventListener(type, () => (handsOnAt = performance.now()), { capture: true, signal });
+    }
+    const turn = () => {
+      const wheels = parts.wheels();
+      if (wheels.length === 0) return;
+      const wheel = wheels[next++ % wheels.length];
+      endSwipe?.();
+      if (light?.el !== wheel.field) {
+        light?.out();
+        light = new Light(wheel.field, null);
+      }
+      const box = wheel.el.getBoundingClientRect();
+      const at = { x: box.left + box.width / 2, y: box.top + box.height / 2 };
+      if (still()) return wheelTouch.stand(at.x, at.y, "upright");
+      // The person is choosing: the wheels are theirs, until they've been still a while.
+      if (hands.busy || performance.now() - handsOnAt < REPLAY_MS) return;
+      endSwipe = swipe(signal, wheel, at);
+    };
+    turn();
+    const turns = setInterval(turn, still() ? DWELL_STILL_MS : WHEEL_TURN_MS);
+    signal.addEventListener("abort", () => {
+      clearInterval(turns);
+      endSwipe?.();
+      light?.out();
+      wheelTouch.gone();
+    });
+  }
+
+  /** A touch presses a wheel, swipes it up a little and back, and lets go: the real wheel,
+   *  drawn turned in the same frame as the touch moves, and nothing chosen. Over at once,
+   *  the wheel as it was, when the person touches anything or the returned function is called. */
+  function swipe(signal: AbortSignal, wheel: TourWheel, at: { x: number; y: number }): () => void {
+    let acting = true;
+    let frame = 0;
+    const row = Number(wheel.el.dataset.rowHeight) || 36;
+    const end = () => {
+      if (!acting) return;
+      acting = false;
+      cancelAnimationFrame(frame);
+      quit();
+      signal.removeEventListener("abort", end);
+      wheel.turn(0);
+      wheelTouch.lift();
+    };
+    const quit = onHandsOn(signal, end); // heard first: the person's press finds the wheel as it was
+    signal.addEventListener("abort", end);
+    const from = at.y + row / 2; // it swipes up through the wheel's middle
+    wheelTouch.press(at.x, from);
+    const start = performance.now();
+    const step = (now: number) => {
+      const t = now - start - WHEEL_PRESS;
+      if (t >= WHEEL_UP + WHEEL_PAUSE + WHEEL_BACK) return end();
+      const rows = WHEEL_ROWS * dragged(t, WHEEL_UP, WHEEL_PAUSE, WHEEL_BACK);
+      wheel.turn(rows);
+      wheelTouch.at(at.x, from - rows * row);
+      frame = requestAnimationFrame(step);
+    };
+    frame = requestAnimationFrame(step);
+    return end;
+  }
+
+  /** The button lit; once its sheet is open, `opened` shows what's in it, until it's closed. */
+  const sheet = (button: () => HTMLElement, dialog: () => HTMLDialogElement, opened: (signal: AbortSignal) => void): Show => (stage) => {
     const { signal } = stage;
     let turn: AbortController | null = null;
     const show = () => {
       turn?.abort();
       turn = new AbortController();
-      const open = dialog().open;
-      const what = open ? () => [...dialog().querySelectorAll<HTMLElement>(options)] : () => (button().hidden ? [] : [button()]);
-      lightInTurn(turn.signal, what, () => null, "in order");
+      if (dialog().open) opened(turn.signal);
+      else lightInTurn(turn.signal, () => (button().hidden ? [] : [button()]), () => null, "in order");
     };
     show();
     const watch = new MutationObserver(show); // the sheet opened or closed
@@ -433,7 +520,9 @@ export function tourShows(parts: ShowParts): Record<TourEvent, Show> {
     searched,
     scrubbed,
     peeked,
-    filtered: sheet(() => parts.funnel, () => parts.filters, "#ranges .range"),
-    set: sheet(() => parts.cog, () => parts.settings, "#switches .setting"),
+    filtered: sheet(() => parts.funnel, () => parts.filters, wheelsInTurn),
+    // Its options lit in turn, top to bottom.
+    set: sheet(() => parts.cog, () => parts.settings, (signal) =>
+      lightInTurn(signal, () => [...parts.settings.querySelectorAll<HTMLElement>("#switches .setting")], () => null, "in order")),
   };
 }

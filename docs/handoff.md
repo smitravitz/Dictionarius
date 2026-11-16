@@ -3,7 +3,7 @@
 Read this first in a new chat, then `.claude/CLAUDE.md`. Update it at the end of any
 session that changes what's below (newest state only; history lives in git).
 
-_Last updated: 2026-11-16, at v0.7.6, the first release with a Play app bundle (its run's `play-app-bundle`) and the store work (ADR-0010); in no store yet. Next: Google Play's internal test track._
+_Last updated: 2026-11-16 (branch `tutorial-and-help-wording`: fragment wording, help sheet, wheels shown in the tour, no Install in Settings; unreleased), at v0.7.6, the first release with a Play app bundle (its run's `play-app-bundle`) and the store work (ADR-0010); in no store yet. Next: Google Play's internal test track._
 
 ## What it is
 
@@ -81,7 +81,7 @@ built from the English Wiktionary dump by `scripts/build_fm_index.py`.
   are no longer kept between starts; Settings' switches are, and the installed app asks for
   persistent storage.
 - A first-run tour (5 steps, in order: search, scrub, peek, filters, settings; each shown,
-  then asked for, what to touch lit in place, the slider shown by a touch) and How It Works behind the "?" (`web/guide.ts`,
+  then asked for, what to touch lit in place, the slider and the Filters sheet's two wheels each shown by a touch) and How It Works behind the "?" (`web/guide.ts`,
   `web/coach.ts`, `web/tour-shows.ts`, `web/hands.ts`).
   Guarded by `e2e/tour.spec.ts` (including a frame-by-frame smoothness check), the Playwright
   project `first-run`, which runs every other e2e test again with the tour on, and

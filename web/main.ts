@@ -1003,6 +1003,8 @@ const coach = new Coach(
     scroller,
     funnel: $("filters-open"),
     filters: $<HTMLDialogElement>("filters"),
+    wheels: () => filtersPanel.wheels(),
+    wheelTouch: $("filters-touch"),
     cog: $("settings-open"),
     settings,
     slider,

@@ -1757,7 +1757,8 @@ a:focus-visible {
   will-change: opacity;
 }
 
-/* The touch that shows where to hold for the slider (web/tour-shows.ts): a fingertip of
+/* The touch that shows where to hold for the slider, and how a wheel turns in the Filters
+   sheet, which has one of its own inside it (web/tour-shows.ts): a fingertip of
    the proof colour, moved by translate and pressed and lifted by opacity and scale, all on
    the compositor. With reduced motion it stands still, an arrow saying which way. */
 .coach-touch {
@@ -1785,6 +1786,10 @@ a:focus-visible {
   translate: 0 -50%;
   color: var(--proof);
   font-size: 1.25rem;
+}
+/* Over a wheel (the Filters sheet): it turns up and down. */
+.coach-touch[data-still="upright"]::after {
+  content: "↕";
 }
 
 /* Back, home and forward, for a mouse (main.ts): in a strip of their own at the top of the

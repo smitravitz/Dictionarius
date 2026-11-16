@@ -142,13 +142,34 @@ async function toPeekStep(page: Page, motion: Motion = "reduce") {
   await expect(count(page)).toHaveText("3 of 5");
 }
 
+/** The Filters sheet's wheel the tour lights now (its field is lit: the label and the wheel). */
+const litWheel = (page: Page) => page.locator('#filters .wheel-field[data-tour-lit="on"]').getByRole("spinbutton");
+/** The touch that shows a wheel being turned, inside the Filters sheet. */
+const wheelTouch = (page: Page) => page.locator("#filters-touch");
+/** Whether the middle of `what` is inside `where`. */
+const over = (page: Page, what: string, where: string) =>
+  page.evaluate(([what, where]) => {
+    const a = document.querySelector(what)!.getBoundingClientRect();
+    const b = document.querySelector(where)!.getBoundingClientRect();
+    const [x, y] = [a.left + a.width / 2, a.top + a.height / 2];
+    return x >= b.left && x <= b.right && y >= b.top && y <= b.bottom;
+  }, [what, where]);
+
+/** On to step 4 by doing steps 1 to 3. */
+async function toFilterStep(page: Page, motion: Motion = "reduce") {
+  await toPeekStep(page, motion);
+  await expect(page.locator('.line[data-tour-lit="on"]')).toHaveCount(1);
+  await holdAt(page, await lightMiddle(page));
+  await expect(count(page)).toHaveText("4 of 5");
+}
+
 /** Every animation the tour has running (on its note and its highlights). */
 const tourAnimations = (page: Page) =>
   page.evaluate(() =>
     document.getAnimations().filter((a) => {
       const effect = a.effect as KeyframeEffect | null;
       const target = effect?.target as Element | null;
-      return !!target && (!!target.closest("#coach, #coach-touch") || (!!effect?.pseudoElement && target.hasAttribute("data-tour-lit")));
+      return !!target && (!!target.closest("#coach, .coach-touch") || (!!effect?.pseudoElement && target.hasAttribute("data-tour-lit")));
     }).length,
   );
 
@@ -181,11 +202,18 @@ test("a first run is shown five things, one at a time, and moves on as each is d
   await expect(count(page)).toHaveText("4 of 5");
   await expect(words(page)).toHaveText("Tap the funnel to filter words by length:");
 
-  // 4. The lit funnel; its options lit in the sheet; closing it moves on.
+  // 4. The lit funnel; in its sheet the left wheel lit, the touch on it, then the right
+  // (never the whole section); closing it moves on, no wheel touched.
   await expect(page.locator('#filters-open[data-tour-lit="on"]')).toHaveCount(1);
   await page.locator("#filters-open").click();
   await expect(page.locator("#filters")).toBeVisible();
   await expect(page.locator('#filters [data-tour-lit="on"]')).toHaveCount(1);
+  await expect(litWheel(page)).toHaveAccessibleName("Minimum word length");
+  await expect(wheelTouch(page)).toBeVisible();
+  expect(await over(page, "#filters-touch", '#filters [role="spinbutton"][aria-label="Minimum word length"]')).toBe(true);
+  await expect(litWheel(page)).toHaveAccessibleName("Maximum word length", { timeout: 6000 });
+  expect(await over(page, "#filters-touch", '#filters [role="spinbutton"][aria-label="Maximum word length"]')).toBe(true);
+  await expect(page.locator("#filters .range[data-tour-lit]")).toHaveCount(0);
   await page.locator("#filters").getByRole("button", { name: "Done" }).click();
   await expect(count(page)).toHaveText("5 of 5");
   await expect(words(page)).toHaveText("Tap the cog to choose what the list shows, like safe search:");
@@ -567,6 +595,87 @@ test("the peek step lights whole words, see-through and borderless, in no partic
   await holdAt(page, await lightMiddle(page));
   await expect(count(page)).toHaveText("4 of 5", { timeout: 3000 });
   await expect(page.locator(".line[data-tour-lit]")).toHaveCount(0);
+});
+
+test("the filter step shows each wheel in turn: lit, and turned a little by a touch that moves with it, choosing nothing", { tag: "@release" }, async ({ page }) => {
+  await firstRun(page, "no-preference");
+  await toFilterStep(page, "no-preference");
+  await page.locator("#filters-open").click();
+  await expect(page.locator("#filters")).toBeVisible();
+
+  // Each wheel's turn, frame by frame: where the touch is and how far the wheel is turned.
+  const watch = (label: string) =>
+    page.evaluate((label) => new Promise<{ lit: boolean; onIt: boolean; y: number; turned: number }[]>((done) => {
+      const wheel = document.querySelector<HTMLElement>(`#filters [role="spinbutton"][aria-label="${label}"]`)!;
+      const track = wheel.querySelector<HTMLElement>(".wheel-track")!;
+      const touch = document.getElementById("filters-touch")!;
+      const frames: { lit: boolean; onIt: boolean; y: number; turned: number }[] = [];
+      let seen = false;
+      const look = () => {
+        const lit = wheel.closest(".wheel-field")!.getAttribute("data-tour-lit") === "on";
+        const showing = !touch.hidden && getComputedStyle(touch).opacity !== "0";
+        if (lit && showing) {
+          seen = true;
+          const t = touch.getBoundingClientRect();
+          const w = wheel.getBoundingClientRect();
+          const [x, y] = [t.left + t.width / 2, t.top + t.height / 2];
+          frames.push({ lit, onIt: x >= w.left && x <= w.right && y >= w.top && y <= w.bottom, y, turned: new DOMMatrix(getComputedStyle(track).transform).m42 });
+        } else if (seen && touch.hidden) return done(frames);
+        requestAnimationFrame(look);
+      };
+      look();
+    }), label);
+
+  for (const label of ["Minimum word length", "Maximum word length"]) {
+    const frames = await watch(label); // the left wheel first, then the right
+    expect(frames.length, label).toBeGreaterThan(20);
+    expect(frames.every((f) => f.onIt), label).toBe(true);
+    // The touch swipes up and comes back, and the wheel turns with it in the same frames:
+    // as far as the touch has moved, to the pixel, and at rest again when it lets go.
+    const rest = frames[0];
+    const far = frames.reduce((a, b) => (b.y < a.y ? b : a));
+    expect(rest.y - far.y, label).toBeGreaterThan(30);
+    expect(rest.y - far.y, label).toBeLessThan(80); // briefly: a row or two
+    for (const f of frames) expect(Math.abs((f.turned - rest.turned) - (f.y - rest.y)), label).toBeLessThan(1.5);
+    const steps = frames.slice(1).map((f, i) => Math.abs(f.y - frames[i].y));
+    expect(Math.max(...steps), label).toBeLessThan(12); // eased: no jump
+    expect(Math.abs(frames.at(-1)!.turned - rest.turned), label).toBeLessThan(1.5);
+  }
+  // Nothing was chosen by the show: both wheels still on Any, no filter set.
+  for (const label of ["Minimum word length", "Maximum word length"]) {
+    await expect(page.getByRole("spinbutton", { name: label })).toHaveAttribute("aria-valuetext", "Any");
+  }
+  await expect(page.locator("#filters-open")).not.toHaveAttribute("data-active", "");
+  await expect(count(page)).toHaveText("4 of 5"); // and a show is never the person's go
+
+  // Closed without a wheel touched: on to the next step, nothing left behind.
+  await page.keyboard.press("Escape");
+  await expect(count(page)).toHaveText("5 of 5");
+  await expect(wheelTouch(page)).toBeHidden();
+  await expect(page.locator("#filters [data-tour-lit]")).toHaveCount(0);
+});
+
+test("a touch on a wheel during its show stops it at once: the wheel as it was, and the person's turn is theirs", async ({ page }) => {
+  await firstRun(page, "no-preference");
+  await toFilterStep(page, "no-preference");
+  await page.locator("#filters-open").click();
+  const wheel = page.getByRole("spinbutton", { name: "Minimum word length" });
+  const turned = () => wheel.locator(".wheel-track").evaluate((track) => new DOMMatrix(getComputedStyle(track).transform).m42);
+  const rest = await turned();
+  await expect.poll(async () => Math.abs((await turned()) - rest), { timeout: 5000 }).toBeGreaterThan(20); // mid-swipe
+  const box = (await wheel.boundingBox())!;
+  const at = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+  await page.mouse.move(at.x, at.y);
+  await page.mouse.down();
+  expect(Math.abs((await turned()) - rest)).toBeLessThan(1); // put back before their press lands
+  await expect(wheelTouch(page)).toBeHidden();
+  // Their own drag, two rows up: it chooses, from where the wheel really was.
+  for (let dy = 6; dy <= 72; dy += 6) await page.mouse.move(at.x, at.y - dy);
+  await page.mouse.up();
+  await expect(wheel).not.toHaveAttribute("aria-valuetext", "Any");
+  await expect(count(page)).toHaveText("4 of 5"); // still asking: the sheet isn't closed yet
+  await page.locator("#filters").getByRole("button", { name: "Done" }).click();
+  await expect(count(page)).toHaveText("5 of 5");
 });
 
 test("the tour stays out of the way: a tap on a lit word opens it, and Back brings the step back", async ({ page }) => {

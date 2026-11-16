@@ -78,13 +78,17 @@ decision or module makes it load-bearing.
   a moment (`web/hands.ts`). Each step's **show** (`web/tour-shows.ts`) acts it out, then
   asks, by **lighting** what to touch: a see-through wash drawn by the thing itself, so it
   moves with it, fading and breathing (opacity only). Fragments and words are lit in turn, in
-  no particular order; a sheet's options in turn once it's open. The slider is held in empty
+  no particular order; Settings' options in turn once it's open. In the Filters sheet the
+  wheels are shown in turn, left then right: each lit with its label while a touch swipes
+  it up a little and back, the real wheel turning with it and choosing nothing; closing the
+  sheet, a wheel touched or not, is the step done. The slider is held in empty
   space, which has nothing to light, so a **touch** shows it: it presses beside a word and
   slides out and back with the histogram, the real slider and list following, then the list
   is put back; again after 5 still seconds. A show never counts as the person's go, starts
   only on a still screen and gives way to any touch. Done or skipped, it's remembered on the
   device (`dictionarius.tour`). **How It Works** (the "?" by the cog) lists the controls;
-  Show me again starts the tour over on the start screen, the funnel's filters cleared.
+  Tutorial, in its top left corner, starts the tour over on the start screen, the funnel's
+  filters cleared. Finished, the note says "Tutorial complete".
 - **Navigation buttons** — back, home (the start screen) and forward over the top corners
   of the list and of a word's page, in the cog's grey, for a mouse: back and forward step
   through the words followed, as a swipe does; back from the list goes home. The slider's
