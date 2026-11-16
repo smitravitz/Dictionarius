@@ -130,6 +130,33 @@ test("with no connection it says so and stays, then carries on once the signal's
   await expect(text).toHaveText("Downloaded · works offline", { timeout: 8000 });
 });
 
+test("a download that goes quiet without an error is dropped and started again at once: the bar finishes with no reload", async ({ page }) => {
+  // The connection dies without saying so: the last file's download gets no answer, ever,
+  // and no error either; the browser still thinks it's online. The next try gets through.
+  let stalled = 0;
+  await network(page);
+  await page.context().route( // after network(): the route added last is asked first
+    (url) => /\.pronunciation\.bin$/.test(url.pathname),
+    async (route) => {
+      if (route.request().headers()["range"]) return route.continue().catch(() => {}); // a word's page
+      if (stalled++ === 0) return; // never answered
+      await route.continue().catch(() => {});
+    },
+  );
+  await open(page);
+  const text = page.locator("#download-text");
+  await expect(text).toHaveText(PROGRESS);
+  const quiet = Date.now();
+  await expect.poll(() => stalled, { timeout: 15_000 }).toBeGreaterThan(0);
+  // Dropped after 3 s with nothing in and started again straight away, since the download
+  // had been coming: not after the 15 s a failed request waits. Before: never, until a reload.
+  await expect(text).toHaveText("Downloaded · works offline", { timeout: 12_000 });
+  expect(Date.now() - quiet).toBeLessThan(15_000);
+  expect(stalled).toBe(2); // the quiet one, then one more: the files already kept weren't asked for again
+  await page.locator("#settings-open").click();
+  await expect(page.locator("#offline")).toHaveText("Saved on this device: works offline.");
+});
+
 test("Settings says only how it ended, not how far along it is", async ({ page }) => {
   await network(page);
   await open(page);

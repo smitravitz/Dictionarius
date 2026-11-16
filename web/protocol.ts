@@ -43,6 +43,9 @@ export type FromWorker =
       keep: { url: string; bytes: number }[];
       alsoKeep: string[];
     }
+  /** A kept copy of a data file wasn't the file and was let go of: it's to be kept again
+   *  (web/keep-on-device.ts), whether or not the keeping has already been through it. */
+  | { type: "let-go" }
   /** How much of the word list has arrived, 0 to 1 (a browser, while it comes). */
   | { type: "progress"; share: number }
   /** The index loaded; `filters` are the ones it has the data for. */
@@ -76,8 +79,9 @@ export type FromWorker =
  *  any others but `alsoKeep`. */
 export type ToDataWorker = { type: "keep"; files: { url: string; bytes: number }[]; alsoKeep: string[] };
 
-/** From the data worker: how far along (0 to 1), done, or not kept (and why). */
+/** From the data worker: how far along (0 to 1), done, or not kept (and why). `stalled`: a
+ *  download went quiet and was dropped (web/data-cache.ts); `error`: a request failed. */
 export type FromDataWorker =
   | { type: "keeping"; share: number }
   | { type: "kept" }
-  | { type: "unkept"; why: "space" | "saving-data" | "error" };
+  | { type: "unkept"; why: "space" | "saving-data" | "error" | "stalled" };

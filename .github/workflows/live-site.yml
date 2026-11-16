@@ -1,0 +1,64 @@
+name: Live site
+
+# Opens the web app where it's published (GitHub Pages) in Chrome and in Edge, as a person's
+# browser meets it: nothing intercepted, GitHub's servers answering. It checks that the servers
+# answer Range requests exactly, that a typed word's page fills in while the dictionary
+# downloads, that the download finishes, and that the next visit needs no download
+# (e2e/live/first-visit.spec.ts). Each run's log says what happened, second by second.
+# Runs after every Pages deploy, and by hand: Actions > Live site > Run workflow.
+# It only looks: a failure here means the site that's already online has a fault.
+on:
+  workflow_dispatch:
+    inputs:
+      url:
+        description: The site to check (empty for the Pages site)
+        type: string
+        required: false
+  workflow_run:
+    workflows: [Pages]
+    types: [completed]
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  live:
+    name: The published site, in ${{ matrix.browser }}
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - browser: chrome
+            install: chromium
+          - browser: edge
+            install: msedge
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps ${{ matrix.install }}
+      - name: Open the site, look a word up, wait for the download, come back
+        env:
+          DICTIONARIUS_LIVE_URL: ${{ inputs.url }}
+        run: |
+          if [ -z "$DICTIONARIUS_LIVE_URL" ]; then unset DICTIONARIUS_LIVE_URL; fi
+          npx playwright test --config playwright.live.config.ts --project "${{ matrix.browser }}"
+      - uses: actions/upload-artifact@v7
+        if: ${{ !cancelled() }}
+        with:
+          name: live-site-${{ matrix.browser }}
+          path: |
+            playwright-report-live/
+            test-results-live/
+          if-no-files-found: ignore
+          retention-days: 14

@@ -17,6 +17,7 @@
     "test:e2e": "playwright test",
     "test:e2e:safari": "DICTIONARIUS_SAFARI=1 playwright test",
     "test:e2e:built": "playwright test --config playwright.built.config.ts",
+    "test:e2e:live": "playwright test --config playwright.live.config.ts --project chrome",
     "typecheck": "tsc --noEmit",
     "bench:speed": "node bench/search-speed.mjs"
   },

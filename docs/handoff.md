@@ -3,7 +3,7 @@
 Read this first in a new chat, then `.claude/CLAUDE.md`. Update it at the end of any
 session that changes what's below (newest state only; history lives in git).
 
-_Last updated: 2026-11-15, at v0.7.6, the first release with a Play app bundle (its run's `play-app-bundle`) and the store work (ADR-0010); in no store yet. Next: Google Play's internal test track._
+_Last updated: 2026-11-16, at v0.7.6, the first release with a Play app bundle (its run's `play-app-bundle`) and the store work (ADR-0010); in no store yet. Next: Google Play's internal test track._
 
 ## What it is
 
@@ -27,11 +27,11 @@ built from the English Wiktionary dump by `scripts/build_fm_index.py`.
 | `web/` | The page: `main.ts`, the worker `search-worker.ts`, the data worker `data-worker.ts`, gestures, loading screen `loader.ts`, service worker `sw.js`, which shell it runs in `shell.ts`, light/dark `theme.ts` (+ `theme-boot.js`), the web app's icons `icons/` |
 | `tools/` | Vite steps: `web-data.ts` (starter, gzipped list), `web-app.ts` (manifest, icons, service worker), `theme-script.ts`; `make-icons.ts` draws `web/icons/` from `docs/brand/icon.svg` |
 | `scripts/` | Python data pipeline, `setup-release.sh`, privacy audit |
-| `e2e/` | Playwright tests (desktop + phone) against `test/fixtures` sample data |
+| `e2e/` | Playwright tests (desktop + phone) against `test/fixtures` sample data; `e2e/built/` the published build, `e2e/live/` the Pages site itself |
 | `android/` | Capacitor Android shell, `EdgeGesturesPlugin.java` |
 | `ios/` | Capacitor iOS shell (Swift Package Manager), its privacy manifest; iPhone only, iOS 16+ |
 | `fastlane/metadata/` | Store listings: Play (`android/en-US/`) and App Store (`en-US/`); `PRIVACY.md` is the policy they link to |
-| `.github/workflows/` | `ci.yml`, `release.yml` (tag → signed APK and Play app bundle), `pages.yml` (web app on Pages), `ios.yml` (iOS builds), `ios-release.yml` (tag → TestFlight), `store-screenshots.yml` (by hand) |
+| `.github/workflows/` | `ci.yml`, `release.yml` (tag → signed APK and Play app bundle), `pages.yml` (web app on Pages), `ios.yml` (iOS builds), `ios-release.yml` (tag → TestFlight), `store-screenshots.yml` (by hand), `live-site.yml` (the Pages site in Chrome and Edge, after each deploy and by hand) |
 
 ## Shipping
 
@@ -115,6 +115,29 @@ built from the English Wiktionary dump by `scripts/build_fm_index.py`.
   first, and in the Android app that a forced theme sets the status bar's icon colour.
 - `/dictionarius/` (lowercase) needs the owner's user-site repo `smitravitz.github.io` with
   a redirecting `404.html` (given to the owner; not confirmed set up).
+
+- Reported 2026-11-16, on the live web app in Edge: the download bar stuck at 99% until a
+  reload, and no definitions at all, reloads included. Not reproduced: nothing here could
+  reach the Pages site or run Edge; a first visit in Chrome 153 (HTTP/1.1 and HTTP/2, a
+  made-up 33 MB dictionary served as Pages serves, a word opened every second through the
+  download) kept everything and filled in every page. Two ways to those screens were found
+  and fixed, each with a test that failed first (branch `restart-stalled-download`,
+  unreleased; the site only changes with a release):
+  1. A background download that went quiet with no error was waited on for ever. It's now
+     dropped after 3 s and started again (ADR-0008).
+  2. A kept copy of a definitions file that was wrong (cut short, or not the file) was
+     trusted: every word said "No definition", on every visit. It's now let go of and read
+     from the network (`web/data-cache.ts`, `e2e/kept-copy.spec.ts`).
+  A file let go of is kept again in the same visit, whichever worker got there first.
+  `e2e/kept-copy.spec.ts` is left out of the Safari-engine run: Playwright's WebKit empties
+  every Cache Storage store on a reload (measured with a store the app never touches;
+  `playwright.config.ts` has the numbers), so no second visit can be tested there. Whether
+  real Safari keeps the dictionary between visits is unchecked: add it to the iPhone checklist.
+  Whether either was the report's cause isn't known. To find out: the console snippet in
+  `docs/development.md` ("In your own browser") run in the owner's Edge, and the new
+  "Live site" workflow (`live-site.yml`, `e2e/live/`; Chrome and Edge against Pages itself,
+  after each Pages deploy and by hand), which has never run on GitHub: its Edge install step
+  and its first results are unseen.
 
 ## Open items
 

@@ -4,7 +4,9 @@
  * address carries their hash, web/data-files.ts), so an old copy is never read for a new
  * one, and matched by address alone (a server's "Vary" headers don't make a kept copy a
  * miss). Filled as the word list is fetched, and by the data worker in the background
- * (web/data-worker.ts); read before the network. Where Cache Storage isn't there (an
+ * (web/data-worker.ts); read before the network, but never trusted over it: a kept copy of
+ * the definitions that isn't the file's size, or doesn't open, is let go of and read from the
+ * network instead (definitionsSource, forget). Where Cache Storage isn't there (an
  * insecure page, a private window that refuses it), everything comes from the network.
  */
 import { openSource, type ByteSource } from "../src/definitions";
@@ -47,13 +49,21 @@ export async function kept(url: string, file: DataFile | null, { fresh = false }
 
 /** A definitions file, read a block at a time: from the device's copy when it has the whole
  *  file, else with Range requests (or whole, where the server can't send ranges), switching
- *  to the device's copy as soon as the data worker has kept it. */
-export async function definitionsSource(url: string, file: DataFile | undefined): Promise<ByteSource | null> {
+ *  to the device's copy as soon as the data worker has kept it. `letGo` hears when a kept
+ *  copy turned out not to be the file and was let go of (it's to be kept again). */
+export async function definitionsSource(url: string, file: DataFile | undefined, letGo: () => void = () => {}): Promise<ByteSource | null> {
   const store = file ? await deviceStore() : null;
   const onDevice = async (): Promise<ByteSource | null> => {
     const copy = await store?.match(url, { ignoreVary: true });
     if (!copy) return null;
     const blob = await copy.blob();
+    if (blob.size !== file!.bytes) {
+      // Not the file (cut short, say): let go of, so it's read from the network and kept again.
+      console.warn(`${url}: the kept copy is ${blob.size} bytes, not ${file!.bytes}; let go of`);
+      await store!.delete(url, { ignoreVary: true }).catch(() => {});
+      letGo();
+      return null;
+    }
     return { size: blob.size, read: async (start, end) => new Uint8Array(await blob.slice(start, end).arrayBuffer()) };
   };
   const device = await onDevice();
@@ -70,14 +80,38 @@ export async function definitionsSource(url: string, file: DataFile | undefined)
   };
 }
 
+/** Lets go of the device's copy of the file at `url`; true if there was one. For a copy
+ *  that turned out not to be the file: the next read is the network's, and it's kept again. */
+export async function forget(url: string): Promise<boolean> {
+  const store = await deviceStore();
+  return (await store?.delete(url, { ignoreVary: true }).catch(() => false)) ?? false;
+}
+
+/** A download with nothing in for this long is dropped, to be started again (keepAll). A
+ *  connection that works sends something well inside it, however slow; one that died without
+ *  saying so never will. Short, so the wait isn't long; a file dropped starts over from its
+ *  first byte, so not shorter. */
+export const DROP_AFTER_MS = 3000;
+
+/** A download dropped because nothing of it came for a while: not a failed request. */
+export class Stalled extends Error {
+  constructor(url: string, ms: number) {
+    super(`${url}: stalled, nothing in for ${ms} ms`);
+    this.name = "Stalled";
+  }
+}
+
 /** Keeps `urls` on the device, fetched in turn at low priority (others' requests go
  *  first), skipping those it has; then lets go of every other file but `alsoKeep`.
  *  `progress` hears the share of `bytes` in, while it's downloading: with every file kept
- *  already it hears nothing. Throws if a file can't be fetched or kept. */
+ *  already it hears nothing. Throws if a file can't be fetched or kept; throws Stalled when
+ *  nothing of it has come for `stallMs` (a connection that died without saying so sends no
+ *  error: the download is dropped, nothing of that file kept, so the caller can start again). */
 export async function keepAll(
   files: readonly { url: string; bytes: number }[],
   alsoKeep: readonly string[],
   progress: (share: number) => void,
+  { stallMs = DROP_AFTER_MS }: { stallMs?: number } = {},
 ): Promise<void> {
   const store = await deviceStore();
   if (!store) throw new Error("no Cache Storage");
@@ -85,19 +119,35 @@ export async function keepAll(
   let done = 0;
   for (const { url, bytes } of files) {
     if (!(await store.match(url, { ignoreVary: true }))) {
-      const response = await fetch(url, { priority: "low" } as RequestInit);
-      if (!response.ok || !response.body) throw new Error(`HTTP ${response.status} for ${url}`);
-      let seen = 0;
-      const counted = response.body.pipeThrough(
-        new TransformStream<Uint8Array, Uint8Array>({
-          transform(chunk, out) {
-            seen += chunk.byteLength;
-            progress(Math.min(1, (done + seen) / total));
-            out.enqueue(chunk);
-          },
-        }),
-      );
-      await store.put(url, new Response(counted, { headers: response.headers }));
+      // Dropped when nothing has come for `stallMs`: no answer yet, or no more of its bytes.
+      const dropped = new AbortController();
+      let quiet: ReturnType<typeof setTimeout> | undefined;
+      const heard = () => {
+        clearTimeout(quiet);
+        quiet = setTimeout(() => dropped.abort(), stallMs);
+      };
+      heard();
+      try {
+        const response = await fetch(url, { priority: "low", signal: dropped.signal } as RequestInit);
+        if (!response.ok || !response.body) throw new Error(`HTTP ${response.status} for ${url}`);
+        let seen = 0;
+        const counted = response.body.pipeThrough(
+          new TransformStream<Uint8Array, Uint8Array>({
+            transform(chunk, out) {
+              heard();
+              seen += chunk.byteLength;
+              progress(Math.min(1, (done + seen) / total));
+              out.enqueue(chunk);
+            },
+            flush: () => clearTimeout(quiet), // all in: the device takes its time writing it
+          }),
+        );
+        await store.put(url, new Response(counted, { headers: response.headers }));
+      } catch (error) {
+        throw dropped.signal.aborted ? new Stalled(url, stallMs) : error;
+      } finally {
+        clearTimeout(quiet);
+      }
       progress(Math.min(1, (done + bytes) / total));
     }
     done += bytes;
