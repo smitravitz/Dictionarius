@@ -3,7 +3,8 @@
  * own downloads every data file and keeps it (web/data-worker.ts). A thin bar under the title
  * says how far along it is and how good the connection is (web/connection.ts); once it's all
  * in it says so and fades out over 5 seconds. With no connection it says so, stays, and
- * carries on once the signal's back. Settings says only how it ended.
+ * carries on once the signal's back; a download that goes quiet part-way is started again at
+ * once. Settings says only how it ended.
  */
 import { connectionQuality, type Quality, type Sample } from "./connection";
 import type { FromDataWorker, ToDataWorker } from "./protocol";
@@ -75,12 +76,15 @@ export function keepOnDevice(toKeep: ToKeep, bar: HTMLElement, result: HTMLEleme
   };
 
   let worker: Worker | null = null;
+  let coming = false; // this run has brought something in
   function start() {
     worker?.terminate();
     samples = [];
+    coming = false;
     worker = new Worker(new URL("./data-worker.ts", import.meta.url), { type: "module" });
     worker.onmessage = ({ data }: MessageEvent<FromDataWorker>) => {
       if (data.type === "keeping") {
+        coming = true;
         share = Math.max(share, data.share); // a restart may redo part of a file: never backwards
         samples.push({ at: performance.now(), bytes: data.share * total });
         if (share < 1) show();
@@ -91,11 +95,14 @@ export function keepOnDevice(toKeep: ToKeep, bar: HTMLElement, result: HTMLEleme
         end("Downloaded · works offline", "kept");
       } else {
         worker?.terminate();
-        if (data.why !== "error") return end("Not saved for offline use", data.why);
+        if (data.why === "space" || data.why === "saving-data") return end("Not saved for offline use", data.why);
         // No connection (or a failure while it looked fine): it says so, and tries again once
         // the browser says it's back, or every so often, a few times while online.
         draw();
         if (navigator.onLine && ++retries > RETRIES) return end("Not saved for offline use", "error");
+        // Went quiet part-way, having been coming: the connection was there a moment ago, so
+        // it starts again at once (counted with the other tries: it can't go round for ever).
+        if (data.why === "stalled" && coming) return start();
         failed = true;
         retry = setTimeout(again, RETRY_MS);
       }

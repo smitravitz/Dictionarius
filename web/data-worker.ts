@@ -5,7 +5,7 @@
  * thread: the search worker answers the page meanwhile, untouched by it. Skipped when
  * there's no room, or the browser is saving data (Data Saver).
  */
-import { keepAll } from "./data-cache";
+import { keepAll, Stalled } from "./data-cache";
 import type { FromDataWorker, ToDataWorker } from "./protocol";
 
 interface WorkerScope {
@@ -39,7 +39,7 @@ async function keep(files: { url: string; bytes: number }[], alsoKeep: string[])
       scope.postMessage({ type: "keeping", share });
     });
     scope.postMessage({ type: "kept" });
-  } catch {
-    scope.postMessage({ type: "unkept", why: "error" });
+  } catch (error) {
+    scope.postMessage({ type: "unkept", why: error instanceof Stalled ? "stalled" : "error" });
   }
 }

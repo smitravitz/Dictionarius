@@ -130,10 +130,9 @@ test("with no connection it says so and stays, then carries on once the signal's
   await expect(text).toHaveText("Downloaded · works offline", { timeout: 8000 });
 });
 
-test("a download that goes quiet without an error is dropped and started again: the bar finishes with no reload", async ({ page }) => {
-  test.slow(); // the stall time (8 s), then the next timed try (15 s)
+test("a download that goes quiet without an error is dropped and started again at once: the bar finishes with no reload", async ({ page }) => {
   // The connection dies without saying so: the last file's download gets no answer, ever,
-  // and no error either; the browser still thinks it's online. Later tries get through.
+  // and no error either; the browser still thinks it's online. The next try gets through.
   let stalled = 0;
   await network(page);
   await page.context().route( // after network(): the route added last is asked first
@@ -146,8 +145,13 @@ test("a download that goes quiet without an error is dropped and started again: 
   );
   await open(page);
   const text = page.locator("#download-text");
-  await expect(text).toHaveText(/^Downloading \d+% · No connection$/, { timeout: 20_000 }); // it says what it sees
-  await expect(text).toHaveText("Downloaded · works offline", { timeout: 40_000 }); // before: never, until a reload
+  await expect(text).toHaveText(PROGRESS);
+  const quiet = Date.now();
+  await expect.poll(() => stalled, { timeout: 15_000 }).toBeGreaterThan(0);
+  // Dropped after 3 s with nothing in and started again straight away, since the download
+  // had been coming: not after the 15 s a failed request waits. Before: never, until a reload.
+  await expect(text).toHaveText("Downloaded · works offline", { timeout: 12_000 });
+  expect(Date.now() - quiet).toBeLessThan(15_000);
   expect(stalled).toBe(2); // the quiet one, then one more: the files already kept weren't asked for again
   await page.locator("#settings-open").click();
   await expect(page.locator("#offline")).toHaveText("Saved on this device: works offline.");

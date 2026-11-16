@@ -76,8 +76,9 @@ export type FromWorker =
  *  any others but `alsoKeep`. */
 export type ToDataWorker = { type: "keep"; files: { url: string; bytes: number }[]; alsoKeep: string[] };
 
-/** From the data worker: how far along (0 to 1), done, or not kept (and why). */
+/** From the data worker: how far along (0 to 1), done, or not kept (and why). `stalled`: a
+ *  download went quiet and was dropped (web/data-cache.ts); `error`: a request failed. */
 export type FromDataWorker =
   | { type: "keeping"; share: number }
   | { type: "kept" }
-  | { type: "unkept"; why: "space" | "saving-data" | "error" };
+  | { type: "unkept"; why: "space" | "saving-data" | "error" | "stalled" };

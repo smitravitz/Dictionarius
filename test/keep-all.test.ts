@@ -1,10 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { keepAll } from "../web/data-cache";
+import { DROP_AFTER_MS, keepAll, Stalled } from "../web/data-cache";
 
 // Keeping the dictionary on the device (web/data-cache.ts, keepAll): a download that goes
 // quiet without an error (a connection that died without saying so) is dropped once nothing
-// has come for the stall time, so the caller can start it again. Before, it was waited on
-// for ever: the bar under the title stayed where it was until the page was reloaded.
+// has come for the stall time (3 s), so the caller can start it again, and told apart from
+// a failed request (Stalled). Before, it was waited on for ever: the bar under the title
+// stayed where it was until the page was reloaded.
 // The network and the device's store are stand-ins here; the stall time is short.
 
 const STALL_MS = 60;
@@ -58,14 +59,26 @@ describe("keeping the dictionary on the device", () => {
   it("drops a download whose bytes stop coming, and keeps nothing of that file", async () => {
     const kept = deviceStore();
     network((chunk) => chunk([1, 2, 3])); // half of it, then nothing more, and no error
-    await expect(within(STALL_MS * 10, keepAll([FILE], [], () => {}, { stallMs: STALL_MS }))).rejects.toThrow(/stalled|abort/i);
+    await expect(within(STALL_MS * 10, keepAll([FILE], [], () => {}, { stallMs: STALL_MS }))).rejects.toBeInstanceOf(Stalled);
     expect(kept.size).toBe(0);
   });
 
   it("drops a download that gets no answer at all", async () => {
     deviceStore();
     network(() => {}, { answers: false });
-    await expect(within(STALL_MS * 10, keepAll([FILE], [], () => {}, { stallMs: STALL_MS }))).rejects.toThrow(/stalled|abort/i);
+    await expect(within(STALL_MS * 10, keepAll([FILE], [], () => {}, { stallMs: STALL_MS }))).rejects.toBeInstanceOf(Stalled);
+  });
+
+  it("waits 3 seconds with nothing in before dropping a download, unless told otherwise", () => {
+    expect(DROP_AFTER_MS).toBe(3000);
+  });
+
+  it("a request the server refuses is a failure, not a stall", async () => {
+    deviceStore();
+    vi.stubGlobal("fetch", async () => new Response("no", { status: 503 }));
+    const failure = await keepAll([FILE], [], () => {}, { stallMs: STALL_MS }).catch((error: unknown) => error);
+    expect(failure).toBeInstanceOf(Error);
+    expect(failure).not.toBeInstanceOf(Stalled);
   });
 
   it("keeps a slow download that keeps coming, however long it takes", async () => {

@@ -65,9 +65,12 @@ download. The person waited for ~90 MB before they could touch anything, every f
   it's all in, "Downloaded · works offline", then it fades out over 5 s. With no connection it
   stays, and carries on as soon as the browser says it's back (or every 15 s). A download that
   goes quiet with no error (a connection that died without saying so, the browser still
-  "online") is dropped once nothing has come for those 8 s and started again the same way,
-  the files already kept not asked for again; before, it was waited on for ever, the bar
-  stuck where it was until a reload. (Amended 2026-11-16.) It sits over the
+  "online") is dropped once nothing has come for 3 s and started again: at once when it had
+  been coming, else as a failed request is (after 15 s), four tries in all; the files already
+  kept aren't asked for again, but the dropped file starts over from its first byte. Before,
+  it was waited on for ever, the bar stuck where it was until a reload. (Amended 2026-11-16;
+  3 s is the owner's choice: on a link that often pauses longer, saving gives up for that
+  visit, and resuming a file part-way with Range would be the next step.) It sits over the
   page, so nothing moves for it; it only shows while something is downloading. Settings says
   only how it ended ("Saved on this device: works offline."). Skipped with Data Saver on, or
   without room. (Amended 2026-11-12: the progress was a line in Settings.)

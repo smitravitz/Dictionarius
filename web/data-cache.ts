@@ -9,7 +9,6 @@
  */
 import { openSource, type ByteSource } from "../src/definitions";
 import type { DataFile } from "../src/starter";
-import { STALL_MS } from "./connection";
 
 export const DATA_CACHE = "dictionarius-data";
 
@@ -71,17 +70,31 @@ export async function definitionsSource(url: string, file: DataFile | undefined)
   };
 }
 
+/** A download with nothing in for this long is dropped, to be started again (keepAll). A
+ *  connection that works sends something well inside it, however slow; one that died without
+ *  saying so never will. Short, so the wait isn't long; a file dropped starts over from its
+ *  first byte, so not shorter. */
+export const DROP_AFTER_MS = 3000;
+
+/** A download dropped because nothing of it came for a while: not a failed request. */
+export class Stalled extends Error {
+  constructor(url: string, ms: number) {
+    super(`${url}: stalled, nothing in for ${ms} ms`);
+    this.name = "Stalled";
+  }
+}
+
 /** Keeps `urls` on the device, fetched in turn at low priority (others' requests go
  *  first), skipping those it has; then lets go of every other file but `alsoKeep`.
  *  `progress` hears the share of `bytes` in, while it's downloading: with every file kept
- *  already it hears nothing. Throws if a file can't be fetched or kept, or when nothing of
- *  it has come for `stallMs` (a connection that died without saying so sends no error: the
- *  download is dropped, nothing of that file kept, so the caller can start again). */
+ *  already it hears nothing. Throws if a file can't be fetched or kept; throws Stalled when
+ *  nothing of it has come for `stallMs` (a connection that died without saying so sends no
+ *  error: the download is dropped, nothing of that file kept, so the caller can start again). */
 export async function keepAll(
   files: readonly { url: string; bytes: number }[],
   alsoKeep: readonly string[],
   progress: (share: number) => void,
-  { stallMs = STALL_MS }: { stallMs?: number } = {},
+  { stallMs = DROP_AFTER_MS }: { stallMs?: number } = {},
 ): Promise<void> {
   const store = await deviceStore();
   if (!store) throw new Error("no Cache Storage");
@@ -94,7 +107,7 @@ export async function keepAll(
       let quiet: ReturnType<typeof setTimeout> | undefined;
       const heard = () => {
         clearTimeout(quiet);
-        quiet = setTimeout(() => dropped.abort(new Error(`${url}: stalled, nothing in for ${stallMs} ms`)), stallMs);
+        quiet = setTimeout(() => dropped.abort(), stallMs);
       };
       heard();
       try {
@@ -113,6 +126,8 @@ export async function keepAll(
           }),
         );
         await store.put(url, new Response(counted, { headers: response.headers }));
+      } catch (error) {
+        throw dropped.signal.aborted ? new Stalled(url, stallMs) : error;
       } finally {
         clearTimeout(quiet);
       }
