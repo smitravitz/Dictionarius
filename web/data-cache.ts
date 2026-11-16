@@ -49,8 +49,9 @@ export async function kept(url: string, file: DataFile | null, { fresh = false }
 
 /** A definitions file, read a block at a time: from the device's copy when it has the whole
  *  file, else with Range requests (or whole, where the server can't send ranges), switching
- *  to the device's copy as soon as the data worker has kept it. */
-export async function definitionsSource(url: string, file: DataFile | undefined): Promise<ByteSource | null> {
+ *  to the device's copy as soon as the data worker has kept it. `letGo` hears when a kept
+ *  copy turned out not to be the file and was let go of (it's to be kept again). */
+export async function definitionsSource(url: string, file: DataFile | undefined, letGo: () => void = () => {}): Promise<ByteSource | null> {
   const store = file ? await deviceStore() : null;
   const onDevice = async (): Promise<ByteSource | null> => {
     const copy = await store?.match(url, { ignoreVary: true });
@@ -60,6 +61,7 @@ export async function definitionsSource(url: string, file: DataFile | undefined)
       // Not the file (cut short, say): let go of, so it's read from the network and kept again.
       console.warn(`${url}: the kept copy is ${blob.size} bytes, not ${file!.bytes}; let go of`);
       await store!.delete(url, { ignoreVary: true }).catch(() => {});
+      letGo();
       return null;
     }
     return { size: blob.size, read: async (start, end) => new Uint8Array(await blob.slice(start, end).arrayBuffer()) };
