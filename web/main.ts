@@ -1022,7 +1022,7 @@ const coach = new Coach(
   (value) => (value === null ? forget(TOUR_KEY) : write(TOUR_KEY, value)),
   hands,
 );
-// Show me again: the tour from the top, on the start screen where it begins, every word in
+// Tutorial (the help sheet): the tour from the top, on the start screen where it begins, every word in
 // play (the funnel's filters cleared).
 $("help-tour").addEventListener("click", () => {
   help.close();

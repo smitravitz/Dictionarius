@@ -33,7 +33,7 @@ export interface Stage {
 /** Acts a step out on the real screen, then asks for it, until stopped. */
 export type Show = (stage: Stage) => void;
 
-const FINISHED_MS = 4000; // how long "That's all five" stays
+const FINISHED_MS = 4000; // how long the closing note ("Tutorial complete") stays
 const SETTLE_MS = 600; // after a step, how long the person is still before the next one shows
 
 export class Coach {
@@ -96,7 +96,7 @@ export class Coach {
     this.stop();
     const { card, count, text, skip } = this.parts;
     count.textContent = "Done";
-    text.textContent = "That's all five. Tap ? any time for How It Works.";
+    text.textContent = "Tutorial complete. Tap ? to review How It Works at any time.";
     skip.hidden = true;
     card.hidden = false;
     this.finishing = setTimeout(() => {
@@ -107,7 +107,7 @@ export class Coach {
 
   /** The note for the step asked for here, and its show; nothing when there's none. */
   private draw() {
-    if (this.finishing) return; // "That's all five" is showing
+    if (this.finishing) return; // the closing note is showing
     const { card, count, text, skip } = this.parts;
     if (this.settling) {
       if (this.screen === "elsewhere") card.hidden = true; // the ticked step, until the next shows

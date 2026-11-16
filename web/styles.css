@@ -1684,15 +1684,13 @@ a:focus-visible {
   font-size: 0.9375rem;
   line-height: 1.4;
 }
-.help-actions {
-  display: flex;
-  justify-content: space-between;
-  align-items: end;
-  gap: 1rem;
-}
+/* Tutorial, in the sheet's top left corner: its tap area reaches up into the padding, so
+   its word sits level with where a sheet's title starts. */
 .help-tour {
+  display: block;
   min-height: 44px;
-  padding: 0.5rem 0;
+  margin: -0.75rem 0 0.125rem;
+  padding: 0.5rem 0.75rem 0.5rem 0;
   border: 0;
   background: transparent;
   color: var(--pencil);

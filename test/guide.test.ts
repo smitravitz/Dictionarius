@@ -7,13 +7,12 @@ import { CONTROLS, ShuffleBag, TOUR, Tour } from "../web/guide";
 describe("How It Works", () => {
   it("lists every control: what to do, then what it's for, read as one sentence", () => {
     expect(CONTROLS.map((c) => [c.how, c.does])).toEqual([
-      ["Tap a fragment", "to find every word containing it"],
-      ["Tap a word", "to open its full entry"],
+      ["Search a fragment", "to find every word containing it"],
       ["Hold a word", "to peek at its meaning"],
+      ["Tap a word", "to open its full entry"],
       ["Hold beside a word, then slide", "to move where the fragment lands mid-word"],
       ["Tap the funnel", "to filter words by length"],
       ["Tap the cog", "to choose what the list shows, like safe search"],
-      ["Back", "returns you to your list, right where you left it"],
     ]);
     for (const c of CONTROLS) expect(c.does[0]).toBe(c.does[0].toLowerCase()); // it carries on from what to do
   });

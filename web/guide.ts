@@ -11,13 +11,12 @@ export interface Control {
 
 /** How It Works: the help sheet's list. */
 export const CONTROLS: readonly Control[] = [
-  { how: "Tap a fragment", does: "to find every word containing it" },
-  { how: "Tap a word", does: "to open its full entry" },
+  { how: "Search a fragment", does: "to find every word containing it" },
   { how: "Hold a word", does: "to peek at its meaning" },
+  { how: "Tap a word", does: "to open its full entry" },
   { how: "Hold beside a word, then slide", does: "to move where the fragment lands mid-word" },
   { how: "Tap the funnel", does: "to filter words by length" },
   { how: "Tap the cog", does: "to choose what the list shows, like safe search" },
-  { how: "Back", does: "returns you to your list, right where you left it" },
 ];
 
 /** What the person did that a step asks for (main.ts reports these). */

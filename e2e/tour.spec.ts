@@ -202,7 +202,7 @@ test("a first run is shown five things, one at a time, and moves on as each is d
     return seen.size;
   }, { timeout: 15_000 }).toBe(options);
   await page.locator("#settings").getByRole("button", { name: "Done" }).click();
-  await expect(card(page)).toContainText("That's all five");
+  await expect(words(page)).toHaveText("Tutorial complete. Tap ? to review How It Works at any time.");
   await expect(page.locator("[data-tour-lit]")).toHaveCount(0);
   await expect(card(page)).toBeHidden({ timeout: 8000 });
 
@@ -634,7 +634,7 @@ test("the start screen has no guide text of its own: the tour says it", async ({
   await expect(page.getByRole("region", { name: "Fragments to search for" })).toBeVisible();
 });
 
-test("the ? beside the cog shows How It Works, and Show me again starts the tour over from anywhere, filters cleared", async ({ page }) => {
+test("the ? beside the cog shows How It Works, and Tutorial starts the tour over from anywhere, filters cleared", async ({ page }) => {
   await page.context().addInitScript(() => {
     if (!sessionStorage.getItem("seeded")) localStorage.setItem("dictionarius.tour", "done");
     sessionStorage.setItem("seeded", "1");
@@ -658,24 +658,29 @@ test("the ? beside the cog shows How It Works, and Show me again starts the tour
   const sheet = page.locator("#help");
   await expect(sheet.getByRole("heading")).toHaveText("How It Works");
   await expect(sheet.locator("dt")).toHaveText([
-    "Tap a fragment",
-    "Tap a word",
+    "Search a fragment",
     "Hold a word",
+    "Tap a word",
     "Hold beside a word, then slide",
     "Tap the funnel",
     "Tap the cog",
-    "Back",
   ]);
   await expect(sheet.locator("dd")).toHaveText([
     "to find every word containing it",
-    "to open its full entry",
     "to peek at its meaning",
+    "to open its full entry",
     "to move where the fragment lands mid-word",
     "to filter words by length",
     "to choose what the list shows, like safe search",
-    "returns you to your list, right where you left it",
   ]);
-  await sheet.getByRole("button", { name: "Show me again" }).click();
+  // Tutorial: in the sheet's top left corner, above everything else in it.
+  const tutorial = sheet.getByRole("button", { name: "Tutorial", exact: true });
+  await expect(sheet.getByRole("button", { name: "Show me again" })).toHaveCount(0);
+  const [corner, link, heading] = [(await sheet.boundingBox())!, (await tutorial.boundingBox())!, (await sheet.getByRole("heading").boundingBox())!];
+  expect(link.x - corner.x).toBeLessThan(32);
+  expect(link.y - corner.y).toBeLessThan(32);
+  expect(link.y + link.height).toBeLessThanOrEqual(heading.y + 1);
+  await tutorial.click();
   await expect(sheet).toBeHidden();
   // Back to the start screen, where the tour begins, the first step showing.
   await expect(page.locator("#intro")).toBeVisible();
