@@ -3,7 +3,7 @@
 Read this first in a new chat, then `.claude/CLAUDE.md`. Update it at the end of any
 session that changes what's below (newest state only; history lives in git).
 
-_Last updated: 2026-11-15, at v0.7.6, the first release with a Play app bundle (its run's `play-app-bundle`) and the store work (ADR-0010); in no store yet. Next: Google Play's internal test track._
+_Last updated: 2026-11-16, at v0.7.6, the first release with a Play app bundle (its run's `play-app-bundle`) and the store work (ADR-0010); in no store yet. Next: Google Play's internal test track._
 
 ## What it is
 
@@ -115,6 +115,16 @@ built from the English Wiktionary dump by `scripts/build_fm_index.py`.
   first, and in the Android app that a forced theme sets the status bar's icon colour.
 - `/dictionarius/` (lowercase) needs the owner's user-site repo `smitravitz.github.io` with
   a redirecting `404.html` (given to the owner; not confirmed set up).
+
+- Reported 2026-11-16, on the web app: the download bar stuck at 99% until a reload, and no
+  definitions. Not reproduced: a first visit in Chrome 153 over HTTP/1.1 and HTTP/2, on a
+  made-up 33 MB dictionary served as Pages serves (exact ranges, validators, `max-age=600`),
+  a word opened every second for the whole download, ended "Downloaded" with every word's
+  page filled in (slowest 2.1 s at 600 kB/s). One way to that screen was found and fixed
+  (branch `restart-stalled-download`, unreleased): a background download that goes quiet with
+  no error was waited on for ever; it's now dropped after 8 s and started again (ADR-0008).
+  Whether that was the report's cause isn't known: it needs the browser's name and what its
+  console says. Nothing here runs Firefox, and nothing could reach the Pages site itself.
 
 ## Open items
 

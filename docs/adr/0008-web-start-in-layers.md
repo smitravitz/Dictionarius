@@ -63,7 +63,11 @@ download. The person waited for ~90 MB before they could touch anything, every f
   `web/connection.ts`: fast from 1 MB/s, slow from 100 kB/s, very slow below, none after 8 s
   with nothing in or with the browser offline; nothing is sent anywhere to measure it). Once
   it's all in, "Downloaded · works offline", then it fades out over 5 s. With no connection it
-  stays, and carries on as soon as the browser says it's back (or every 15 s). It sits over the
+  stays, and carries on as soon as the browser says it's back (or every 15 s). A download that
+  goes quiet with no error (a connection that died without saying so, the browser still
+  "online") is dropped once nothing has come for those 8 s and started again the same way,
+  the files already kept not asked for again; before, it was waited on for ever, the bar
+  stuck where it was until a reload. (Amended 2026-11-16.) It sits over the
   page, so nothing moves for it; it only shows while something is downloading. Settings says
   only how it ended ("Saved on this device: works offline."). Skipped with Data Saver on, or
   without room. (Amended 2026-11-12: the progress was a line in Settings.)
@@ -98,6 +102,11 @@ download. The person waited for ~90 MB before they could touch anything, every f
 - `e2e/start.spec.ts`: the app shows and a suggestion opens landed with the word list held
   back; a typed search shows progress, then its words; a second visit downloads no data.
   `e2e/built/offline.spec.ts`: the published build opens and works offline after one visit.
+
+- `test/keep-all.test.ts`, `e2e/download-bar.spec.ts`: a background download that goes quiet
+  is dropped after the stall time and started again; the bar finishes with no reload (without
+  the fix it read "Downloading 99% · No connection" for good: the last file is the smallest,
+  so a stall in it shows as 99%).
 
 ## Open questions
 

@@ -9,6 +9,7 @@
  */
 import { openSource, type ByteSource } from "../src/definitions";
 import type { DataFile } from "../src/starter";
+import { STALL_MS } from "./connection";
 
 export const DATA_CACHE = "dictionarius-data";
 
@@ -73,11 +74,14 @@ export async function definitionsSource(url: string, file: DataFile | undefined)
 /** Keeps `urls` on the device, fetched in turn at low priority (others' requests go
  *  first), skipping those it has; then lets go of every other file but `alsoKeep`.
  *  `progress` hears the share of `bytes` in, while it's downloading: with every file kept
- *  already it hears nothing. Throws if a file can't be fetched or kept. */
+ *  already it hears nothing. Throws if a file can't be fetched or kept, or when nothing of
+ *  it has come for `stallMs` (a connection that died without saying so sends no error: the
+ *  download is dropped, nothing of that file kept, so the caller can start again). */
 export async function keepAll(
   files: readonly { url: string; bytes: number }[],
   alsoKeep: readonly string[],
   progress: (share: number) => void,
+  { stallMs = STALL_MS }: { stallMs?: number } = {},
 ): Promise<void> {
   const store = await deviceStore();
   if (!store) throw new Error("no Cache Storage");
@@ -85,19 +89,33 @@ export async function keepAll(
   let done = 0;
   for (const { url, bytes } of files) {
     if (!(await store.match(url, { ignoreVary: true }))) {
-      const response = await fetch(url, { priority: "low" } as RequestInit);
-      if (!response.ok || !response.body) throw new Error(`HTTP ${response.status} for ${url}`);
-      let seen = 0;
-      const counted = response.body.pipeThrough(
-        new TransformStream<Uint8Array, Uint8Array>({
-          transform(chunk, out) {
-            seen += chunk.byteLength;
-            progress(Math.min(1, (done + seen) / total));
-            out.enqueue(chunk);
-          },
-        }),
-      );
-      await store.put(url, new Response(counted, { headers: response.headers }));
+      // Dropped when nothing has come for `stallMs`: no answer yet, or no more of its bytes.
+      const dropped = new AbortController();
+      let quiet: ReturnType<typeof setTimeout> | undefined;
+      const heard = () => {
+        clearTimeout(quiet);
+        quiet = setTimeout(() => dropped.abort(new Error(`${url}: stalled, nothing in for ${stallMs} ms`)), stallMs);
+      };
+      heard();
+      try {
+        const response = await fetch(url, { priority: "low", signal: dropped.signal } as RequestInit);
+        if (!response.ok || !response.body) throw new Error(`HTTP ${response.status} for ${url}`);
+        let seen = 0;
+        const counted = response.body.pipeThrough(
+          new TransformStream<Uint8Array, Uint8Array>({
+            transform(chunk, out) {
+              heard();
+              seen += chunk.byteLength;
+              progress(Math.min(1, (done + seen) / total));
+              out.enqueue(chunk);
+            },
+            flush: () => clearTimeout(quiet), // all in: the device takes its time writing it
+          }),
+        );
+        await store.put(url, new Response(counted, { headers: response.headers }));
+      } finally {
+        clearTimeout(quiet);
+      }
       progress(Math.min(1, (done + bytes) / total));
     }
     done += bytes;

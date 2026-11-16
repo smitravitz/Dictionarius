@@ -16,8 +16,9 @@ export interface Sample {
 const WINDOW_MS = 5000;
 /** Less than this to judge by, and it says nothing yet. */
 const LEAST_MS = 1000;
-/** Nothing in for this long: no connection. */
-const STALL_MS = 8000;
+/** Nothing in for this long: no connection. The download itself is dropped at the same
+ *  moment, to be started again (web/data-cache.ts, keepAll). */
+export const STALL_MS = 8000;
 /** At least this fast (bytes a second): the 34 MB dictionary in about half a minute. */
 const FAST = 1_000_000;
 /** At least this: a few minutes. Below it, very slow. */
