@@ -34,6 +34,7 @@ import { TapOff } from "./tap-off";
 import { placeToKeep, placeToRestore, type Place } from "./place";
 import { Capacitor } from "@capacitor/core";
 import { AS_APP, SHELL } from "./shell";
+import { keepUpWithNewBuilds } from "./update";
 import { offerInstall } from "./install";
 import { setUpTheme } from "./theme";
 import { keepOnDevice } from "./keep-on-device";
@@ -247,9 +248,28 @@ const safe = () => filters["safe-search"] === true;
 let toKeep: Extract<FromWorker, { type: "starter" }> | null = null;
 
 // The published web app keeps the page itself on the device, to open offline (web/sw.js,
-// written by the web build only). Never in the app, nor while developing.
+// written by the web build only), and reloads itself into a new build once one is down
+// (web/update.ts), back at the same place (below). Never in the app, nor while developing.
+const UPDATED_KEY = "dictionarius.updated"; // this tab only: it reloaded itself into a new build
 if (import.meta.env.PROD && !Capacitor.isNativePlatform() && "serviceWorker" in navigator) {
-  navigator.serviceWorker.register("./sw.js").catch(() => {}); // a build without one: online only
+  keepUpWithNewBuilds(() => {
+    keepPlace();
+    try {
+      sessionStorage.setItem(UPDATED_KEY, "1");
+    } catch {
+      // no storage: it comes back to the start screen
+    }
+  });
+}
+/** Whether this start is the page's own reload into a new build (asked once). */
+function reloadedForNewBuild(): boolean {
+  try {
+    const was = sessionStorage.getItem(UPDATED_KEY) !== null;
+    sessionStorage.removeItem(UPDATED_KEY);
+    return was;
+  } catch {
+    return false;
+  }
 }
 // Installed, it asks the browser to keep its storage for good: the settings, the place and
 // the dictionary kept on the device aren't cleared when the device runs short of space.
@@ -1028,7 +1048,9 @@ watchScreens(); // the start screen's first frame has the tour's note in place, 
 // does) and as it goes to the background, and restored on the next start, so that when the
 // phone closes it in the background (cheap phones do, often) it comes back to the same
 // search, scroll and word. As it changes, not only on the way out: a WebView may never hear
-// it was hidden before the kill. A page in a browser tab that's reloaded starts fresh.
+// it was hidden before the kill. A page in a browser tab that's reloaded starts fresh,
+// except when it reloaded itself into a new build (web/update.ts): that wasn't the person's
+// doing, so it comes back to their place too, kept just before.
 const PLACE_KEY = "dictionarius.place";
 let scrollToFinish: number | null = null; // how far down the list goes once its rows are in
 /** Where the person left the list while a tour show has it moved, or null: the place kept is
@@ -1108,6 +1130,8 @@ if (AS_APP) {
   scroller.addEventListener("scroll", placeChanged, { passive: true });
   input.addEventListener("input", placeChanged);
   new MutationObserver(placeChanged).observe(document.getElementById("app")!, { attributes: true, attributeFilter: ["hidden"], subtree: true });
+}
+if (reloadedForNewBuild() || AS_APP) {
   const place = placeToRestore(read(PLACE_KEY), Date.now());
   forget(PLACE_KEY); // once: a later start is fresh unless it's kept again
   if (place?.word) void restoreWord({ ...place, word: place.word });

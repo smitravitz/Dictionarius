@@ -24,7 +24,7 @@ built from the English Wiktionary dump by `scripts/build_fm_index.py`.
 | Path | What |
 |---|---|
 | `src/` | Search engine, definitions reader, filters (runs in the worker; unit-tested) |
-| `web/` | The page: `main.ts`, the worker `search-worker.ts`, the data worker `data-worker.ts`, gestures, loading screen `loader.ts`, service worker `sw.js`, which shell it runs in `shell.ts`, light/dark `theme.ts` (+ `theme-boot.js`), the web app's icons `icons/` |
+| `web/` | The page: `main.ts`, taking up a new build `update.ts`, the worker `search-worker.ts`, the data worker `data-worker.ts`, gestures, loading screen `loader.ts`, service worker `sw.js`, which shell it runs in `shell.ts`, light/dark `theme.ts` (+ `theme-boot.js`), the web app's icons `icons/` |
 | `tools/` | Vite steps: `web-data.ts` (starter, gzipped list), `web-app.ts` (manifest, icons, service worker), `theme-script.ts`; `make-icons.ts` draws `web/icons/` from `docs/brand/icon.svg` |
 | `scripts/` | Python data pipeline, `setup-release.sh`, privacy audit |
 | `e2e/` | Playwright tests (desktop + phone) against `test/fixtures` sample data; `e2e/built/` the published build, `e2e/live/` the Pages site itself |
@@ -104,8 +104,11 @@ built from the English Wiktionary dump by `scripts/build_fm_index.py`.
 - Installable web app (ADR-0009, released in v0.7.2): a manifest and icons (web build only),
   Install in Settings where the browser offers it; installed, it behaves like the Android app
   (Back word → results → start screen → out, place kept, straight back to a word that was open),
-  decided in `web/shell.ts`; once kept, the page opens from the device at once and a new build
-  from the next start. Also for every build: a light/dark switch
+  decided in `web/shell.ts`; once kept, the page opens from the device at once. A new build
+  (branch `reload-into-new-build`, unreleased, stacked on `restart-stalled-download`): the open
+  page reloads itself into it once it's down, at the same search or word, hands off first
+  (`web/update.ts`); released builds up to v0.7.6 open a new build only from the next start
+  with every tab closed, so the release that brings this in arrives that old way, once. Also for every build: a light/dark switch
   at the top right of Settings (dark by default everywhere; light kept once picked), and "Still downloading"
   with dots on a word's page whose definitions are on their way ("Still loading" in the app);
   with no network it says so instead, and fills in once the signal's back (ADR-0005, "On a
