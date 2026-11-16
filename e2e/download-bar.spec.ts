@@ -168,13 +168,34 @@ test("Settings says only how it ended, not how far along it is", async ({ page }
   await expect(note).toBeVisible();
 });
 
+/** How many files the device's store held as the page started, before the app could add any
+ *  (an init script runs before the app's own). Read after the page has loaded. */
+async function noteKeptAtStart(page: Page) {
+  await page.addInitScript(() => {
+    (window as unknown as { keptAtStart: Promise<number> }).keptAtStart = caches
+      .open("dictionarius-data")
+      .then((store) => store.keys())
+      .then((keys) => keys.length)
+      .catch(() => -1);
+  });
+}
+const keptAtStart = (page: Page) => page.evaluate(() => (window as unknown as { keptAtStart: Promise<number> }).keptAtStart);
+
 test("with the dictionary already on the device, the bar never shows", async ({ page }) => {
   await network(page);
   await open(page);
   await expect(page.locator("#download-text")).toHaveText("Downloaded · works offline", { timeout: 30_000 });
   await recordBar(page);
+  await noteKeptAtStart(page);
   await page.reload();
   await expect(page.locator("#status")).toHaveText(/^[\d,]+ words$/);
+  // The precondition, checked rather than assumed: the dictionary is on the device as the page
+  // starts again. Playwright's WebKit empties the device's store on every reload (measured in
+  // CI on 2026-11-16: 30 reloads of 30, before and after PR 18, every file downloaded again),
+  // so there this visit isn't the one the test is about; it used to pass there only when the
+  // download beat the bar, and failed on main when it didn't.
+  test.skip((await keptAtStart(page)) === 0, "this browser kept nothing on the device across the reload");
+  expect(await keptAtStart(page), "the dictionary is on the device as the page starts").toBeGreaterThan(0);
   await page.waitForTimeout(1500);
   expect((await barFrames(page)).filter((f) => f.shown)).toEqual([]);
 });
