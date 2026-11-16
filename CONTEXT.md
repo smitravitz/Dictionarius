@@ -140,8 +140,9 @@ decision or module makes it load-bearing.
   the results and a word's page (the trail is one step); in a tab, the results and a word's
   page. Going somewhere by hand takes the steps it left out of the history, so Back never does
   nothing.
-- **Install** — Settings' button where the browser offers to install the page
-  (`web/install.ts`); the manifest and icons are the web build's (`tools/web-app.ts`,
+- **Install** — the browser's own to offer (its menu or address bar; on iPhone, Share → Add
+  to Home Screen): the app has no Install button of its own, in Settings or anywhere, and
+  never holds the browser's offer back; the manifest and icons are the web build's (`tools/web-app.ts`,
   `web/icons/` from `tools/make-icons.ts`).
 - **Theme** — light or dark: dark on every device, unless the person picks light with the
   switch at the top right of Settings (`web/theme.ts`, `web/theme-choice.ts`); only light is

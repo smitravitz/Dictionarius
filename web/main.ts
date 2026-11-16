@@ -35,7 +35,6 @@ import { placeToKeep, placeToRestore, type Place } from "./place";
 import { Capacitor } from "@capacitor/core";
 import { AS_APP, SHELL } from "./shell";
 import { keepUpWithNewBuilds } from "./update";
-import { offerInstall } from "./install";
 import { setUpTheme } from "./theme";
 import { keepOnDevice } from "./keep-on-device";
 
@@ -277,8 +276,6 @@ function reloadedForNewBuild(): boolean {
 // (Chromium grants it to an installed app without asking; Firefox may ask once.) A tab
 // doesn't ask: the person never chose to keep it; the Android app's storage is its own.
 if (SHELL === "installed") void navigator.storage?.persist?.().catch(() => false);
-// And where the browser offers to install it, Settings has Install (web/install.ts).
-offerInstall($("install"), $<HTMLButtonElement>("install-button"), AS_APP);
 
 let shown = false; // the word count and filters, from the starter or the word list
 let arrived = 0; // how much of the word list is in, 0 to 1 (a browser, while it comes)
