@@ -3,7 +3,7 @@ import { normalize } from "./normalize";
 
 /**
  * Reading safe search's hand-picked list (data/safe-search.list): words to allow or
- * block, and pieces that hide every word containing them, on top of the rule
+ * block, and fragments that hide every word containing them, on top of the rule
  * in docs/index-format.md#safe-search. The index
  * builder applies it too; applying it again here means an edit reaches the
  * app without rebuilding the index. Words are stored encoded (ROT13, then

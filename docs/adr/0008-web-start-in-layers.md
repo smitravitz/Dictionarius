@@ -33,7 +33,7 @@ download. The person waited for ~90 MB before they could touch anything, every f
    once, but counts and the frequency graph would change when the full list arrives, and the
    index format and builder would need a second list. Kept in reserve if the wait for typed
    searches is still too long.
-3. **Splitting the index by first letter**: doesn't work; a search finds a piece anywhere in
+3. **Splitting the index by first letter**: doesn't work; a search finds a fragment anywhere in
    a word, so every search needs every word.
 4. **A search server**: breaks offline use and the privacy budget.
 

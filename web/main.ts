@@ -12,7 +12,7 @@ import { OffsetSlider } from "./offset-slider";
 import { ScrollerGestures } from "./scroller-gestures";
 import { TapAway } from "./tap-away";
 import { setUpNativeShell } from "./native";
-import { LANES, PIECES, lanesOf, tileWeight } from "./examples";
+import { LANES, FRAGMENTS, lanesOf, tileWeight } from "./examples";
 import { FILTERS, describeRange, filterKey, type FilterInfo, type Range } from "../src/filters";
 import { loadFilters, saveFilter } from "./saved-filters";
 import { FiltersPanel } from "./filters-panel";
@@ -520,7 +520,7 @@ function describe() {
   if (!counts) return;
   const q = `“${query}”`;
   if (counts.occurrences === 0) {
-    summary.textContent = `No word contains ${q}. Try a shorter piece.`;
+    summary.textContent = `No word contains ${q}. Try a shorter fragment.`;
     return;
   }
   if (counts.total === 0) {
@@ -832,34 +832,34 @@ for (const panel of panels) {
 
 // The suggestions on the start screen (web/examples.ts): two lanes drifting
 // slowly opposite ways, shuffled each start; tapping one searches for it and
-// opens its words around the middle. A tile is a little bigger for a piece
+// opens its words around the middle. A tile is a little bigger for a fragment
 // that finds more words, and its letters lean a little (the tiles stay level).
 // Each lane holds its tiles twice, the second set hidden from screen readers,
 // so the drift loops without a seam.
 const examples = $("examples");
 const TILTS = [-1.5, 1, -0.5, 1.5, -1, 0.5, -1.5, 0.5, -0.5, 1];
-const pieceCounts = PIECES.map(([, words]) => words);
+const fragmentCounts = FRAGMENTS.map(([, words]) => words);
 const DRIFT = 16; // px per second: slow enough to read, quick enough to notice
 
-function tile(piece: string, words: number, i: number, copy: boolean): HTMLButtonElement {
+function tile(fragment: string, words: number, i: number, copy: boolean): HTMLButtonElement {
   const button = document.createElement("button");
   button.type = "button";
   button.className = "tile";
-  button.dataset.query = piece;
+  button.dataset.query = fragment;
   if (copy) button.tabIndex = -1;
-  button.style.setProperty("--k", tileWeight(words, pieceCounts).toFixed(3));
+  button.style.setProperty("--k", tileWeight(words, fragmentCounts).toFixed(3));
   button.style.setProperty("--tilt", `${TILTS[i % TILTS.length]}deg`);
   const face = document.createElement("span");
   face.className = "tile-face";
   const text = document.createElement("span");
   text.className = "tile-text";
-  text.textContent = piece;
+  text.textContent = fragment;
   face.append(text);
   button.append(face);
   return button;
 }
 
-lanesOf(PIECES, LANES).forEach((pieces, lane) => {
+lanesOf(FRAGMENTS, LANES).forEach((fragments, lane) => {
   const box = document.createElement("div");
   box.className = "lane";
   const track = document.createElement("div");
@@ -868,7 +868,7 @@ lanesOf(PIECES, LANES).forEach((pieces, lane) => {
     const set = document.createElement("div");
     set.className = "tile-set";
     if (copy) set.setAttribute("aria-hidden", "true");
-    pieces.forEach(([piece, words], i) => set.append(tile(piece, words, i + lane * 5, copy)));
+    fragments.forEach(([fragment, words], i) => set.append(tile(fragment, words, i + lane * 5, copy)));
     track.append(set);
   }
   box.append(track);
@@ -1002,7 +1002,7 @@ const coach = new Coach(
   tourShows({
     hands,
     touch: $("coach-touch"),
-    pieces: examples,
+    fragments: examples,
     scroller,
     funnel: $("filters-open"),
     filters: $<HTMLDialogElement>("filters"),
@@ -1041,7 +1041,7 @@ const screenNow = (): Screen => (!intro.hidden ? "start" : !frame.hidden ? "resu
 const watchScreens = () => {
   updateNav();
   const screen = screenNow();
-  if (screen === "results") coach.did("searched"); // a piece or a typed search: the list is up
+  if (screen === "results") coach.did("searched"); // a fragment or a typed search: the list is up
   coach.on(screen);
 };
 new MutationObserver(watchScreens).observe(document.getElementById("app")!, { attributes: true, attributeFilter: ["hidden"], subtree: true });

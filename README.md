@@ -10,7 +10,7 @@ Type `eren` and get *serene*, *coherent*, *adherence*: every word with your lett
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/app-dark.png">
-  <img src="docs/screenshots/app-light.png" alt="Four phone screens: the start screen with its search field and drifting pieces; a search for 'eren' with the slider's histogram showing 4 letters before the piece; a held word's meanings peeking over the list; the full entry for 'serene' with pronunciations, meanings and examples.">
+  <img src="docs/screenshots/app-light.png" alt="Four phone screens: the start screen with its search field and drifting fragments; a search for 'eren' with the slider's histogram showing 4 letters before the fragment; a held word's meanings peeking over the list; the full entry for 'serene' with pronunciations, meanings and examples.">
 </picture>
 
 **[Open it in your browser](https://smitravitz.github.io/Dictionarius/)** · **[Get the Android app](#android)**
@@ -18,8 +18,8 @@ Type `eren` and get *serene*, *coherent*, *adherence*: every word with your lett
 ## ✨ Features
 
 - ⚡ **Instant.** Results appear as you type: the first screen in about a millisecond across all 1,357,380 words, with no server to wait for (measured under **How it works**).
-- 🔎 **Search inside words.** Any piece of a word finds every word containing it, lined up on your letters: the exact word, then words that start with it, then those with one letter before it, two, and so on. A summary counts how many start with, end with and contain it.
-- ↔️ **Slide to move the piece.** Hold the space beside a word and slide to jump to words where your letters land later or earlier; a frequency graph shows how many there are at each place. Alt+←/→ does the same from a keyboard.
+- 🔎 **Search inside words.** Any fragment of a word finds every word containing it, lined up on your letters: the exact word, then words that start with it, then those with one letter before it, two, and so on. A summary counts how many start with, end with and contain it.
+- ↔️ **Slide to move the fragment.** Hold the space beside a word and slide to jump to words where your letters land later or earlier; a frequency graph shows how many there are at each place. Alt+←/→ does the same from a keyboard.
 - 👀 **Peek.** Hold a word for its first meanings; let go and they're gone.
 - 📚 **Full entries.** Tap a word for its meanings, an example of each in use, pronunciation and origin. Words inside a definition open their own entries, and a swipe (or the back and forward buttons) steps through the words you followed.
 - 🎚️ **Filters and settings.** Word length with two roller wheels; safe search, phrases and names in Settings (common words only by default).
@@ -41,7 +41,7 @@ Needs Android 7.0 or later. Add `https://github.com/smitravitz/Dictionarius` to 
 
 ## ⚙️ How it works
 
-Search runs on an **FM-index**, a compressed index that *is* the word list, so finding a piece anywhere in a word costs no more than finding its start. There's no server and no database to wait for:
+Search runs on an **FM-index**, a compressed index that *is* the word list, so finding a fragment anywhere in a word costs no more than finding its start. There's no server and no database to wait for:
 
 | Searching all 1,357,380 words | Median | Slowest |
 |---|---|---|

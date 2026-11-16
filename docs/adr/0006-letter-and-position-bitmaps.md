@@ -50,35 +50,35 @@ cost grows with every pack. It would trade away the brand to save code.
 
 1. **Letters only (a letter-mask column).** Cheap and covers "contains / doesn't contain".
    No positions, so no patterns. Kept as step 1 of the chosen option.
-2. **Hybrid: the FM-index for pieces; bitmaps for letters and positions, compiled into the
+2. **Hybrid: the FM-index for fragments; bitmaps for letters and positions, compiled into the
    one filter** (chosen).
 3. **Bitmaps only** (bit-sliced positional columns doing substring search as well, after
    O'Neil & Quass 1997 and BitWeaving, Li & Patel 2013). One primitive for everything,
    counts instant, ids free to follow rank order. But every keystroke scans the pack
-   (about 19M word operations for a three-letter piece over 1.36M words: a few ms on a
+   (about 19M word operations for a three-letter fragment over 1.36M words: a few ms on a
    desktop, 10–25 ms estimated on a phone, unmeasured), the cost grows linearly with each
    pack, and ends-with needs a second set of planes. Rejected: it gives up the instant,
    any-size search the app is built on.
-4. **Every substring in a hash table** (true O(1) lookup of any piece). About 70M+
+4. **Every substring in a hash table** (true O(1) lookup of any fragment). About 70M+
    distinct substrings: hundreds of MB. Rejected.
 
 ## Decision
 
 ### 1. The FM-index stays the search engine
 
-Pieces (mid-word, prefix, ends-with), the order of results (position, then rank) and the
+Fragments (mid-word, prefix, ends-with), the order of results (position, then rank) and the
 per-position counts stay with the FM-index, unchanged. Loading it stays the only thing
 between opening the app and the first search.
 
 ### 2. Conditions compile into the one filter
 
-A search is `piece ∧ condition`, where `condition` is a boolean expression over atoms:
+A search is `fragment ∧ condition`, where `condition` is a boolean expression over atoms:
 the existing column filters (length, frequency, names, safe search), plus the new letter
 and position atoms. The expression compiles to one bitmap (bitwise AND / OR / NOT over
 42,418 32-bit words per operand for 1.36M words) and joins `WordFilter`'s union. It's built
 when the condition changes, never per keystroke.
 
-With no piece typed, a condition alone defines the list: its count is a popcount of the
+With no fragment typed, a condition alone defines the list: its count is a popcount of the
 compiled bitmap, and its words are listed in id order (alphabetical; see open questions).
 
 ### 3. Letters and their counts: columns, bitmaps built from them
@@ -151,15 +151,15 @@ Bench scripts beside `bench/definitions_packing.py`, on a full build; results re
 - `WordFilter` becomes the meeting point of every condition: column filters, letters,
   patterns. New conditions of the same shape (rhymes, syllable counts, letter counts) join
   the same way: a set over ids, compiled once.
-- Two engines to keep in step (pieces in the FM-index, conditions in bitmaps), joined by
+- Two engines to keep in step (fragments in the FM-index, conditions in bitmaps), joined by
   word ids, which ADR-0005 already makes the spine.
-- Conditions with two pieces (`eat` and `ion`) stay costly: the second piece has to be
+- Conditions with two fragments (`eat` and `ion`) stay costly: the second fragment has to be
   listed in full to become a set (about the time counting it takes today). Offered as an
   explicit "and also contains" step, cached, not computed per keystroke.
 
 ## Open questions
 
-- Order of a condition-only list (no piece typed): alphabetical by id is free; by rank
+- Order of a condition-only list (no fragment typed): alphabetical by id is free; by rank
   needs a sort of the set (or a rank-ordered id permutation, about 5 MB).
 - What the spare flag bit holds.
 - The filter menu's controls for letters, counts and patterns (a letter grid, chips, a

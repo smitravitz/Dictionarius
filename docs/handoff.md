@@ -192,7 +192,7 @@ built from the English Wiktionary dump by `scripts/build_fm_index.py`.
    On the phone, confirm reading in place (ADR-0005): `adb shell dumpsys meminfo
    io.github.smitravitz.dictionarius` should show about 57 MB less than v0.5.x, and a
    word page should still feel instant (Chromium: 85–97 ms for an uncached block).
-4. Check the newer suggestion pieces in `web/examples.ts` against real word counts.
+4. Check the newer suggestion fragments in `web/examples.ts` against real word counts.
 5. ADR-0006 gates: the `LTRS` letter column first, then the positions layer and the
    letter keyboard / pattern field.
 6. ADR-0007 (planning only, nothing started): pronunciations for the 92.7% of words

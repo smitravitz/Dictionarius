@@ -8,10 +8,10 @@ import { Completer } from "../src/complete";
 import { defaultFilters } from "../src/filters";
 import { SAFE_SEARCH_OVERRIDES } from "../src/safe-search-overrides";
 import { buildStarter, type DataFile, type Starter } from "../src/starter";
-import { PIECES } from "../web/examples";
+import { FRAGMENTS } from "../web/examples";
 
 export function makeStarter(indexBytes: Uint8Array, files: Record<string, DataFile>): Starter {
   const index = HeadwordIndex.fromBytes(indexBytes);
   const completer = new Completer(index, SAFE_SEARCH_OVERRIDES);
-  return buildStarter(index, completer, PIECES.map(([piece]) => piece), defaultFilters(), files);
+  return buildStarter(index, completer, FRAGMENTS.map(([fragment]) => fragment), defaultFilters(), files);
 }

@@ -2,9 +2,9 @@
  * The first-run tour's shows (web/coach.ts runs one per step): each step acted out on the
  * real screen, quickly, then asked for until the coach stops it. What to touch is *lit*: a
  * see-through wash drawn by the thing itself (its ::before; styles.css), so it moves with it
- * in the same frame (a drifting piece, a scrolling row), and only ever fades or pulses.
+ * in the same frame (a drifting fragment, a scrolling row), and only ever fades or pulses.
  *
- * - searched: the pieces on screen lit in turn, in no particular order, as they drift.
+ * - searched: the fragments on screen lit in turn, in no particular order, as they drift.
  * - scrubbed: an empty space has nothing to light, so a touch shows it: it presses beside a
  *   word, the real slider opens by itself, and the touch slides out and back, the histogram
  *   and the list following it frame by frame; then it lets go, the list put back where it
@@ -29,8 +29,8 @@ export interface ShowParts {
   hands: Hands;
   /** The touch that shows where to hold for the slider. */
   touch: HTMLElement;
-  /** The pieces on the start screen. */
-  pieces: HTMLElement;
+  /** The fragments on the start screen. */
+  fragments: HTMLElement;
   /** The results list's scrolling box. */
   scroller: HTMLElement;
   funnel: HTMLElement;
@@ -199,7 +199,7 @@ function onHandsOn(signal: AbortSignal, fn: () => void): () => void {
 }
 
 export function tourShows(parts: ShowParts): Record<TourEvent, Show> {
-  const { hands, pieces, scroller, slider } = parts;
+  const { hands, fragments, scroller, slider } = parts;
 
   /** Lights one of what `offered()` gives at a time, each for a while: in no particular
    *  order (each once before any again), or top to bottom. Moves on early when the lit one
@@ -280,20 +280,20 @@ export function tourShows(parts: ShowParts): Record<TourEvent, Show> {
   }
 
   const searched: Show = (stage) => {
-    // The pieces wholly on screen, as they drift.
+    // The fragments wholly on screen, as they drift.
     const tiles = () => {
-      const view = pieces.getBoundingClientRect();
+      const view = fragments.getBoundingClientRect();
       const left = Math.max(view.left, 0) + 8;
       const right = Math.min(view.right, window.innerWidth) - 8;
-      return [...pieces.querySelectorAll<HTMLElement>(".tile-face")].filter((face) => {
+      return [...fragments.querySelectorAll<HTMLElement>(".tile-face")].filter((face) => {
         const box = face.getBoundingClientRect();
         return box.width > 0 && box.left >= left && box.right <= right;
       });
     };
     lightInTurn(stage.signal, tiles);
     const clear = () => {
-      const bag = pieces.getBoundingClientRect();
-      stage.keepClear({ top: bag.top, bottom: bag.bottom }); // the note goes above the pieces
+      const bag = fragments.getBoundingClientRect();
+      stage.keepClear({ top: bag.top, bottom: bag.bottom }); // the note goes above the fragments
     };
     clear();
     window.addEventListener("resize", clear, { signal: stage.signal });

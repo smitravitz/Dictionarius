@@ -11,10 +11,10 @@ export interface Control {
 
 /** How It Works: the help sheet's list. */
 export const CONTROLS: readonly Control[] = [
-  { how: "Tap a piece", does: "to find every word containing it" },
+  { how: "Tap a fragment", does: "to find every word containing it" },
   { how: "Tap a word", does: "to open its full entry" },
   { how: "Hold a word", does: "to peek at its meaning" },
-  { how: "Hold beside a word, then slide", does: "to move where the piece lands mid-word" },
+  { how: "Hold beside a word, then slide", does: "to move where the fragment lands mid-word" },
   { how: "Tap the funnel", does: "to filter words by length" },
   { how: "Tap the cog", does: "to choose what the list shows, like safe search" },
   { how: "Back", does: "returns you to your list, right where you left it" },
@@ -34,8 +34,8 @@ export interface TourStep {
 
 /** The first-run tour: each step shown, then asked for; the next only once it's done. */
 export const TOUR: readonly TourStep[] = [
-  { event: "searched", screen: "start", how: "Tap a piece below", does: "to search for it and open every word with it inside:" },
-  { event: "scrubbed", screen: "results", how: "Hold beside a word, then slide", does: "to move where the piece lands mid-word:" },
+  { event: "searched", screen: "start", how: "Tap a fragment below", does: "to search for it and open every word with it inside:" },
+  { event: "scrubbed", screen: "results", how: "Hold beside a word, then slide", does: "to move where the fragment lands mid-word:" },
   { event: "peeked", screen: "results", how: "Press & Hold a word", does: "to peek at what it means:" },
   { event: "filtered", screen: "results", how: "Tap the funnel", does: "to filter words by length:" },
   { event: "set", screen: "results", how: "Tap the cog", does: "to choose what the list shows, like safe search:" },

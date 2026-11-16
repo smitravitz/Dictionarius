@@ -7,10 +7,10 @@ import { CONTROLS, ShuffleBag, TOUR, Tour } from "../web/guide";
 describe("How It Works", () => {
   it("lists every control: what to do, then what it's for, read as one sentence", () => {
     expect(CONTROLS.map((c) => [c.how, c.does])).toEqual([
-      ["Tap a piece", "to find every word containing it"],
+      ["Tap a fragment", "to find every word containing it"],
       ["Tap a word", "to open its full entry"],
       ["Hold a word", "to peek at its meaning"],
-      ["Hold beside a word, then slide", "to move where the piece lands mid-word"],
+      ["Hold beside a word, then slide", "to move where the fragment lands mid-word"],
       ["Tap the funnel", "to filter words by length"],
       ["Tap the cog", "to choose what the list shows, like safe search"],
       ["Back", "returns you to your list, right where you left it"],
@@ -22,8 +22,8 @@ describe("How It Works", () => {
 describe("the tour", () => {
   it("asks for five things, in this order, in these words", () => {
     expect(TOUR.map((s) => [s.event, s.screen, `${s.how} ${s.does}`])).toEqual([
-      ["searched", "start", "Tap a piece below to search for it and open every word with it inside:"],
-      ["scrubbed", "results", "Hold beside a word, then slide to move where the piece lands mid-word:"],
+      ["searched", "start", "Tap a fragment below to search for it and open every word with it inside:"],
+      ["scrubbed", "results", "Hold beside a word, then slide to move where the fragment lands mid-word:"],
       ["peeked", "results", "Press & Hold a word to peek at what it means:"],
       ["filtered", "results", "Tap the funnel to filter words by length:"],
       ["set", "results", "Tap the cog to choose what the list shows, like safe search:"],

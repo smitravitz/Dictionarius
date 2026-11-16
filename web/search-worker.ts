@@ -21,7 +21,7 @@ import { definitionsSource, forget } from "./data-cache";
 import { starterUrl } from "../src/starter";
 import { landingRow, landingWindow } from "../src/landing";
 import { PAGE_SIZE, type FromWorker, type ToWorker } from "./protocol";
-import { PIECES } from "./examples";
+import { FRAGMENTS } from "./examples";
 
 /** Background counting runs in slices this long, so requests aren't held up. */
 const COUNT_SLICE_MS = 12;
@@ -209,7 +209,7 @@ function fromStarter(data: Extract<ToWorker, { type: "search" }>): boolean {
 }
 
 function sendStarterRows(seq: number, query: string, from: number, items: Suggestion[]) {
-  const counts = starter!.pieces[query].counts;
+  const counts = starter!.fragments[query].counts;
   scope.postMessage({ type: "rows", seq, query, from, items, known: counts.total ?? 0, complete: true, counts });
 }
 
@@ -356,12 +356,12 @@ function countAhead() {
     aheadFilters = key;
   }
   const slice = () => {
-    const piece = PIECES.map(([p]) => normalize(p)).find((q) => !ahead.get(q)?.complete);
-    if (piece === undefined || !completer || aheadFilters !== filterKey(filters)) return;
-    let m = ahead.get(piece);
+    const fragment = FRAGMENTS.map(([p]) => normalize(p)).find((q) => !ahead.get(q)?.complete);
+    if (fragment === undefined || !completer || aheadFilters !== filterKey(filters)) return;
+    let m = ahead.get(fragment);
     if (!m) {
-      m = completer.search(piece, { filters });
-      ahead.set(piece, m);
+      m = completer.search(fragment, { filters });
+      ahead.set(fragment, m);
     }
     const started = performance.now();
     while (!m.complete && performance.now() - started < COUNT_SLICE_MS) m.count(20_000);

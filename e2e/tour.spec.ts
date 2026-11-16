@@ -23,7 +23,7 @@ test.describe.configure({ timeout: 60_000 + LOAD_MS });
 
 type Motion = "reduce" | "no-preference";
 
-/** A first start. With reduced motion the start screen is still (a piece can be tapped),
+/** A first start. With reduced motion the start screen is still (a fragment can be tapped),
  *  nothing is acted out and the highlight doesn't pulse. */
 async function firstRun(page: Page, motion: Motion = "reduce") {
   await page.emulateMedia({ reducedMotion: motion });
@@ -63,7 +63,7 @@ async function middle(page: Page, selector: string) {
   return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
 }
 
-/** Step 1, by typing (the pieces drift when motion is on); the keyboard put away. */
+/** Step 1, by typing (the fragments drift when motion is on); the keyboard put away. */
 async function searchByTyping(page: Page) {
   await page.locator("#q").fill("ate");
   await page.locator("#q").blur();
@@ -156,15 +156,15 @@ test("a first run is shown five things, one at a time, and moves on as each is d
   await firstRun(page);
   await expect(card(page)).toBeVisible();
   await expect(count(page)).toHaveText("1 of 5");
-  await expect(words(page)).toHaveText("Tap a piece below to search for it and open every word with it inside:");
+  await expect(words(page)).toHaveText("Tap a fragment below to search for it and open every word with it inside:");
 
-  // 1. A piece, lit where it is: its list opens.
+  // 1. A fragment, lit where it is: its list opens.
   await expect(lit(page)).toHaveCount(1);
   expect(await lit(page).evaluate((el) => !!el.closest("#examples .tile"))).toBe(true);
   await lit(page).click();
   await expect(page.locator("#frame")).toBeVisible();
   await expect(count(page)).toHaveText("2 of 5");
-  await expect(words(page)).toHaveText("Hold beside a word, then slide to move where the piece lands mid-word:");
+  await expect(words(page)).toHaveText("Hold beside a word, then slide to move where the fragment lands mid-word:");
 
   // 2. Hold where the touch shows, beside a word, and slide: the slider. Nothing lit: an
   // empty space doesn't say what to do; the touch and the note do.
@@ -266,7 +266,7 @@ test("nothing new shows while the person is still holding: the next step waits f
   await expect(page.locator('#filters-open[data-tour-lit="on"]')).toHaveCount(1);
 });
 
-test("the start screen's highlight is drawn by the piece itself, so it moves with it", async ({ page }) => {
+test("the start screen's highlight is drawn by the fragment itself, so it moves with it", async ({ page }) => {
   await firstRun(page, "no-preference");
   await expect(lit(page)).toHaveCount(1);
   // On a tile inside a drifting lane: the same element the browser moves, every frame.
@@ -282,7 +282,7 @@ test("the start screen's highlight is drawn by the piece itself, so it moves wit
 test("the highlight is smooth: it only fades and pulses, eased, and never jumps", async ({ page }) => {
   test.setTimeout(90_000 + LOAD_MS);
   await firstRun(page, "no-preference");
-  // How it looks, frame by frame, from the start screen's pieces through the scrubber's show
+  // How it looks, frame by frame, from the start screen's fragments through the scrubber's show
   // and its asking, to the peek's words: every highlight's opacity changes no faster than a
   // gentle fade, so nothing pops in, out or flickers, however one hands over to the next.
   await page.evaluate(() => {
@@ -340,7 +340,7 @@ test("the highlight is smooth: it only fades and pulses, eased, and never jumps"
     };
     requestAnimationFrame(watch);
   });
-  await page.waitForTimeout(4000); // pieces, lit in turn
+  await page.waitForTimeout(4000); // fragments, lit in turn
   await searchByTyping(page);
   await afterTheShow(page); // the scrubber's touch, sliding with the histogram
   await scrubAt(page, await besideAWord(page));
@@ -422,7 +422,7 @@ test("the scrubber shows itself: a touch slides with the histogram, the list fol
   for (let i = 1; i < open.length; i++) {
     if (open[i].bar !== open[i - 1].bar) expect(open[i].touch).not.toBe(open[i - 1].touch);
   }
-  expect(new Set(open.map((f) => f.bar)).size).toBeGreaterThan(1); // the piece moved
+  expect(new Set(open.map((f) => f.bar)).size).toBeGreaterThan(1); // the fragment moved
   expect(open.some((f) => f.top !== before)).toBe(true); // and the list with it
   expect(frames.at(-1)!.top).toBe(before); // and it's back where it was
   expect(frames.slice(first).every((f) => f.step === "2 of 5")).toBe(true); // the show isn't the person's go
@@ -499,7 +499,7 @@ test("the peek step lights whole words, see-through and borderless, in no partic
   await afterTheShow(page);
 
   // Which word is lit, frame by frame from the very first, and how well its highlight
-  // covers it: the whole word (every letter, not only the piece), as much as the row shows.
+  // covers it: the whole word (every letter, not only the fragment), as much as the row shows.
   const recording = page.evaluate(async () => {
     const litLine = () => document.querySelector<HTMLElement>('.line[data-tour-lit="on"]');
     const waitUntil = performance.now() + 15_000;
@@ -611,9 +611,9 @@ test("the note is never a wall, and never covers what a step is about", async ({
   await firstRun(page);
   const view = page.viewportSize()!;
   const note = async () => (await card(page).boundingBox())!;
-  // 1: the pieces.
-  const pieces = (await page.locator("#examples").boundingBox())!;
-  expect((await note()).y + (await note()).height).toBeLessThanOrEqual(pieces.y);
+  // 1: the fragments.
+  const fragments = (await page.locator("#examples").boundingBox())!;
+  expect((await note()).y + (await note()).height).toBeLessThanOrEqual(fragments.y);
   await page.locator("#examples button.tile").first().click();
   // 2: the touch beside a word.
   await expect(touch(page)).toBeVisible({ timeout: 10_000 });
@@ -631,7 +631,7 @@ test("the start screen has no guide text of its own: the tour says it", async ({
   await firstRun(page);
   await expect(page.locator("#intro")).not.toContainText("pick one");
   await expect(page.locator(".bag-label")).toHaveCount(0);
-  await expect(page.getByRole("region", { name: "Pieces to search for" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Fragments to search for" })).toBeVisible();
 });
 
 test("the ? beside the cog shows How It Works, and Show me again starts the tour over from anywhere, filters cleared", async ({ page }) => {
@@ -658,7 +658,7 @@ test("the ? beside the cog shows How It Works, and Show me again starts the tour
   const sheet = page.locator("#help");
   await expect(sheet.getByRole("heading")).toHaveText("How It Works");
   await expect(sheet.locator("dt")).toHaveText([
-    "Tap a piece",
+    "Tap a fragment",
     "Tap a word",
     "Hold a word",
     "Hold beside a word, then slide",
@@ -670,7 +670,7 @@ test("the ? beside the cog shows How It Works, and Show me again starts the tour
     "to find every word containing it",
     "to open its full entry",
     "to peek at its meaning",
-    "to move where the piece lands mid-word",
+    "to move where the fragment lands mid-word",
     "to filter words by length",
     "to choose what the list shows, like safe search",
     "returns you to your list, right where you left it",

@@ -1,5 +1,5 @@
 # Safe search: hand-picked words to allow (always shown) or block (always
-# hidden), and pieces that hide every word containing them, on top of the
+# hidden), and fragments that hide every word containing them, on top of the
 # rule in docs/index-format.md#safe-search.
 # Encoded (ROT13, then base64) so the file isn't a readable word list.
 # Show or edit it with: python scripts/safe_search_list.py

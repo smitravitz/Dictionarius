@@ -36,7 +36,7 @@ decision or module makes it load-bearing.
   (0 = the headword starts with the typed text).
 - **Start screen** — what shows with nothing typed: a title page (the name set
   large, what Dictionarius does, a worked example, the word count), the field,
-  and the **suggestions** (`web/examples.ts`): general pieces of words, shown
+  and the **suggestions** (`web/examples.ts`): general fragments of words, shown
   plain ("tion", "ough", "ere"), in two lanes drifting slowly opposite ways,
   shuffled each start, each tile a little bigger the more words it finds.
   Tapping one opens its words around the middle of the list (**landing**,
@@ -71,13 +71,13 @@ decision or module makes it load-bearing.
   **word columns** in the index (`LEN`, `NAME`, `SHAPE`); a choice compiles to
   one **WordFilter** that every list and count goes through (ADR-0003).
 - **Tour** — what a first run is shown (`web/guide.ts`, drawn by `web/coach.ts`): five
-  things to do, in order, each moving on only when the person does it: search (tap a piece),
+  things to do, in order, each moving on only when the person does it: search (tap a fragment),
   scrub (hold beside a word and slide), **peek** (hold a word), filters (the funnel),
   settings (the cog). A note at the foot says which ("2 of 5"), never covering what it's
   about; a step done is ticked, and the next waits until the person has let go and been still
   a moment (`web/hands.ts`). Each step's **show** (`web/tour-shows.ts`) acts it out, then
   asks, by **lighting** what to touch: a see-through wash drawn by the thing itself, so it
-  moves with it, fading and breathing (opacity only). Pieces and words are lit in turn, in
+  moves with it, fading and breathing (opacity only). Fragments and words are lit in turn, in
   no particular order; a sheet's options in turn once it's open. The slider is held in empty
   space, which has nothing to light, so a **touch** shows it: it presses beside a word and
   slides out and back with the histogram, the real slider and list following, then the list

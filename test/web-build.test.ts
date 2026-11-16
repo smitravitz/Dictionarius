@@ -60,7 +60,7 @@ describe("the web build's data", () => {
       const starter = readStarter(JSON.parse(readFileSync(join(out, "headwords-sample.starter.json"), "utf8")));
       expect(starter).not.toBeNull();
       expect(starter!.words).toBe(HeadwordIndex.fromBytes(new Uint8Array(readFileSync(bin))).size);
-      expect(Object.keys(starter!.pieces).length).toBeGreaterThan(20);
+      expect(Object.keys(starter!.fragments).length).toBeGreaterThan(20);
       const named = ["headwords-sample.bin", "headwords-sample.bin.gz", "headwords-sample.definitions.bin", "headwords-sample.examples.bin"];
       for (const name of named) {
         expect(starter!.files[name], name).toEqual({ sha256: sha(join(out, name)), bytes: statSync(join(out, name)).size });

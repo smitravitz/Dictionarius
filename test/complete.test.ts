@@ -258,9 +258,9 @@ describe("Completer", () => {
       });
     });
 
-    describe("with a piece to hide wherever it appears", () => {
+    describe("with a fragment to hide wherever it appears", () => {
       // "snigger" reads as the slur in it: every word containing a blocked
-      // piece is hidden, unless it is allowed.
+      // fragment is hidden, unless it is allowed.
       const netted = new Completer(index, { contains: ["Gap"], allow: ["air gap"] });
 
       it("hides every word containing it, except allowed ones, and counts what it shows", () => {
