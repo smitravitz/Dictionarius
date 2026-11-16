@@ -75,6 +75,16 @@ showing anything. The Android app does all of these better already.
   and an open page never asks for a file of its build that's gone. (At first the page waited
   up to 2 s for the network's copy, so a new build showed at once: on a phone that wait, on
   every open, was most of the white screen before the loading screen.)
+  **Amended 2026-11-16 (the owner's call):** "from the next start" left people on an old build
+  for as long as a tab stayed open, reloads included, and an old page over newly published data
+  is a pairing no test covers. Now the open page tells a new build's worker to take over as
+  soon as its files are kept, and reloads itself into it once (`web/update.ts`): the new build
+  is what the person has moments after opening, and a tab left open looks for one each time
+  they come back to it. The reload waits for a second with no key, touch or wheel, and comes
+  back to the same search, scroll and word (the place of `web/place.ts`, for this one reload
+  in a tab too). The page still opens from the device at once. A page from before this
+  (v0.7.6 and earlier) doesn't know to reload: the release that brings this in still arrives
+  at its next start, with every tab of the old one closed; every release after it, by itself.
 - **Light or dark** (`web/theme.ts`, a switch at the top right of Settings): **dark** on every
   device, whatever the system's own setting, unless the person picks light; only light is kept
   (`dictionarius.theme`), so picking dark again goes back to the default. It sets
@@ -118,7 +128,9 @@ showing anything. The Android app does all of these better already.
   safe circle on an opaque square; the touch icon is opaque; the PNGs match the SVG.
 - `e2e/built/opening.spec.ts`: once kept, the page's first frame comes within a second with
   the network 30 s slow; a copy of the site given a new build serves the kept build at once,
-  holds the new one waiting while a page is open, and opens it from the next start; a first
+  and then reloads itself into the new one, once, at the same search or word, not under a
+  typing hand, and a tab left open does when come back to (first written as: holds the new one
+  waiting while a page is open, and opens it from the next start); a first
   visit waits for the network. Measured with the real dictionary on a 4× slowed phone, from
   asking to open to the loading screen: 1,632 ms with the network answering in 1.5 s and
   2,125 ms with it answering in 5 s, before; 150 to 295 ms after, whatever the network.

@@ -86,7 +86,7 @@ Store screenshots: Actions → Store screenshots → Run workflow, or
 word list's starter and gzipped copy, the service worker, the manifest and icons) and tests it
 served as Pages serves it: that it opens from the starter, works offline after one visit
 (ADR-0008), that Chrome finds it installable, and that once kept it opens from the device at
-once, a new build from the next start (ADR-0009). CI runs it after the main browser tests. A plain `npm run build` (the Android
+once and then reloads itself into a new build, at the same place (ADR-0009). CI runs it after the main browser tests. A plain `npm run build` (the Android
 app's) leaves these out.
 
 ### The live site
