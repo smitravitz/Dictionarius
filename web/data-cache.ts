@@ -4,7 +4,9 @@
  * address carries their hash, web/data-files.ts), so an old copy is never read for a new
  * one, and matched by address alone (a server's "Vary" headers don't make a kept copy a
  * miss). Filled as the word list is fetched, and by the data worker in the background
- * (web/data-worker.ts); read before the network. Where Cache Storage isn't there (an
+ * (web/data-worker.ts); read before the network, but never trusted over it: a kept copy of
+ * the definitions that isn't the file's size, or doesn't open, is let go of and read from the
+ * network instead (definitionsSource, forget). Where Cache Storage isn't there (an
  * insecure page, a private window that refuses it), everything comes from the network.
  */
 import { openSource, type ByteSource } from "../src/definitions";
@@ -54,6 +56,12 @@ export async function definitionsSource(url: string, file: DataFile | undefined)
     const copy = await store?.match(url, { ignoreVary: true });
     if (!copy) return null;
     const blob = await copy.blob();
+    if (blob.size !== file!.bytes) {
+      // Not the file (cut short, say): let go of, so it's read from the network and kept again.
+      console.warn(`${url}: the kept copy is ${blob.size} bytes, not ${file!.bytes}; let go of`);
+      await store!.delete(url, { ignoreVary: true }).catch(() => {});
+      return null;
+    }
     return { size: blob.size, read: async (start, end) => new Uint8Array(await blob.slice(start, end).arrayBuffer()) };
   };
   const device = await onDevice();
@@ -68,6 +76,13 @@ export async function definitionsSource(url: string, file: DataFile | undefined)
       return (local ?? network).read(start, end);
     },
   };
+}
+
+/** Lets go of the device's copy of the file at `url`; true if there was one. For a copy
+ *  that turned out not to be the file: the next read is the network's, and it's kept again. */
+export async function forget(url: string): Promise<boolean> {
+  const store = await deviceStore();
+  return (await store?.delete(url, { ignoreVary: true }).catch(() => false)) ?? false;
 }
 
 /** A download with nothing in for this long is dropped, to be started again (keepAll). A

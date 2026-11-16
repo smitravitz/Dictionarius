@@ -17,7 +17,7 @@ import { defaultFilters, filterKey, type FilterState } from "../src/filters";
 import { DefinitionsFile, LAYERS, Unreachable, layerUrl, openSource, type ByteSource, type Layer, type WordKeys } from "../src/definitions";
 import { landingFrom, rowsFrom, starterKeys, type Starter } from "../src/starter";
 import { fetchStarter, fetchWordList, nameOf, versioned } from "./data-files";
-import { definitionsSource } from "./data-cache";
+import { definitionsSource, forget } from "./data-cache";
 import { starterUrl } from "../src/starter";
 import { landingRow, landingWindow } from "../src/landing";
 import { PAGE_SIZE, type FromWorker, type ToWorker } from "./protocol";
@@ -245,14 +245,25 @@ function answer(data: Extract<ToWorker, { type: "rows" | "seek" }>) {
  *  missing or doesn't fit is left out: the page shows what there is. `inPlace`: read
  *  each file a block at a time with Range requests, where the server sends exact
  *  ranges (the app's does: RangedAssets.java), else hold it whole. */
-async function loadDefinitions(url: string, index: WordKeys, inPlace: boolean) {
+async function loadDefinitions(url: string, index: WordKeys, inPlace: boolean, again = false): Promise<void> {
   const [done, failed] = [found, lost];
   reloadDefinitions = () => {
     definitions = expectDefinitions();
     void loadDefinitions(url, index, inPlace);
   };
   // In a browser with a starter: from the device when it has them, else a block at a time.
-  const fetched = (at: string) => (starter ? definitionsSource(versioned(at, starter.files[nameOf(at)]), starter.files[nameOf(at)]) : openSource(at, { inPlace }));
+  const from = starter;
+  const kept = (at: string) => versioned(at, from!.files[nameOf(at)]);
+  const fetched = (at: string) => (from ? definitionsSource(kept(at), from.files[nameOf(at)]) : openSource(at, { inPlace }));
+  // A file that didn't open may be the device's copy gone wrong, not the file: its copy is
+  // let go of and the files opened once more, from the network. True when that's worth doing
+  // (there was a copy to let go of, and this isn't already the second go). If the network's
+  // file is wrong too, the word pages go without it, as before.
+  const lettingGo = async (wrong: string[]) => {
+    if (!from || again) return false;
+    const had = await Promise.all(wrong.map((at) => forget(kept(at))));
+    return had.some(Boolean);
+  };
   let core: ByteSource | null, layers: (ByteSource | null)[];
   try {
     [core, ...layers] = await Promise.all([fetched(url), ...LAYERS.map((kind) => fetched(layerUrl(url, kind)))]);
@@ -265,10 +276,17 @@ async function loadDefinitions(url: string, index: WordKeys, inPlace: boolean) {
     const given: Partial<Record<Layer, ByteSource>> = {};
     LAYERS.forEach((kind, i) => layers[i] && (given[kind] = layers[i]));
     // Every file opened once, all at the same time; a layer that doesn't fit is left out.
-    done(await DefinitionsFile.openFitting(core, index, given, (kind, why) => console.warn(`left out ${kind}:`, why instanceof Error ? why.message : why)));
+    const out: string[] = [];
+    const file = await DefinitionsFile.openFitting(core, index, given, (kind, why) => {
+      out.push(layerUrl(url, kind));
+      console.warn(`left out ${kind}:`, why instanceof Error ? why.message : why);
+    });
+    if (out.length > 0 && (await lettingGo(out))) return loadDefinitions(url, index, inPlace, true);
+    done(file);
   } catch (error) {
     console.warn("no definitions:", error instanceof Error ? error.message : error);
     if (error instanceof Unreachable) failed(error); // the next question tries again
+    else if (await lettingGo([url])) return loadDefinitions(url, index, inPlace, true);
     else done(null);
   }
 }
