@@ -84,7 +84,20 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npm run test:e2e:safari
+      # TEMPORARY (branch safari-reload-flake-check): the reload flow 30 times in Safari's
+      # engine, on main as merged and on main before PR 18 (793793f), retries off.
+      - name: Reload flake check, main as merged
+        run: |
+          DICTIONARIUS_SAFARI=1 npx playwright test e2e/reload-probe.spec.ts --repeat-each=30 --retries=0 --reporter=list 2>&1 | grep -E "PROBE|passed|failed" || true
+          DICTIONARIUS_SAFARI=1 npx playwright test e2e/download-bar.spec.ts -g "already on the device" --repeat-each=30 --retries=0 --reporter=list 2>&1 | grep -E "✘|[0-9]+ (passed|failed)" || true
+      - name: Reload flake check, main before PR 18 (793793f)
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git fetch -q --depth=1 origin 793793fbc90924a433bec410be2c5145d061dabf || git fetch -q --depth=40 origin main
+          git checkout 793793fbc90924a433bec410be2c5145d061dabf -- web src
+          git diff --cached --stat | tail -1
+          DICTIONARIUS_SAFARI=1 npx playwright test e2e/reload-probe.spec.ts --repeat-each=30 --retries=0 --reporter=list 2>&1 | grep -E "PROBE|passed|failed" || true
+          DICTIONARIUS_SAFARI=1 npx playwright test e2e/download-bar.spec.ts -g "already on the device" --repeat-each=30 --retries=0 --reporter=list 2>&1 | grep -E "✘|[0-9]+ (passed|failed)" || true
       - uses: actions/upload-artifact@v7
         if: failure()
         with:
