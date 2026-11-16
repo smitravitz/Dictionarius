@@ -133,6 +133,11 @@ built from the English Wiktionary dump by `scripts/build_fm_index.py`.
   every Cache Storage store on a reload (measured with a store the app never touches;
   `playwright.config.ts` has the numbers), so no second visit can be tested there. Whether
   real Safari keeps the dictionary between visits is unchecked: add it to the iPhone checklist.
+  The same limit failed main once (download-bar's "already on the device" test, which had never
+  had its precondition in WebKit: 30 reloads of 30 emptied the store, before PR 18 as after);
+  that test now checks the dictionary is kept and skips, saying why, where it isn't.
+  `place.spec.ts`'s "comes back straight to the word" flakes in WebKit on most runs, likely the
+  same cause (unconfirmed).
   Whether either was the report's cause isn't known. To find out: the console snippet in
   `docs/development.md` ("In your own browser") run in the owner's Edge, and the new
   "Live site" workflow (`live-site.yml`, `e2e/live/`; Chrome and Edge against Pages itself,
