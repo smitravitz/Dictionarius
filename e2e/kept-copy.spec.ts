@@ -44,7 +44,7 @@ async function keptAgain(page: Page, name: string, said: string[]): Promise<numb
       const bytes = await (await store.match(request))!.arrayBuffer();
       return { size: bytes.byteLength, starts: new TextDecoder().decode(bytes.slice(0, 8)) };
     }, name);
-  const until = Date.now() + 30_000;
+  const until = Date.now() + 12_000;
   let seen: Awaited<ReturnType<typeof look>> = null;
   while (Date.now() < until) {
     seen = await look();
