@@ -27,11 +27,11 @@ built from the English Wiktionary dump by `scripts/build_fm_index.py`.
 | `web/` | The page: `main.ts`, the worker `search-worker.ts`, the data worker `data-worker.ts`, gestures, loading screen `loader.ts`, service worker `sw.js`, which shell it runs in `shell.ts`, light/dark `theme.ts` (+ `theme-boot.js`), the web app's icons `icons/` |
 | `tools/` | Vite steps: `web-data.ts` (starter, gzipped list), `web-app.ts` (manifest, icons, service worker), `theme-script.ts`; `make-icons.ts` draws `web/icons/` from `docs/brand/icon.svg` |
 | `scripts/` | Python data pipeline, `setup-release.sh`, privacy audit |
-| `e2e/` | Playwright tests (desktop + phone) against `test/fixtures` sample data |
+| `e2e/` | Playwright tests (desktop + phone) against `test/fixtures` sample data; `e2e/built/` the published build, `e2e/live/` the Pages site itself |
 | `android/` | Capacitor Android shell, `EdgeGesturesPlugin.java` |
 | `ios/` | Capacitor iOS shell (Swift Package Manager), its privacy manifest; iPhone only, iOS 16+ |
 | `fastlane/metadata/` | Store listings: Play (`android/en-US/`) and App Store (`en-US/`); `PRIVACY.md` is the policy they link to |
-| `.github/workflows/` | `ci.yml`, `release.yml` (tag → signed APK and Play app bundle), `pages.yml` (web app on Pages), `ios.yml` (iOS builds), `ios-release.yml` (tag → TestFlight), `store-screenshots.yml` (by hand) |
+| `.github/workflows/` | `ci.yml`, `release.yml` (tag → signed APK and Play app bundle), `pages.yml` (web app on Pages), `ios.yml` (iOS builds), `ios-release.yml` (tag → TestFlight), `store-screenshots.yml` (by hand), `live-site.yml` (the Pages site in Chrome and Edge, after each deploy and by hand) |
 
 ## Shipping
 
@@ -116,15 +116,23 @@ built from the English Wiktionary dump by `scripts/build_fm_index.py`.
 - `/dictionarius/` (lowercase) needs the owner's user-site repo `smitravitz.github.io` with
   a redirecting `404.html` (given to the owner; not confirmed set up).
 
-- Reported 2026-11-16, on the web app: the download bar stuck at 99% until a reload, and no
-  definitions. Not reproduced: a first visit in Chrome 153 over HTTP/1.1 and HTTP/2, on a
-  made-up 33 MB dictionary served as Pages serves (exact ranges, validators, `max-age=600`),
-  a word opened every second for the whole download, ended "Downloaded" with every word's
-  page filled in (slowest 2.1 s at 600 kB/s). One way to that screen was found and fixed
-  (branch `restart-stalled-download`, unreleased): a background download that goes quiet with
-  no error was waited on for ever; it's now dropped after 8 s and started again (ADR-0008).
-  Whether that was the report's cause isn't known: it needs the browser's name and what its
-  console says. Nothing here runs Firefox, and nothing could reach the Pages site itself.
+- Reported 2026-11-16, on the live web app in Edge: the download bar stuck at 99% until a
+  reload, and no definitions at all, reloads included. Not reproduced: nothing here could
+  reach the Pages site or run Edge; a first visit in Chrome 153 (HTTP/1.1 and HTTP/2, a
+  made-up 33 MB dictionary served as Pages serves, a word opened every second through the
+  download) kept everything and filled in every page. Two ways to those screens were found
+  and fixed, each with a test that failed first (branch `restart-stalled-download`,
+  unreleased; the site only changes with a release):
+  1. A background download that went quiet with no error was waited on for ever. It's now
+     dropped after 3 s and started again (ADR-0008).
+  2. A kept copy of a definitions file that was wrong (cut short, or not the file) was
+     trusted: every word said "No definition", on every visit. It's now let go of and read
+     from the network (`web/data-cache.ts`, `e2e/kept-copy.spec.ts`).
+  Whether either was the report's cause isn't known. To find out: the console snippet in
+  `docs/development.md` ("In your own browser") run in the owner's Edge, and the new
+  "Live site" workflow (`live-site.yml`, `e2e/live/`; Chrome and Edge against Pages itself,
+  after each Pages deploy and by hand), which has never run on GitHub: its Edge install step
+  and its first results are unseen.
 
 ## Open items
 

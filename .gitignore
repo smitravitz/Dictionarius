@@ -24,6 +24,8 @@ test-results/
 playwright-report/
 playwright-report-built/
 test-results-built/
+playwright-report-live/
+test-results-live/
 low-ram-results/
 test-results-store/
 /store-screenshots/

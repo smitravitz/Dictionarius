@@ -89,6 +89,52 @@ served as Pages serves it: that it opens from the starter, works offline after o
 once, a new build from the next start (ADR-0009). CI runs it after the main browser tests. A plain `npm run build` (the Android
 app's) leaves these out.
 
+### The live site
+
+`npm run test:e2e:live` opens the published site itself (https://smitravitz.github.io/Dictionarius/)
+in Chrome, with nothing in between: no dev server and no request interception, so the
+browser's own HTTP cache is on and GitHub's servers answer (`playwright.live.config.ts`,
+`e2e/live/`). It checks that each definitions file answers a Range request exactly, then makes
+a first visit: types a word at once, reads its page while the dictionary downloads, waits for
+"Saved on this device", reloads and reads the word again. Its log lists what happened, second
+by second (the bar's text, console errors, failed requests), whether it passes or not.
+
+```bash
+npm run test:e2e:live                                                    # Chrome (npx playwright install chromium)
+npx playwright test --config playwright.live.config.ts --project edge   # Microsoft Edge, the one installed
+DICTIONARIUS_LIVE_URL=http://localhost:4174/ npm run test:e2e:live       # another address (end it with a slash)
+```
+
+On GitHub: Actions → Live site → Run workflow (`live-site.yml`) runs it in Chrome and Edge;
+it also runs after every Pages deploy. It tests a fresh browser profile: a fault that only
+shows in a profile that has visited before (an old kept copy, an old service worker) needs
+that profile, see "In your own browser" below.
+
+**In your own browser.** What a profile has kept can differ from a fresh one. To tell the two
+apart, open the site in a private (InPrivate, Incognito) window: if it works there and not in
+the ordinary window, the fault is in what the profile kept. To see what's kept, paste this in
+the ordinary window's console (F12 → Console) on the site; it prints each data file's size on
+the device beside the size it should be, and how the server answers a Range request:
+
+```js
+(async () => {
+  const starter = await (await fetch("headwords.starter.json", { cache: "no-cache" })).json();
+  const store = await caches.open("dictionarius-data");
+  const rows = [];
+  for (const [name, file] of Object.entries(starter.files)) {
+    const url = new URL(`${name}?v=${file.sha256.slice(0, 16)}`, location.href.replace(/[?#].*$/, "")).href;
+    const copy = await store.match(url, { ignoreVary: true });
+    const onDevice = copy ? (await copy.blob()).size : "not kept";
+    const answer = await fetch(url, { headers: { Range: "bytes=64-163" } }).then(async (r) => ((await r.arrayBuffer()), `${r.status} ${r.headers.get("Content-Range")}`), String);
+    rows.push({ name, shouldBe: file.bytes, onDevice, right: onDevice === file.bytes || name.endsWith(".gz") || onDevice === "not kept", range: answer });
+  }
+  console.table(rows);
+  console.log("service worker:", (await navigator.serviceWorker.getRegistrations()).map((r) => r.active?.scriptURL), "kept:", (await store.keys()).length, "files");
+})();
+```
+
+To start that profile afresh: F12 → Application → Storage → Clear site data, then reload.
+
 The web app's icons (`web/icons/`) are drawn from `docs/brand/icon.svg`; after changing it,
 run `node tools/make-icons.ts` and commit what it writes (a unit test fails until you do).
 

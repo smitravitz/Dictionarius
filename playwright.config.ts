@@ -12,13 +12,15 @@ import { defineConfig, devices } from "@playwright/test";
 const SAFARI = !!process.env.DICTIONARIUS_SAFARI;
 const safari = {
   name: "iphone-safari",
-  testIgnore: ["**/back.spec.ts", "**/dropdown.spec.ts", "**/positions.spec.ts", "**/start.spec.ts", "**/built/**"],
+  testIgnore: ["**/back.spec.ts", "**/dropdown.spec.ts", "**/positions.spec.ts", "**/start.spec.ts", "**/built/**", "**/live/**"],
   use: { ...devices["iPhone 15"] },
 };
 
 export default defineConfig({
   testDir: "e2e",
-  testIgnore: ["**/built/**"], // the published build's own tests: playwright.built.config.ts
+  // The published build's own tests (playwright.built.config.ts), and the live site's
+  // (playwright.live.config.ts).
+  testIgnore: ["**/built/**", "**/live/**"],
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
@@ -36,7 +38,7 @@ export default defineConfig({
     // It must change nothing any other test relies on (e2e/tour.spec.ts tests the tour itself).
     {
       name: "first-run",
-      testIgnore: ["**/tour.spec.ts", "**/word-page-sample.spec.ts", "**/word-page-network.spec.ts", "**/built/**"],
+      testIgnore: ["**/tour.spec.ts", "**/word-page-sample.spec.ts", "**/word-page-network.spec.ts", "**/built/**", "**/live/**"],
       use: { ...devices["Pixel 7"], storageState: { cookies: [], origins: [] } },
     },
   ],
