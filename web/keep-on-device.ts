@@ -32,8 +32,9 @@ const RESULT = {
   error: "Couldn’t save the dictionary for offline use. It still works online.",
 } as const;
 
-export function keepOnDevice(toKeep: ToKeep, bar: HTMLElement, result: HTMLElement) {
-  if (toKeep.keep.length === 0) return;
+/** `again()`: a kept file was let go of (it wasn't the file): go through them once more. */
+export function keepOnDevice(toKeep: ToKeep, bar: HTMLElement, result: HTMLElement): { again(): void } {
+  if (toKeep.keep.length === 0) return { again() {} };
   const text = bar.querySelector<HTMLElement>(".download-text")!;
   const track = bar.querySelector<HTMLElement>(".download-track")!;
   const fill = bar.querySelector<HTMLElement>(".download-fill")!;
@@ -76,11 +77,15 @@ export function keepOnDevice(toKeep: ToKeep, bar: HTMLElement, result: HTMLEleme
   };
 
   let worker: Worker | null = null;
+  let running = false; // a worker is going through the files
+  let more = false; // a file was let go of meanwhile: once more when this run ends
   let coming = false; // this run has brought something in
   function start() {
     worker?.terminate();
     samples = [];
     coming = false;
+    running = true;
+    more = false;
     worker = new Worker(new URL("./data-worker.ts", import.meta.url), { type: "module" });
     worker.onmessage = ({ data }: MessageEvent<FromDataWorker>) => {
       if (data.type === "keeping") {
@@ -91,10 +96,13 @@ export function keepOnDevice(toKeep: ToKeep, bar: HTMLElement, result: HTMLEleme
         draw();
       } else if (data.type === "kept") {
         worker?.terminate();
+        if (more) return start(); // one was let go of while this ran: it may have been passed already
+        running = false;
         share = 1;
         end("Downloaded · works offline", "kept");
       } else {
         worker?.terminate();
+        running = false;
         if (data.why === "space" || data.why === "saving-data") return end("Not saved for offline use", data.why);
         // No connection (or a failure while it looked fine): it says so, and tries again once
         // the browser says it's back, or every so often, a few times while online.
@@ -121,4 +129,16 @@ export function keepOnDevice(toKeep: ToKeep, bar: HTMLElement, result: HTMLEleme
   window.addEventListener("online", again);
   window.addEventListener("offline", draw);
   start();
+  return {
+    again() {
+      if (running) return void (more = true);
+      if (failed) return; // waiting to try again: that try will find it missing
+      // Ended, with a file since let go of: not all saved after all, until this run says so.
+      result.hidden = true;
+      result.textContent = "";
+      window.addEventListener("online", again);
+      window.addEventListener("offline", draw);
+      start();
+    },
+  };
 }

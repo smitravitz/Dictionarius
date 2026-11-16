@@ -246,6 +246,7 @@ const safe = () => filters["safe-search"] === true;
 // worker of its own keeps every data file on this device (web/keep-on-device.ts): a bar under
 // the title says how far along, Settings how it ended.
 let toKeep: Extract<FromWorker, { type: "starter" }> | null = null;
+let keeping: { again(): void } | null = null;
 
 // The published web app keeps the page itself on the device, to open offline (web/sw.js,
 // written by the web build only), and reloads itself into a new build once one is down
@@ -310,8 +311,11 @@ worker.onmessage = ({ data }: MessageEvent<FromWorker>) => {
     case "ready":
       ready = true;
       show(data.words, data.filters);
-      if (toKeep) keepOnDevice(toKeep, $("download"), $("offline")); // the rest, now the word list is in: nothing it needs is held up
+      if (toKeep) keeping = keepOnDevice(toKeep, $("download"), $("offline")); // the rest, now the word list is in: nothing it needs is held up
       if (normalize(searchText()) && !counts) summary.textContent = "Searching…";
+      break;
+    case "let-go":
+      keeping?.again(); // a kept file wasn't the file: kept again now, not at the next visit
       break;
     case "failed":
       status.textContent = "Word list unavailable";

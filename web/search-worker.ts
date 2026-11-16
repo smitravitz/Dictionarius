@@ -254,7 +254,8 @@ async function loadDefinitions(url: string, index: WordKeys, inPlace: boolean, a
   // In a browser with a starter: from the device when it has them, else a block at a time.
   const from = starter;
   const kept = (at: string) => versioned(at, from!.files[nameOf(at)]);
-  const fetched = (at: string) => (from ? definitionsSource(kept(at), from.files[nameOf(at)]) : openSource(at, { inPlace }));
+  const letGo = () => scope.postMessage({ type: "let-go" });
+  const fetched = (at: string) => (from ? definitionsSource(kept(at), from.files[nameOf(at)], letGo) : openSource(at, { inPlace }));
   // A file that didn't open may be the device's copy gone wrong, not the file: its copy is
   // let go of and the files opened once more, from the network. True when that's worth doing
   // (there was a copy to let go of, and this isn't already the second go). If the network's
@@ -262,6 +263,7 @@ async function loadDefinitions(url: string, index: WordKeys, inPlace: boolean, a
   const lettingGo = async (wrong: string[]) => {
     if (!from || again) return false;
     const had = await Promise.all(wrong.map((at) => forget(kept(at))));
+    if (had.some(Boolean)) letGo();
     return had.some(Boolean);
   };
   let core: ByteSource | null, layers: (ByteSource | null)[];
