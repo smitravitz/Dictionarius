@@ -131,6 +131,10 @@ built from the English Wiktionary dump by `scripts/build_fm_index.py`.
   2. A kept copy of a definitions file that was wrong (cut short, or not the file) was
      trusted: every word said "No definition", on every visit. It's now let go of and read
      from the network (`web/data-cache.ts`, `e2e/kept-copy.spec.ts`).
+  A file let go of is kept again in the same visit, whichever worker got there first.
+  `e2e/kept-copy.spec.ts` is left out of the Safari-engine run: there the page can't see the
+  device's store after a reload though the workers can (`playwright.config.ts` says more), so
+  how the kept dictionary behaves in Safari's engine is untested, as it was before.
   Whether either was the report's cause isn't known. To find out: the console snippet in
   `docs/development.md` ("In your own browser") run in the owner's Edge, and the new
   "Live site" workflow (`live-site.yml`, `e2e/live/`; Chrome and Edge against Pages itself,

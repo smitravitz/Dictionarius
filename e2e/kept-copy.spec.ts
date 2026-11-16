@@ -25,12 +25,40 @@ function spoil(page: Page, name: string, how: "cut short" | "zeros") {
   );
 }
 
-const keptSize = (page: Page, name: string) =>
-  page.evaluate(async (name) => {
-    const store = await caches.open("dictionarius-data");
-    const request = (await store.keys()).find((r) => new URL(r.url).pathname.endsWith(name));
-    return request ? (await (await store.match(request))!.blob()).size : null;
-  }, name);
+/** What the page's console said (the app warns when it lets go of a copy, or can't keep one). */
+function consoleOf(page: Page): string[] {
+  const said: string[] = [];
+  page.on("console", (message) => said.push(`${message.type()}: ${message.text()}`));
+  page.on("pageerror", (error) => said.push(`error: ${error.message}`));
+  return said;
+}
+
+/** Waits until the file named `name` is kept again and starts as a definitions file does;
+ *  returns its size. If it never is, the error says what the page was saying meanwhile. */
+async function keptAgain(page: Page, name: string, said: string[]): Promise<number | null> {
+  const look = () =>
+    page.evaluate(async (name) => {
+      const store = await caches.open("dictionarius-data");
+      const request = (await store.keys()).find((r) => new URL(r.url).pathname.endsWith(name));
+      if (!request) return null;
+      const bytes = await (await store.match(request))!.arrayBuffer();
+      return { size: bytes.byteLength, starts: new TextDecoder().decode(bytes.slice(0, 8)) };
+    }, name);
+  const until = Date.now() + 12_000;
+  let seen: Awaited<ReturnType<typeof look>> = null;
+  while (Date.now() < until) {
+    seen = await look();
+    if (seen?.starts === "DICTDEF1") return seen.size;
+    await page.waitForTimeout(250);
+  }
+  const state = await page.evaluate(async () => ({
+    settings: document.getElementById("offline")?.textContent,
+    bar: document.getElementById("download")?.hidden ? "(hidden)" : document.getElementById("download-text")?.textContent,
+    kept: (await (await caches.open("dictionarius-data")).keys()).map((r) => new URL(r.url).pathname.split("/").pop()),
+    storage: await navigator.storage?.estimate?.().catch(() => null),
+  }));
+  throw new Error(`${name} wasn't kept again (last seen: ${JSON.stringify(seen)}). The page: ${JSON.stringify(state)}. Its console: ${JSON.stringify(said)}`);
+}
 
 async function readIngot(page: Page) {
   await page.locator("#q").fill("ingot");
@@ -42,44 +70,17 @@ async function readIngot(page: Page) {
 }
 
 for (const how of ["cut short", "zeros"] as const) {
-  test(`a kept copy of the definitions that's ${how === "zeros" ? "not the file at all" : how} is let go of: the word's page still fills in`, async ({ page }) => {
-    await visitUntilSaved(page);
-    const size = await spoil(page, "headwords-sample.definitions.bin", how);
-    await page.reload();
-    await expect(page.locator("#loader")).toHaveCount(0);
-    await readIngot(page);
-    // And the right file is kept again, for the next visit.
-    await expect.poll(() => keptSize(page, "headwords-sample.definitions.bin"), { timeout: 20_000 }).toBe(size);
-    await expect
-      .poll(() =>
-        page.evaluate(async () => {
-          const store = await caches.open("dictionarius-data");
-          const request = (await store.keys()).find((r) => new URL(r.url).pathname.endsWith("headwords-sample.definitions.bin"))!;
-          return new TextDecoder().decode((await (await store.match(request))!.arrayBuffer()).slice(0, 8));
-        }),
-      )
-      .toBe("DICTDEF1");
-  });
-}
-
-for (const how of ["cut short", "zeros"] as const) {
-  test(`a kept copy of one layer that's ${how === "zeros" ? "not the file at all" : how} is let go of too, and kept again`, async ({ page }) => {
-    await visitUntilSaved(page);
-    const size = await spoil(page, "headwords-sample.etymology.bin", how);
-    await page.reload();
-    await expect(page.locator("#loader")).toHaveCount(0);
-    await readIngot(page);
-    await expect
-      .poll(
-        () =>
-          page.evaluate(async () => {
-            const store = await caches.open("dictionarius-data");
-            const request = (await store.keys()).find((r) => new URL(r.url).pathname.endsWith("headwords-sample.etymology.bin"));
-            return request ? new TextDecoder().decode((await (await store.match(request))!.arrayBuffer()).slice(0, 8)) : null;
-          }),
-        { timeout: 20_000 },
-      )
-      .toBe("DICTDEF1");
-    expect(await keptSize(page, "headwords-sample.etymology.bin")).toBe(size);
-  });
+  for (const file of ["headwords-sample.definitions.bin", "headwords-sample.etymology.bin"]) {
+    const what = file.includes("definitions") ? "the definitions" : "one layer";
+    test(`a kept copy of ${what} that's ${how === "zeros" ? "not the file at all" : how} is let go of: the word's page still fills in, and the file is kept again`, async ({ page }) => {
+      const said = consoleOf(page);
+      await visitUntilSaved(page);
+      const size = await spoil(page, file, how);
+      await page.reload();
+      await expect(page.locator("#loader")).toHaveCount(0);
+      await readIngot(page);
+      // And the right file is kept again in this visit, for the next one.
+      expect(await keptAgain(page, file, said)).toBe(size);
+    });
+  }
 }

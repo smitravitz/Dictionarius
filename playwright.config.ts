@@ -8,11 +8,16 @@ import { defineConfig, devices } from "@playwright/test";
 // runs in, which the projects below (all Chromium) never touch. Asked for by name
 // (`npm run test:e2e:safari`), so a plain `playwright test` runs what it always has.
 // Left out: the files whose gestures or slow-phone timing go through Chromium's own devtools
-// (a swipe, a touch that holds and slides, a throttled CPU), which WebKit doesn't have.
+// (a swipe, a touch that holds and slides, a throttled CPU), which WebKit doesn't have; and
+// kept-copy.spec.ts, which plants a wrong file in the device's store from the page and looks
+// for the right one afterwards: in Playwright's WebKit the page sees that store empty after a
+// reload while the app's workers still read from it (CI, 2026-11-16: Settings said saved, the
+// page listed no files), so the test can't look. No test of the kept dictionary runs in
+// Safari's engine yet (start.spec.ts and built/ are out too): an open item.
 const SAFARI = !!process.env.DICTIONARIUS_SAFARI;
 const safari = {
   name: "iphone-safari",
-  testIgnore: ["**/back.spec.ts", "**/dropdown.spec.ts", "**/positions.spec.ts", "**/start.spec.ts", "**/built/**", "**/live/**"],
+  testIgnore: ["**/back.spec.ts", "**/dropdown.spec.ts", "**/positions.spec.ts", "**/start.spec.ts", "**/kept-copy.spec.ts", "**/built/**", "**/live/**"],
   use: { ...devices["iPhone 15"] },
 };
 
