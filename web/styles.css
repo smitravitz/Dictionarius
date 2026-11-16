@@ -427,7 +427,8 @@ body {
 }
 
 .app:has(> .intro:not([hidden])) .status,
-.app:has(> .intro[hidden]) > .title-page {
+.app:has(> .intro[hidden]) > .title-page,
+.app:has(> .intro[hidden]) > .specimen {
   display: none;
 }
 
@@ -444,8 +445,10 @@ body {
   text-wrap: balance;
 }
 
+/* The worked example, under the search field it's about (the start screen only). */
 .specimen {
-  margin: 1.375rem 0 0;
+  margin: 0.25rem 0 0;
+  padding: 0 var(--pad);
   color: var(--pencil);
   font-family: var(--font-word);
   font-size: 1.1875rem;
@@ -627,7 +630,6 @@ body {
   .tagline {
     margin-top: 0.875rem;
   }
-  .specimen,
   .facts {
     margin-top: 1rem;
   }
