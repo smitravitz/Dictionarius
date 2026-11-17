@@ -10,7 +10,7 @@ import { HeadwordIndex } from "../src/headword-index";
 import { Completer } from "../src/complete";
 import { defaultFilters } from "../src/filters";
 import { SAFE_SEARCH_OVERRIDES } from "../src/safe-search-overrides";
-import { PIECES } from "../web/examples";
+import { FRAGMENTS } from "../web/examples";
 
 const ROUNDS = 5; // each query's time is its median over these
 
@@ -23,7 +23,7 @@ export function run(path: string) {
   completer.prepare(filters);
   const opening = performance.now() - started;
 
-  const queries = [..."abcdefghijklmnopqrstuvwxyz", ...PIECES.map(([piece]) => piece)];
+  const queries = [..."abcdefghijklmnopqrstuvwxyz", ...FRAGMENTS.map(([fragment]) => fragment)];
   const firstScreen: number[] = [];
   const counted: number[] = [];
   for (const query of queries) {

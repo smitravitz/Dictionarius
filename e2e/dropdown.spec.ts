@@ -220,7 +220,7 @@ test("fast typing shows results for the final text only", async ({ page }) => {
 test("says so when no word contains the fragment", async ({ page }) => {
   await open(page);
   await page.locator("#q").fill("qzxqzx");
-  await expect(page.locator("#summary")).toHaveText("No word contains “qzxqzx”. Try a shorter piece.");
+  await expect(page.locator("#summary")).toHaveText("No word contains “qzxqzx”. Try a shorter fragment.");
   await expect(page.locator("li.word")).toHaveCount(0);
 });
 
@@ -231,13 +231,13 @@ test("the start screen is a title page: the name, what it finds, the word count,
   await expect(page.locator("#facts")).toHaveText("17,082 words · every definition · fully offline");
   await expect(page.locator("#status")).toBeHidden(); // the count is in the facts line here
 
-  // Plain pieces, no ellipses, each once (the moving lanes' second copies are hidden from screen readers).
+  // Plain fragments, no ellipses, each once (the moving lanes' second copies are hidden from screen readers).
   const tiles = page.locator("#examples").getByRole("button");
   expect(await tiles.count()).toBe(34);
   const labels = await tiles.allTextContents();
   for (const label of labels) expect(label).toMatch(/^[a-z]+$/);
   expect(new Set(labels).size).toBe(labels.length);
-  // Bigger for pieces that find more words, but only a little.
+  // Bigger for fragments that find more words, but only a little.
   const size = (name: string) =>
     page.locator(`#examples button[data-query="${name}"]`).first().evaluate((el) => parseFloat(getComputedStyle(el).fontSize));
   expect(await size("ing")).toBeGreaterThan(await size("hood"));

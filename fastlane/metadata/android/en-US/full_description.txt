@@ -3,7 +3,7 @@ Dictionarius is an English dictionary that works with no connection at all, and 
 Type "eren" and get serene, coherent, adherence: every word with your letters anywhere inside it, not only at the start. Results appear as you type. All 1,357,380 English words and their definitions from Wiktionary are on your device.
 
 SEARCH INSIDE WORDS
-• Any piece of a word finds every word that contains it, lined up on your letters: the exact word, then words that start with it, then those with one letter before it, two, and so on.
+• Any fragment of a word finds every word that contains it, lined up on your letters: the exact word, then words that start with it, then those with one letter before it, two, and so on.
 • A summary counts how many words start with, end with and contain your letters.
 • Hold beside a word and slide to jump to words where your letters come later or earlier. A small graph shows how many there are at each place.
 

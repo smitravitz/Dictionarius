@@ -80,3 +80,26 @@ test("the start screen opens in order: everything in place first, the word count
   expect(loadAt).toBeGreaterThan(builtAt);
   expect(framesAfter).toBeGreaterThanOrEqual(1);
 });
+
+test("the worked example sits under the search field, above the fragments, and goes with the start screen", async ({ page }) => {
+  await page.setViewportSize({ width: 412, height: 900 }); // tall enough to show it (styles.css drops it on a short screen)
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto("/?index=headwords-sample.bin");
+  await expect(page.locator("#status")).toHaveText(/^[\d,]+ words$/);
+  await expect(page.locator("#loader")).toHaveCount(0);
+  const example = page.locator(".specimen");
+  await expect(example).toHaveText("“eren” finds serene, coherent, adherence, etc.");
+  await expect(example).toBeVisible();
+  const [field, line, fragments] = [(await page.locator(".search").boundingBox())!, (await example.boundingBox())!, (await page.locator("#examples").boundingBox())!];
+  expect(line.y).toBeGreaterThanOrEqual(field.y + field.height);
+  expect(line.y + line.height).toBeLessThanOrEqual(fragments.y);
+  // Its words start at the page's left margin, like the rest (just past its opening quote mark).
+  const [margin, firstWord] = [(await page.locator(".tagline").boundingBox())!.x, (await example.locator("mark").first().boundingBox())!.x];
+  expect(firstWord - margin).toBeGreaterThan(0);
+  expect(firstWord - margin).toBeLessThan(16);
+
+  // A search: the list takes the start screen's place, the example with it.
+  await page.locator("#q").fill("ate");
+  await expect(page.locator("#frame")).toBeVisible();
+  await expect(example).toBeHidden();
+});

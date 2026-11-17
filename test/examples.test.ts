@@ -1,16 +1,16 @@
 import { describe, it, expect } from "vitest";
-import { PIECES, lanesOf, tileWeight } from "../web/examples";
+import { FRAGMENTS, lanesOf, tileWeight } from "../web/examples";
 
-// The start screen's suggestions: plain pieces, shuffled into two lanes.
+// The start screen's suggestions: plain fragments, shuffled into two lanes.
 
 describe("the suggestions", () => {
-  it("are plain pieces, each once", () => {
-    const pieces = PIECES.map(([piece]) => piece);
-    for (const p of pieces) expect(p).toMatch(/^[a-z]+$/);
-    expect(new Set(pieces).size).toBe(pieces.length);
+  it("are plain fragments, each once", () => {
+    const fragments = FRAGMENTS.map(([fragment]) => fragment);
+    for (const p of fragments) expect(p).toMatch(/^[a-z]+$/);
+    expect(new Set(fragments).size).toBe(fragments.length);
   });
 
-  it("weigh a piece by its word count, on a log scale from the fewest (0) to the most (1)", () => {
+  it("weigh a fragment by its word count, on a log scale from the fewest (0) to the most (1)", () => {
     const counts = [100, 1000, 10000];
     expect(tileWeight(100, counts)).toBe(0);
     expect(tileWeight(10000, counts)).toBe(1);

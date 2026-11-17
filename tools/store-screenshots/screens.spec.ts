@@ -14,8 +14,8 @@ const INDEX = REAL ? "headwords.bin" : "headwords-sample.bin";
 const LOAD_MS = REAL ? 120_000 : 10_000; // the real list takes a while to open in a browser
 test.describe.configure({ timeout: 60_000 + LOAD_MS });
 
-// A piece that finds many words, and one of them with a full page.
-const PIECE = REAL ? "eren" : "zorb";
+// A fragment that finds many words, and one of them with a full page.
+const FRAGMENT = REAL ? "eren" : "zorb";
 const WORD = REAL ? "serene" : "zorble";
 
 async function open(page: Page) {
@@ -43,9 +43,9 @@ test("1: the start screen", async ({ page }) => {
   await shoot(page, "1-start");
 });
 
-test("2: a piece of a word finds every word that has it", async ({ page }) => {
+test("2: a fragment of a word finds every word that has it", async ({ page }) => {
   await open(page);
-  await page.locator("#q").fill(PIECE);
+  await page.locator("#q").fill(FRAGMENT);
   await expect(page.locator("li.word").first()).toBeVisible();
   await expect(page.locator("#summary")).not.toHaveText("");
   await shoot(page, "2-search");
@@ -59,7 +59,7 @@ test("3: a word's page", async ({ page }) => {
 
 test("4: filters", async ({ page }) => {
   await open(page);
-  await page.locator("#q").fill(PIECE);
+  await page.locator("#q").fill(FRAGMENT);
   await expect(page.locator("li.word").first()).toBeVisible();
   await page.getByRole("button", { name: "Filters" }).click();
   await expect(page.getByRole("dialog", { name: "Filters" })).toBeVisible();

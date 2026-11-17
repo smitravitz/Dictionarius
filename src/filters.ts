@@ -24,7 +24,7 @@ export type FilterState = Readonly<Record<string, boolean | Range | undefined>>;
 export interface SafeSearchOverrides {
   /** Hide these too: words the labels missed. */
   block?: readonly string[];
-  /** Hide every word containing one of these pieces ("snigger" reads as the slur in it). */
+  /** Hide every word containing one of these fragments ("snigger" reads as the slur in it). */
   contains?: readonly string[];
   /** Show these after all: words the labels caught by mistake. Wins over block and contains. */
   allow?: readonly string[];
@@ -204,7 +204,7 @@ function wordsWhere(column: Uint8Array | null, test: (value: number) => boolean)
 }
 
 /** Safe search's words: the index's explicit words, plus `block` and every
- *  word containing a piece in `contains`, minus `allow`. Words the index
+ *  word containing a fragment in `contains`, minus `allow`. Words the index
  *  doesn't have are ignored. */
 function safeSearchHides({ index, overrides }: FilterContext): Uint32Array {
   const bits = new Uint32Array((index.size + 31) >>> 5);
@@ -213,8 +213,8 @@ function safeSearchHides({ index, overrides }: FilterContext): Uint32Array {
     words.map((w) => index.exact(normalize(w))).filter((id): id is number => id !== null);
   for (const id of index.explicitIds()) set(id);
   for (const id of lookup(overrides.block)) set(id);
-  for (const piece of overrides.contains ?? []) {
-    const key = normalize(piece);
+  for (const fragment of overrides.contains ?? []) {
+    const key = normalize(fragment);
     if (key) for (const id of index.wordsContaining(key)) set(id);
   }
   for (const id of lookup(overrides.allow)) bits[id >>> 5] &= ~(1 << (id & 31));

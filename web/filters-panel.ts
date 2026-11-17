@@ -11,7 +11,19 @@ import { chooseMax, chooseMin, maxOptions, minOptions } from "./wheel-model";
 
 type RangeInfo = Extract<FilterInfo, { kind: "range" }>;
 
+/** A wheel as the first-run tour sees it (web/tour-shows.ts). */
+export interface TourWheel {
+  /** The wheel with its label: what the tour lights. */
+  field: HTMLElement;
+  /** The wheel itself: where a touch turns it. */
+  el: HTMLElement;
+  /** Draw it turned this many rows from its choice (0 puts it back), choosing nothing. */
+  turn(rows: number): void;
+}
+
 export class FiltersPanel {
+  private shown: TourWheel[] = [];
+
   constructor(
     private readonly dialog: HTMLDialogElement,
     private readonly ranges: HTMLElement,
@@ -27,8 +39,14 @@ export class FiltersPanel {
   offer(available: FilterInfo[]): void {
     const ranges = available.filter((f): f is RangeInfo => f.kind === "range");
     this.button.hidden = ranges.length === 0;
+    this.shown = [];
     this.ranges.replaceChildren(...ranges.map((f) => this.section(f)));
     this.mark();
+  }
+
+  /** The wheels on offer, in reading order: each range's Min, then its Max. */
+  wheels(): readonly TourWheel[] {
+    return this.shown;
   }
 
   private section(f: RangeInfo): HTMLElement {
@@ -55,7 +73,9 @@ export class FiltersPanel {
     const to = el("span", "wheels-to");
     to.textContent = "to";
     const wheels = el("div", "wheels");
-    wheels.append(field("Min", min), to, field("Max", max));
+    const fields = [field("Min", min), field("Max", max)];
+    wheels.append(fields[0], to, fields[1]);
+    [min, max].forEach((wheel, i) => this.shown.push({ field: fields[i], el: wheel.el, turn: (rows) => wheel.preview(rows) }));
     section.append(title, help, wheels);
     return section;
   }

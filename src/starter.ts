@@ -48,27 +48,27 @@ export interface Starter {
   available: FilterInfo[];
   /** filterKey() of the filters the lists were worked out with (the defaults) */
   filters: string;
-  /** each suggestion's counts (complete) and landing spots, by its normalized piece */
-  pieces: Record<string, { counts: Counts; landings: Landing[] }>;
+  /** each suggestion's counts (complete) and landing spots, by its normalized fragment */
+  fragments: Record<string, { counts: Counts; landings: Landing[] }>;
   /** the data files served with it (set by the build): the word list, gzipped or not,
    *  and its definitions, so the page can keep them on the device by version */
   files: Record<string, DataFile>;
 }
 
-/** The starter for an index: each piece in `pieces` searched with `filters`, counted to
+/** The starter for an index: each fragment in `fragments` searched with `filters`, counted to
  *  the end, and its rows kept around LANDINGS spots picked as a landing picks them. */
 export function buildStarter(
   index: HeadwordIndex,
   completer: Completer,
-  pieces: readonly string[],
+  fragments: readonly string[],
   filters: FilterState,
   files: Record<string, DataFile> = {},
   random: () => number = Math.random,
 ): Starter {
   const key = filterKey(filters);
-  const out: Starter["pieces"] = {};
-  for (const piece of pieces) {
-    const query = normalize(piece);
+  const out: Starter["fragments"] = {};
+  for (const fragment of fragments) {
+    const query = normalize(fragment);
     const m = completer.search(query, { filters });
     while (!m.complete) m.count(1_000_000);
     const total = m.total!;
@@ -88,12 +88,12 @@ export function buildStarter(
     keysHash: hash ? hex(hash) : "",
     available: completer.availableFilters(),
     filters: key,
-    pieces: out,
+    fragments: out,
     files,
   };
 }
 
-/** A suggestion's list, landed, from the starter: null when it hasn't that piece, or was
+/** A suggestion's list, landed, from the starter: null when it hasn't that fragment, or was
  *  worked out with other filters than `filters` (a filterKey()). */
 export function landingFrom(
   starter: Starter,
@@ -101,19 +101,19 @@ export function landingFrom(
   filters: string,
   random: () => number = Math.random,
 ): (Landing & { counts: Counts }) | null {
-  const piece = filters === starter.filters ? starter.pieces[query] : undefined;
-  if (!piece || piece.landings.length === 0) return null;
-  const landing = piece.landings[Math.min(piece.landings.length - 1, Math.floor(random() * piece.landings.length))];
-  return { ...landing, counts: piece.counts };
+  const fragment = filters === starter.filters ? starter.fragments[query] : undefined;
+  if (!fragment || fragment.landings.length === 0) return null;
+  const landing = fragment.landings[Math.min(fragment.landings.length - 1, Math.floor(random() * fragment.landings.length))];
+  return { ...landing, counts: fragment.counts };
 }
 
 /** Rows [from, to) of a suggestion's list, if one of its landings holds them all; null otherwise. */
 export function rowsFrom(starter: Starter, query: string, filters: string, from: number, to: number): Suggestion[] | null {
-  const piece = filters === starter.filters ? starter.pieces[query] : undefined;
-  if (!piece) return null;
-  const total = piece.counts.total ?? 0;
+  const fragment = filters === starter.filters ? starter.fragments[query] : undefined;
+  if (!fragment) return null;
+  const total = fragment.counts.total ?? 0;
   const end = Math.min(to, total);
-  for (const l of piece.landings) {
+  for (const l of fragment.landings) {
     if (from >= l.from && end <= l.from + l.items.length) return l.items.slice(from - l.from, end - l.from);
   }
   return null;
@@ -124,8 +124,8 @@ export function rowsFrom(starter: Starter, query: string, filters: string, from:
  *  the list is in). Another word's key throws. */
 export function starterKeys(starter: Starter): WordKeys {
   const keys = new Map<number, string>();
-  for (const piece of Object.values(starter.pieces)) {
-    for (const l of piece.landings) for (const s of l.items) keys.set(s.id, s.key);
+  for (const fragment of Object.values(starter.fragments)) {
+    for (const l of fragment.landings) for (const s of l.items) keys.set(s.id, s.key);
   }
   const hash = unhex(starter.keysHash);
   return {
@@ -154,8 +154,8 @@ export function readStarter(json: unknown): Starter | null {
     typeof s.keysHash === "string" &&
     typeof s.filters === "string" &&
     Array.isArray(s.available) &&
-    typeof s.pieces === "object" &&
-    s.pieces !== null &&
+    typeof s.fragments === "object" &&
+    s.fragments !== null &&
     typeof s.files === "object" &&
     s.files !== null;
   return ok ? (s as Starter) : null;

@@ -3,19 +3,19 @@
 
 The list is what Wiktionary's labels get wrong: bad words whose first meaning
 is innocent (block), ordinary words or names that share a search key with
-an offensive one (allow), and pieces of a slur that every word containing them
+an offensive one (allow), and fragments of a slur that every word containing them
 reads as (contains: "snigger"). Its words are stored encoded, one per line, so
 the file isn't a readable list of slurs; this script decodes them for you.
 
   python scripts/safe_search_list.py show [allow|block|contains]
   python scripts/safe_search_list.py add block WORD [WORD ...]
   python scripts/safe_search_list.py add allow WORD [WORD ...]
-  python scripts/safe_search_list.py add contains PIECE [PIECE ...]
+  python scripts/safe_search_list.py add contains FRAGMENT [FRAGMENT ...]
   python scripts/safe_search_list.py remove WORD [WORD ...]
 
 Quote a phrase: add block "two words". The index builder applies the list (an
 allowed word's plurals and tenses stay visible too; a blocked word is just
-that word, so list its plural as well; a piece hides every word containing
+that word, so list its plural as well; a fragment hides every word containing
 it, unless allowed), and so does the app when it loads, so an edit shows
 without rebuilding the index. Each build writes headwords.safe-review.tsv to
 find candidates in.
@@ -30,7 +30,7 @@ PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data", "s
 SECTIONS = ("allow", "block", "contains")
 HEADER = """\
 # Safe search: hand-picked words to allow (always shown) or block (always
-# hidden), and pieces that hide every word containing them, on top of the
+# hidden), and fragments that hide every word containing them, on top of the
 # rule in docs/index-format.md#safe-search.
 # Encoded (ROT13, then base64) so the file isn't a readable word list.
 # Show or edit it with: python scripts/safe_search_list.py
@@ -46,7 +46,7 @@ def decode(token):
 
 
 def parse(text):
-    """{"allow": [words], "block": [words], "contains": [pieces]}, decoded, in file order."""
+    """{"allow": [words], "block": [words], "contains": [fragments]}, decoded, in file order."""
     sections = {name: [] for name in SECTIONS}
     current = None
     for n, line in enumerate(text.splitlines(), 1):
@@ -101,7 +101,7 @@ def main(argv):
     with open(PATH, "w", encoding="utf-8") as f:
         f.write(render(sections))
     print(f"{len(sections['allow'])} allowed, {len(sections['block'])} blocked, "
-          f"{len(sections['contains'])} piece(s)")
+          f"{len(sections['contains'])} fragment(s)")
 
 
 if __name__ == "__main__":

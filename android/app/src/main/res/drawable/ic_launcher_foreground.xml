@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- App icon foreground: three words lined up on the seam, the matched piece in magenta.
+<!-- App icon foreground: three words lined up on the seam, the matched fragment in magenta.
      Same drawing as docs/brand/icon.svg; 108x108 adaptive-icon canvas, art inside the 66dp safe zone. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp" android:height="108dp"

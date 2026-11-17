@@ -4,7 +4,7 @@
 - **Date:** 2026-11-12
 - **Deciders:** project owner
 - **Builds on:** [ADR-0008](0008-web-start-in-layers.md) (the page and its data kept on the device)
-- **Related:** `web/shell.ts`, `web/main.ts` (history, place), `web/install.ts`, `web/sw.js`,
+- **Related:** `web/shell.ts`, `web/main.ts` (history, place), `web/sw.js`,
   `web/theme.ts`, `web/theme-boot.js`, `web/dots.ts`, `tools/web-app.ts`,
   `tools/theme-script.ts`, `tools/make-icons.ts`, `web/icons/`, `e2e/back.spec.ts`,
   `e2e/place.spec.ts`, `e2e/install.spec.ts`, `e2e/theme.spec.ts`, `e2e/built/install.spec.ts`,
@@ -63,9 +63,11 @@ showing anything. The Android app does all of these better already.
   `tools/make-icons.ts` and committed in `web/icons/`: rounded "any" icons (192, 512),
   a square "maskable" one (512) whose glyph sits inside the 80% safe circle, and an opaque
   180 px `apple-touch-icon`. The splash and bars use the light paper colour.
-- **Install** in Settings, only where the browser offers it (`beforeinstallprompt`, Chromium),
-  asking the browser's own prompt; never in an app; the browser's own ways to install are left
-  alone (no `preventDefault`).
+- ~~**Install** in Settings, only where the browser offers it (`beforeinstallprompt`,
+  Chromium), asking the browser's own prompt.~~ Taken out on 2026-11-16 (the owner's call:
+  Settings never has an Install button), with `web/install.ts`. Installing is the browser's
+  own to offer; its ways to install are left alone (no `preventDefault`), and
+  `e2e/install.spec.ts` now checks that Settings has no Install even when the browser offers.
 - **The service worker** moves from `tools/web-data.ts` to `tools/web-app.ts` and keeps the
   manifest, icons and theme script with the page. Its build name now hashes each file's
   contents, not only names: the manifest and icons keep their names from build to build.

@@ -3,7 +3,7 @@
 Read this first in a new chat, then `.claude/CLAUDE.md`. Update it at the end of any
 session that changes what's below (newest state only; history lives in git).
 
-_Last updated: 2026-11-16, at v0.7.6, the first release with a Play app bundle (its run's `play-app-bundle`) and the store work (ADR-0010); in no store yet. Next: Google Play's internal test track._
+_Last updated: 2026-11-16 (branch `tutorial-and-help-wording`: fragment wording, help sheet, wheels shown in the tour, no Install in Settings; unreleased), at v0.7.6, the first release with a Play app bundle (its run's `play-app-bundle`) and the store work (ADR-0010); in no store yet. Next: Google Play's internal test track._
 
 ## What it is
 
@@ -81,7 +81,7 @@ built from the English Wiktionary dump by `scripts/build_fm_index.py`.
   are no longer kept between starts; Settings' switches are, and the installed app asks for
   persistent storage.
 - A first-run tour (5 steps, in order: search, scrub, peek, filters, settings; each shown,
-  then asked for, what to touch lit in place, the slider shown by a touch) and How It Works behind the "?" (`web/guide.ts`,
+  then asked for, what to touch lit in place, the slider and the Filters sheet's two wheels each shown by a touch) and How It Works behind the "?" (`web/guide.ts`,
   `web/coach.ts`, `web/tour-shows.ts`, `web/hands.ts`).
   Guarded by `e2e/tour.spec.ts` (including a frame-by-frame smoothness check), the Playwright
   project `first-run`, which runs every other e2e test again with the tour on, and
@@ -102,7 +102,7 @@ built from the English Wiktionary dump by `scripts/build_fm_index.py`.
   `tools/web-data.ts` when `DICTIONARIUS_WEB=1` (pages.yml); the APK is unchanged. Check on Pages that Range requests come back exact (206) and that Settings
   reaches "Saved on this device". `npm run test:e2e:built` tests the published build.
 - Installable web app (ADR-0009, released in v0.7.2): a manifest and icons (web build only),
-  Install in Settings where the browser offers it; installed, it behaves like the Android app
+  installed with the browser's own Install (Settings has no Install button, since 2026-11-16); installed, it behaves like the Android app
   (Back word → results → start screen → out, place kept, straight back to a word that was open),
   decided in `web/shell.ts`; once kept, the page opens from the device at once. A new build
   (branch `reload-into-new-build`, unreleased, stacked on `restart-stalled-download`): the open
@@ -192,7 +192,7 @@ built from the English Wiktionary dump by `scripts/build_fm_index.py`.
    On the phone, confirm reading in place (ADR-0005): `adb shell dumpsys meminfo
    io.github.smitravitz.dictionarius` should show about 57 MB less than v0.5.x, and a
    word page should still feel instant (Chromium: 85–97 ms for an uncached block).
-4. Check the newer suggestion pieces in `web/examples.ts` against real word counts.
+4. Check the newer suggestion fragments in `web/examples.ts` against real word counts.
 5. ADR-0006 gates: the `LTRS` letter column first, then the positions layer and the
    letter keyboard / pattern field.
 6. ADR-0007 (planning only, nothing started): pronunciations for the 92.7% of words

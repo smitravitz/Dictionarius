@@ -153,7 +153,7 @@ KEPT_CATEGORIES = EXPLICIT_CATEGORIES | SLUR_CATEGORIES
 EXPLICIT_LABELS = EXPLICIT_TAGS | {"cat:" + c for c in EXPLICIT_CATEGORIES}
 SLUR_LABELS = SLUR_TAGS | {"cat:" + c for c in SLUR_CATEGORIES}
 BLOCKED = "blocked by hand"
-CONTAINS = "contains a blocked piece"
+CONTAINS = "contains a blocked fragment"
 CANDIDATE = "a slur meaning further down"
 
 
@@ -310,19 +310,19 @@ class Labels:
 
 
 def read_safe_search_list(text):
-    """(allow, block, pieces), normalized, from the encoded hand-picked list
+    """(allow, block, fragments), normalized, from the encoded hand-picked list
     (data/safe-search.list, see scripts/safe_search_list.py)."""
     sections = safe_search_list.parse(text)
-    allow, block, pieces = (frozenset(normalize(w) for w in sections[name]) for name in safe_search_list.SECTIONS)
+    allow, block, fragments = (frozenset(normalize(w) for w in sections[name]) for name in safe_search_list.SECTIONS)
     both = allow & block
     if both:
         raise ValueError(f"{len(both)} word(s) both allowed and blocked")
-    return allow, block, pieces
+    return allow, block, fragments
 
 
-def explicit_keys(keys, forms_by_key, reasons, allow=frozenset(), block=frozenset(), pieces=frozenset()):
+def explicit_keys(keys, forms_by_key, reasons, allow=frozenset(), block=frozenset(), fragments=frozenset()):
     """(id, reason) of each search key safe search hides: blocked keys, keys
-    containing a blocked piece, and keys whose most common written form is
+    containing a blocked fragment, and keys whose most common written form is
     explicit (ties: the lowercase form). Call after word_frequencies(), which
     ranks forms."""
     out = []
@@ -332,7 +332,7 @@ def explicit_keys(keys, forms_by_key, reasons, allow=frozenset(), block=frozense
         if key in block:
             out.append((i, BLOCKED))
             continue
-        if any(p in key for p in pieces):
+        if any(p in key for p in fragments):
             out.append((i, CONTAINS))
             continue
         word = main_form(key, forms_by_key[key])
@@ -974,13 +974,13 @@ def main():
             log("  wordfreq not installed, skipping frequencies (pip install wordfreq)")
 
     # Safe search's rule, worked out now: it also breaks ties between display forms.
-    reasons, allow, block, pieces = {}, frozenset(), frozenset(), frozenset()
+    reasons, allow, block, fragments = {}, frozenset(), frozenset(), frozenset()
     if labels.seen:
         if args.safe_search_list:
             with open(args.safe_search_list, encoding="utf-8") as f:
-                allow, block, pieces = read_safe_search_list(f.read())
+                allow, block, fragments = read_safe_search_list(f.read())
             log(f"  safe search hand-picked list: {len(allow):,} allowed, {len(block):,} blocked, "
-                f"{len(pieces):,} piece(s)")
+                f"{len(fragments):,} fragment(s)")
         reasons = labels.explicit_reasons(allow)
         EXPLICIT_FORMS.update(reasons)
 
@@ -1023,7 +1023,7 @@ def main():
     # Safe search: a key is explicit when its most common written form is.
     explicit_ids = None
     if labels.seen:
-        hidden = explicit_keys(keys, forms_by_key, reasons, allow, block, pieces)
+        hidden = explicit_keys(keys, forms_by_key, reasons, allow, block, fragments)
         shown = candidate_keys(keys, forms_by_key, {**labels.candidates(reasons), **reasons}, hidden, allow)
         explicit_ids = [i for i, _ in hidden]
         sections.append(("EXPLICIT", np.array(explicit_ids, dtype="<u4")))

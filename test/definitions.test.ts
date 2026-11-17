@@ -6,7 +6,7 @@ import { Completer } from "../src/complete";
 import { defaultFilters } from "../src/filters";
 import { SAFE_SEARCH_OVERRIDES } from "../src/safe-search-overrides";
 import { buildStarter, starterKeys } from "../src/starter";
-import { PIECES } from "../web/examples";
+import { FRAGMENTS } from "../web/examples";
 
 // The definitions (docs/definitions-format.md): every word's meanings by the
 // index's word id, in compressed blocks, with examples, etymology and
@@ -437,7 +437,7 @@ describe("definitions before the word list is in", () => {
   const completer = new Completer(index, SAFE_SEARCH_OVERRIDES);
   // The fixture's definitions cover a few words: suggestions made of them hold them.
   const covered = [6177, 7732, 12272, 13011, 15791, 17056].map((id) => index.key(id));
-  const starter = buildStarter(index, completer, [...PIECES.map(([p]) => p), ...covered], defaultFilters());
+  const starter = buildStarter(index, completer, [...FRAGMENTS.map(([p]) => p), ...covered], defaultFilters());
   const file = (ext: string) => bytesSource(new Uint8Array(readFileSync(`${base}${ext}`)));
   const open = (keys: WordKeys) =>
     DefinitionsFile.open(file(".definitions.bin"), keys, Object.fromEntries(LAYERS.map((kind) => [kind, file(`.${kind}.bin`)])));
@@ -445,7 +445,7 @@ describe("definitions before the word list is in", () => {
   it("reads a starter word's page with the starter's keys, as with the word list", async () => {
     const early = await open(starterKeys(starter));
     const later = await open(index);
-    const ids = Object.values(starter.pieces).flatMap((p) => p.landings.flatMap((l) => l.items.map((s) => s.id)));
+    const ids = Object.values(starter.fragments).flatMap((p) => p.landings.flatMap((l) => l.items.map((s) => s.id)));
     expect(ids.length).toBeGreaterThan(50);
     let withDefinitions = 0;
     for (const id of new Set(ids)) {

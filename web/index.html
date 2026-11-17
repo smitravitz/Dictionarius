@@ -62,10 +62,9 @@
       </header>
 
       <!-- The start screen is a title page: the name above (the masthead's, set large), what it
-           does, a worked example, and the facts. It gives way to the results once you type. -->
+           does and the facts; a worked example goes under the search field. It gives way to the results once you type. -->
       <section class="title-page" id="title" aria-label="About">
         <p class="tagline">The English dictionary that finds a word from any part of it.</p>
-        <p class="specimen">“<mark>eren</mark>” finds s<mark>eren</mark>e, coh<mark>eren</mark>t, adh<mark>eren</mark>ce, etc.</p>
         <p class="facts" id="facts">Loading the word list…</p>
       </section>
 
@@ -107,14 +106,16 @@
           </svg>
         </button>
       </div>
+      <!-- A worked example, under the field it's about; the start screen's only. -->
+      <p class="specimen">“<mark>eren</mark>” finds s<mark>eren</mark>e, coh<mark>eren</mark>t, adh<mark>eren</mark>ce, etc.</p>
       <p class="summary" id="summary" aria-live="polite"></p>
       <!-- Each range filter that's set (word length), so it isn't forgotten, with a cross to clear it. -->
       <div class="active-filters" id="active-filters" hidden></div>
 
-      <!-- No words of its own: the first-run tour and How It Works say what the pieces do. -->
-      <section class="intro" id="intro" aria-label="Pieces to search for">
+      <!-- No words of its own: the first-run tour and How It Works say what the fragments do. -->
+      <section class="intro" id="intro" aria-label="Fragments to search for">
         <div class="bag-wrap">
-          <!-- Two lanes of pieces drifting slowly (main.ts), sized a little by how many words each finds. -->
+          <!-- Two lanes of fragments drifting slowly (main.ts), sized a little by how many words each finds. -->
           <div class="carousel" id="examples"></div>
         </div>
       </section>
@@ -178,26 +179,20 @@
         <div id="switches"></div>
         <!-- A browser: how keeping the dictionary on this device ended (the bar shows it under way). -->
         <p class="offline-note" id="offline" role="status" hidden></p>
-        <!-- Where the browser offers it (web/install.ts): install as an app of its own. -->
-        <div class="install" id="install" hidden>
-          <span class="setting-text">
-            <span class="setting-name">Install as an app</span>
-            <span class="setting-help" id="install-help">Opens from your home screen, in a window of its own.</span>
-          </span>
-          <button class="install-button" id="install-button" type="button" aria-describedby="install-help">Install</button>
-        </div>
         <button class="settings-done" value="done">Done</button>
       </form>
     </dialog>
     <dialog class="settings" id="help" aria-labelledby="help-title">
       <form method="dialog">
-        <h2 class="settings-title" id="help-title">How It Works</h2>
+        <!-- The title, and at its right, in the sheet's top right corner, Tutorial: the
+             first-run tour again, from the start screen. -->
+        <div class="settings-head">
+          <h2 class="settings-title" id="help-title">How It Works</h2>
+          <button class="help-tour" id="help-tour" type="button">Tutorial</button>
+        </div>
         <!-- The controls, in web/guide.ts's words. -->
         <dl class="guide" id="guide"></dl>
-        <div class="help-actions">
-          <button class="help-tour" id="help-tour" type="button">Show me again</button>
-          <button class="settings-done" value="done">Done</button>
-        </div>
+        <button class="settings-done" value="done">Done</button>
       </form>
     </dialog>
     <!-- The first-run tour (web/coach.ts): a note saying what to do, while what to touch is
@@ -217,6 +212,9 @@
         <div id="ranges"></div>
         <button class="settings-done" value="done">Done</button>
       </form>
+      <!-- The tour's touch for the wheels (web/tour-shows.ts): inside the sheet, which is
+           drawn over everything else on the page, the page's own touch included. -->
+      <div class="coach-touch" id="filters-touch" aria-hidden="true" hidden></div>
     </dialog>
     <script type="module" src="./main.ts"></script>
   </body>

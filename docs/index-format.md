@@ -179,7 +179,7 @@ explicit, so a slur spelling such as `RuSSian` can't hide `Russian`).
 names search keys to **block** (bad words whose first meaning is innocent, and
 ones the labels miss), to **allow** (names and ordinary words that share a
 key with an offensive word, and the odd ordinary word a chain of spellings
-reaches, such as `foo`), and pieces whose words all **contain** a slur, which
+reaches, such as `foo`), and fragments whose words all **contain** a slur, which
 hide every key containing them (`snigger` reads as the slur in it; so do
 compounds such as `glownigger` that Wiktionary doesn't label). Allow wins. It is stored encoded so the repository doesn't
 carry a readable list of slurs; `python scripts/safe_search_list.py show`

@@ -1,15 +1,15 @@
 /**
- * The suggestions on the start screen: general, telling pieces of English
+ * The suggestions on the start screen: general, telling fragments of English
  * words, shown plain ("tion", "ough", "ere"), in two slowly drifting lanes,
  * shuffled each time the app starts. Tapping one opens its words around the
- * middle of its list (src/landing.ts), so where the piece sits in a word
+ * middle of its list (src/landing.ts), so where the fragment sits in a word
  * needn't be spelled out.
  *
- * `words` is how many times the piece occurs in the full index's 1,357,380
+ * `words` is how many times the fragment occurs in the full index's 1,357,380
  * search keys (phrases and names included), counted with the builder's index
  * reader for data-4c057f0a. It only sizes the tiles, a little; it isn't shown.
  */
-export const PIECES: readonly (readonly [piece: string, words: number])[] = [
+export const FRAGMENTS: readonly (readonly [fragment: string, words: number])[] = [
   ["tion", 43232],
   ["ough", 3259],
   ["ology", 2495],
@@ -49,7 +49,7 @@ export const PIECES: readonly (readonly [piece: string, words: number])[] = [
 /** Lanes of suggestions on the start screen. */
 export const LANES = 2;
 
-/** Where a piece's word count falls between the fewest and most, on a log
+/** Where a fragment's word count falls between the fewest and most, on a log
  *  scale: 0 for the fewest, 1 for the most (a tile's size follows it). */
 export function tileWeight(words: number, all: readonly number[]): number {
   const lo = Math.log(Math.min(...all));

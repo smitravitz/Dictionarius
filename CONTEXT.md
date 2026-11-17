@@ -36,7 +36,7 @@ decision or module makes it load-bearing.
   (0 = the headword starts with the typed text).
 - **Start screen** — what shows with nothing typed: a title page (the name set
   large, what Dictionarius does, a worked example, the word count), the field,
-  and the **suggestions** (`web/examples.ts`): general pieces of words, shown
+  and the **suggestions** (`web/examples.ts`): general fragments of words, shown
   plain ("tion", "ough", "ere"), in two lanes drifting slowly opposite ways,
   shuffled each start, each tile a little bigger the more words it finds.
   Tapping one opens its words around the middle of the list (**landing**,
@@ -71,20 +71,25 @@ decision or module makes it load-bearing.
   **word columns** in the index (`LEN`, `NAME`, `SHAPE`); a choice compiles to
   one **WordFilter** that every list and count goes through (ADR-0003).
 - **Tour** — what a first run is shown (`web/guide.ts`, drawn by `web/coach.ts`): five
-  things to do, in order, each moving on only when the person does it: search (tap a piece),
+  things to do, in order, each moving on only when the person does it: search (tap a fragment),
   scrub (hold beside a word and slide), **peek** (hold a word), filters (the funnel),
   settings (the cog). A note at the foot says which ("2 of 5"), never covering what it's
   about; a step done is ticked, and the next waits until the person has let go and been still
   a moment (`web/hands.ts`). Each step's **show** (`web/tour-shows.ts`) acts it out, then
   asks, by **lighting** what to touch: a see-through wash drawn by the thing itself, so it
-  moves with it, fading and breathing (opacity only). Pieces and words are lit in turn, in
-  no particular order; a sheet's options in turn once it's open. The slider is held in empty
+  moves with it, fading and breathing (opacity only). Fragments and words are lit in turn, in
+  no particular order; Settings' options in turn once it's open. In the Filters sheet the
+  wheels are shown in turn, left then right: each lit with its label while a touch swipes
+  it up a little and back, the real wheel turning with it and choosing nothing; closing the
+  sheet, a wheel touched or not, is the step done. The slider is held in empty
   space, which has nothing to light, so a **touch** shows it: it presses beside a word and
   slides out and back with the histogram, the real slider and list following, then the list
   is put back; again after 5 still seconds. A show never counts as the person's go, starts
   only on a still screen and gives way to any touch. Done or skipped, it's remembered on the
   device (`dictionarius.tour`). **How It Works** (the "?" by the cog) lists the controls;
-  Show me again starts the tour over on the start screen, the funnel's filters cleared.
+  Tutorial, in its top right corner beside the title, starts the tour over on the start screen, the funnel's
+  filters cleared. Finished, the note says "Tutorial complete.", and on a line of its own where to
+  see it again (the "?").
 - **Navigation buttons** — back, home (the start screen) and forward over the top corners
   of the list and of a word's page, in the cog's grey, for a mouse: back and forward step
   through the words followed, as a swipe does; back from the list goes home. The slider's
@@ -140,8 +145,9 @@ decision or module makes it load-bearing.
   the results and a word's page (the trail is one step); in a tab, the results and a word's
   page. Going somewhere by hand takes the steps it left out of the history, so Back never does
   nothing.
-- **Install** — Settings' button where the browser offers to install the page
-  (`web/install.ts`); the manifest and icons are the web build's (`tools/web-app.ts`,
+- **Install** — the browser's own to offer (its menu or address bar; on iPhone, Share → Add
+  to Home Screen): the app has no Install button of its own, in Settings or anywhere, and
+  never holds the browser's offer back; the manifest and icons are the web build's (`tools/web-app.ts`,
   `web/icons/` from `tools/make-icons.ts`).
 - **Theme** — light or dark: dark on every device, unless the person picks light with the
   switch at the top right of Settings (`web/theme.ts`, `web/theme-choice.ts`); only light is

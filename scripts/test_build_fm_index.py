@@ -245,14 +245,14 @@ class Keys(unittest.TestCase):
         self.assertEqual(display_forms("rude", forms["rude"]), ["rude", "Rude"])
         self.assertEqual(explicit_keys(["nameword", "rude"], forms, reasons), [(1, "main meaning")])
 
-    def test_a_piece_hides_every_key_that_contains_it(self):
-        # "snigger" reads as the slur in it: a hand-picked piece hides every key
+    def test_a_fragment_hides_every_key_that_contains_it(self):
+        # "snigger" reads as the slur in it: a hand-picked fragment hides every key
         # containing it, unless that key is allowed.
         keys = ["air gap", "gap", "gapword", "plain", "sgappy"]
         forms = {k: {k} for k in keys}
-        found = explicit_keys(keys, forms, {}, allow={"air gap"}, pieces={"gap"})
-        self.assertEqual(found, [(1, "contains a blocked piece"), (2, "contains a blocked piece"),
-                                 (4, "contains a blocked piece")])
+        found = explicit_keys(keys, forms, {}, allow={"air gap"}, fragments={"gap"})
+        self.assertEqual(found, [(1, "contains a blocked fragment"), (2, "contains a blocked fragment"),
+                                 (4, "contains a blocked fragment")])
 
     def test_a_key_is_a_name_when_its_most_common_spelling_is(self):
         # "turkey" (the bird) ties with "Turkey" (the country): the plain key
@@ -291,14 +291,14 @@ class HandPickedList(unittest.TestCase):
                                         "contains": ["Gapp"]})
         self.assertNotIn("Gapword", text)  # encoded
         self.assertNotIn("Gapp", text)
-        allow, block, pieces = read_safe_search_list(text)
+        allow, block, fragments = read_safe_search_list(text)
         self.assertEqual(allow, {"boy", "fun run", "cafe"})
         self.assertEqual(block, {"gapword"})
-        self.assertEqual(pieces, {"gapp"})
+        self.assertEqual(fragments, {"gapp"})
 
-    def test_a_list_without_pieces_reads(self):
-        allow, block, pieces = read_safe_search_list(safe_search_list.render({"allow": ["boy"], "block": []}))
-        self.assertEqual((allow, block, pieces), ({"boy"}, set(), set()))
+    def test_a_list_without_fragments_reads(self):
+        allow, block, fragments = read_safe_search_list(safe_search_list.render({"allow": ["boy"], "block": []}))
+        self.assertEqual((allow, block, fragments), ({"boy"}, set(), set()))
 
     def test_a_word_outside_a_section_is_an_error(self):
         with self.assertRaises(ValueError):
@@ -314,10 +314,10 @@ class HandPickedList(unittest.TestCase):
 
     def test_the_shipped_list_reads(self):
         with open(safe_search_list.PATH, encoding="utf-8") as f:
-            allow, block, pieces = read_safe_search_list(f.read())
+            allow, block, fragments = read_safe_search_list(f.read())
         self.assertTrue(allow)
         self.assertTrue(block)
-        self.assertTrue(pieces)
+        self.assertTrue(fragments)
 
 
 class LabelsCache(unittest.TestCase):

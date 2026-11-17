@@ -1,7 +1,7 @@
 import XCTest
 
 /// Opens the installed app in a simulator and does what a person does first: waits for the
-/// word list, searches for a piece of a word, opens a word and reads its meaning. Each screen
+/// word list, searches for a fragment of a word, opens a word and reads its meaning. Each screen
 /// is kept as a picture (ios.yml pulls them out of the result).
 ///
 /// It is the only thing that runs the real iOS app before a phone does: the page in iOS's own
@@ -9,9 +9,9 @@ import XCTest
 /// file a block at a time. The app must be built with the sample word list named as the real
 /// one is (ios.yml does that), and it finds the page's parts the way VoiceOver does.
 final class SimulatorRun: XCTestCase {
-    /// A piece to type, a word among its results, and words from that word's meaning and
+    /// A fragment to type, a word among its results, and words from that word's meaning and
     /// example in the sample list (test/fixtures/headwords-sample.golden.json).
-    private let piece = "ingot"
+    private let fragment = "ingot"
     private let word = "ingot"
     private let fromItsMeaning = "cast metal"
 
@@ -33,14 +33,14 @@ final class SimulatorRun: XCTestCase {
         skipTheTour(waiting: 20)
         keep("1-start")
 
-        // Type a piece of a word.
+        // Type a fragment of a word.
         let box = searchBox()
         XCTAssertTrue(box.waitForExistence(timeout: 20), "no search box")
         tapOnScreen(box)
-        box.typeText(piece)
+        box.typeText(fragment)
         skipTheTour(waiting: 3)
         guard let row = resultRow(labelled: word, below: box, waiting: 30) else {
-            return XCTFail("no results for \(piece)")
+            return XCTFail("no results for \(fragment)")
         }
         keep("2-search")
 

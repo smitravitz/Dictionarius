@@ -386,7 +386,7 @@ body {
 
 /* With nothing typed, the start screen is a title page: the masthead's name
    set large under the cog, what Dictionarius does, a worked example and the
-   facts; then the field; then the bag of pieces at the foot. Typing anything
+   facts; then the field; then the bag of fragments at the foot. Typing anything
    brings back the usual header (the name small, the word count). */
 .app:has(> .intro:not([hidden])) .masthead {
   flex-wrap: wrap;
@@ -427,7 +427,8 @@ body {
 }
 
 .app:has(> .intro:not([hidden])) .status,
-.app:has(> .intro[hidden]) > .title-page {
+.app:has(> .intro[hidden]) > .title-page,
+.app:has(> .intro[hidden]) > .specimen {
   display: none;
 }
 
@@ -444,8 +445,10 @@ body {
   text-wrap: balance;
 }
 
+/* The worked example, under the search field it's about (the start screen only). */
 .specimen {
-  margin: 1.375rem 0 0;
+  margin: 0.25rem 0 0;
+  padding: 0 var(--pad);
   color: var(--pencil);
   font-family: var(--font-word);
   font-size: 1.1875rem;
@@ -575,7 +578,7 @@ body {
   }
 }
 
-/* --k (0-1) says how many words the piece finds, among the bag's: a tile is
+/* --k (0-1) says how many words the fragment finds, among the bag's: a tile is
    17-21 px. A 44 px tap target around a level 42 px tile whose letters lean. */
 .tile {
   flex: none;
@@ -627,7 +630,6 @@ body {
   .tagline {
     margin-top: 0.875rem;
   }
-  .specimen,
   .facts {
     margin-top: 1rem;
   }
@@ -1268,8 +1270,7 @@ a:focus-visible {
   font-weight: 500;
 }
 
-.setting,
-.install {
+.setting {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1348,35 +1349,6 @@ a:focus-visible {
   font-size: 0.8125rem;
   line-height: 1.4;
   font-variant-numeric: tabular-nums; /* the percentage doesn't jitter as it climbs */
-}
-
-/* Install as an app: a row like a switch's, with a button where the switch would be (not a
-   switch: the tour lights only those). */
-.install {
-  margin-top: 0.75rem;
-  cursor: default;
-}
-
-.install-button {
-  flex: none;
-  min-height: 44px;
-  padding: 0.5rem 1rem;
-  border: 1px solid var(--hairline);
-  border-radius: 0.375rem;
-  background: transparent;
-  color: var(--proof);
-  font: inherit;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.install-button:hover {
-  background: var(--proof-wash);
-}
-
-.install-button:focus-visible {
-  outline: 2px solid var(--proof);
-  outline-offset: 2px;
 }
 
 .settings-done {
@@ -1684,15 +1656,13 @@ a:focus-visible {
   font-size: 0.9375rem;
   line-height: 1.4;
 }
-.help-actions {
-  display: flex;
-  justify-content: space-between;
-  align-items: end;
-  gap: 1rem;
-}
+/* Tutorial, in the sheet's top right corner, level with the title (the sheet's head row,
+   like Settings' light/dark switch): its tap area reaches into the padding, so its word
+   lines up with the right edge of what's below. */
 .help-tour {
+  flex: none;
   min-height: 44px;
-  padding: 0.5rem 0;
+  padding: 0.5rem 0.75rem;
   border: 0;
   background: transparent;
   color: var(--pencil);
@@ -1787,7 +1757,8 @@ a:focus-visible {
   will-change: opacity;
 }
 
-/* The touch that shows where to hold for the slider (web/tour-shows.ts): a fingertip of
+/* The touch that shows where to hold for the slider, and how a wheel turns in the Filters
+   sheet, which has one of its own inside it (web/tour-shows.ts): a fingertip of
    the proof colour, moved by translate and pressed and lifted by opacity and scale, all on
    the compositor. With reduced motion it stands still, an arrow saying which way. */
 .coach-touch {
@@ -1815,6 +1786,10 @@ a:focus-visible {
   translate: 0 -50%;
   color: var(--proof);
   font-size: 1.25rem;
+}
+/* Over a wheel (the Filters sheet): it turns up and down. */
+.coach-touch[data-still="upright"]::after {
+  content: "↕";
 }
 
 /* Back, home and forward, for a mouse (main.ts): in a strip of their own at the top of the

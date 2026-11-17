@@ -96,7 +96,7 @@ for (const app of apps) {
     });
 
     test("a suggestion's list is a step too", async ({ page }) => {
-      await page.emulateMedia({ reducedMotion: "reduce" }); // the pieces hold still to be tapped
+      await page.emulateMedia({ reducedMotion: "reduce" }); // the fragments hold still to be tapped
       await page.locator("#examples button[data-query='ing']").first().click();
       await expect(page.locator("#frame")).toBeVisible();
       await expect(page.locator("#q")).toHaveValue("ing");
