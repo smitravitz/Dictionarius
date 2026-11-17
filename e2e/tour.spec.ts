@@ -230,7 +230,8 @@ test("a first run is shown five things, one at a time, and moves on as each is d
     return seen.size;
   }, { timeout: 15_000 }).toBe(options);
   await page.locator("#settings").getByRole("button", { name: "Done" }).click();
-  await expect(words(page)).toHaveText("Tutorial complete. Tap ? to review How It Works at any time.");
+  // The closing note: two lines.
+  await expect.poll(() => words(page).evaluate((el) => (el as HTMLElement).innerText)).toBe("Tutorial complete.\nTap ? to review the Tutorial at any time.");
   await expect(page.locator("[data-tour-lit]")).toHaveCount(0);
   await expect(card(page)).toBeHidden({ timeout: 8000 });
 

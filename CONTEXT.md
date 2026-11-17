@@ -88,7 +88,8 @@ decision or module makes it load-bearing.
   only on a still screen and gives way to any touch. Done or skipped, it's remembered on the
   device (`dictionarius.tour`). **How It Works** (the "?" by the cog) lists the controls;
   Tutorial, in its top right corner beside the title, starts the tour over on the start screen, the funnel's
-  filters cleared. Finished, the note says "Tutorial complete".
+  filters cleared. Finished, the note says "Tutorial complete.", and on a line of its own where to
+  see it again (the "?").
 - **Navigation buttons** — back, home (the start screen) and forward over the top corners
   of the list and of a word's page, in the cog's grey, for a mouse: back and forward step
   through the words followed, as a swipe does; back from the list goes home. The slider's
