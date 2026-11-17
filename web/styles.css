@@ -1656,13 +1656,13 @@ a:focus-visible {
   font-size: 0.9375rem;
   line-height: 1.4;
 }
-/* Tutorial, in the sheet's top left corner: its tap area reaches up into the padding, so
-   its word sits level with where a sheet's title starts. */
+/* Tutorial, in the sheet's top right corner, level with the title (the sheet's head row,
+   like Settings' light/dark switch): its tap area reaches into the padding, so its word
+   lines up with the right edge of what's below. */
 .help-tour {
-  display: block;
+  flex: none;
   min-height: 44px;
-  margin: -0.75rem 0 0.125rem;
-  padding: 0.5rem 0.75rem 0.5rem 0;
+  padding: 0.5rem 0.75rem;
   border: 0;
   background: transparent;
   color: var(--pencil);

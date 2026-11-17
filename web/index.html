@@ -184,9 +184,12 @@
     </dialog>
     <dialog class="settings" id="help" aria-labelledby="help-title">
       <form method="dialog">
-        <!-- In the sheet's top left corner: the first-run tour again, from the start screen. -->
-        <button class="help-tour" id="help-tour" type="button">Tutorial</button>
-        <h2 class="settings-title" id="help-title">How It Works</h2>
+        <!-- The title, and at its right, in the sheet's top right corner, Tutorial: the
+             first-run tour again, from the start screen. -->
+        <div class="settings-head">
+          <h2 class="settings-title" id="help-title">How It Works</h2>
+          <button class="help-tour" id="help-tour" type="button">Tutorial</button>
+        </div>
         <!-- The controls, in web/guide.ts's words. -->
         <dl class="guide" id="guide"></dl>
         <button class="settings-done" value="done">Done</button>

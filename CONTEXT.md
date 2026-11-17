@@ -87,7 +87,7 @@ decision or module makes it load-bearing.
   is put back; again after 5 still seconds. A show never counts as the person's go, starts
   only on a still screen and gives way to any touch. Done or skipped, it's remembered on the
   device (`dictionarius.tour`). **How It Works** (the "?" by the cog) lists the controls;
-  Tutorial, in its top left corner, starts the tour over on the start screen, the funnel's
+  Tutorial, in its top right corner beside the title, starts the tour over on the start screen, the funnel's
   filters cleared. Finished, the note says "Tutorial complete".
 - **Navigation buttons** — back, home (the start screen) and forward over the top corners
   of the list and of a word's page, in the cog's grey, for a mouse: back and forward step

@@ -782,13 +782,15 @@ test("the ? beside the cog shows How It Works, and Tutorial starts the tour over
     "to filter words by length",
     "to choose what the list shows, like safe search",
   ]);
-  // Tutorial: in the sheet's top left corner, above everything else in it.
+  // Tutorial: in the sheet's top right corner, level with its title, a thumb's size.
   const tutorial = sheet.getByRole("button", { name: "Tutorial", exact: true });
   await expect(sheet.getByRole("button", { name: "Show me again" })).toHaveCount(0);
   const [corner, link, heading] = [(await sheet.boundingBox())!, (await tutorial.boundingBox())!, (await sheet.getByRole("heading").boundingBox())!];
-  expect(link.x - corner.x).toBeLessThan(32);
+  expect(corner.x + corner.width - (link.x + link.width)).toBeLessThan(32);
   expect(link.y - corner.y).toBeLessThan(32);
-  expect(link.y + link.height).toBeLessThanOrEqual(heading.y + 1);
+  expect(link.x).toBeGreaterThan(heading.x + heading.width); // beside the title, not over it
+  expect(Math.abs(link.y + link.height / 2 - (heading.y + heading.height / 2))).toBeLessThan(4);
+  expect(link.height).toBeGreaterThanOrEqual(44);
   await tutorial.click();
   await expect(sheet).toBeHidden();
   // Back to the start screen, where the tour begins, the first step showing.
