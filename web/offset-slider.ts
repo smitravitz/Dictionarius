@@ -7,7 +7,9 @@
  * right, as tall as the words found there, and as wide as position-scale.ts
  * gives it: 4-6 letters wide, 6 at about 75%, the rare far end squeezed. A
  * cursor marks the chosen bar; the margins either side count as the first and
- * last position, so the ends are easy to reach. Each step ticks; the list
+ * last position, so the ends are easy to reach. Dotted spread bands behind the
+ * bars mark where the middle 68.3% and 95.4% of the words lie, labelled in a
+ * ruler under them (spread-bands.ts). Each step ticks; the list
  * scrolls to the words at that position as you go, and stays whole: scroll up
  * or down from there.
  *
@@ -19,8 +21,10 @@
  */
 import { pulse, tick } from "./haptics";
 import { positionDots, positionScale, type PositionScale } from "./position-scale";
+import { spreadBands } from "./spread-bands";
 
 const TRACK_SHARE = 0.8; // the active range, of the width; the margins either side reach the ends
+const LABEL_ROOM = 30; // a spread band narrower than this, in pixels, goes unlabelled
 
 export interface SliderState {
   /** the normalized query */
@@ -49,6 +53,8 @@ export class OffsetSlider {
   private readonly window: HTMLElement;
   private readonly track: HTMLElement;
   private readonly thumb: HTMLElement;
+  private readonly bands: HTMLElement;
+  private readonly ruler: HTMLElement;
   private value = 0;
   private max = 0;
   private scale: PositionScale = positionScale(1);
@@ -73,7 +79,13 @@ export class OffsetSlider {
     this.track = div("slider-track");
     this.thumb = div("slider-thumb");
     this.window.append(this.track, this.thumb);
-    this.el.append(label, this.note, this.window);
+    // The spread bands' dotted lines run behind the bars and down through the ruler
+    // under them, where their shares are labelled (spread-bands.ts).
+    const plot = div("slider-plot");
+    this.bands = div("slider-bands");
+    this.ruler = div("slider-ruler");
+    plot.append(this.bands, this.window, this.ruler);
+    this.el.append(label, this.note, plot);
     frame.append(this.el);
   }
 
@@ -148,6 +160,7 @@ export class OffsetSlider {
       bars.push(bar);
     }
     this.track.replaceChildren(...bars);
+    this.layoutBands(state);
 
     const { dots, more } = positionDots(value);
     this.dots.textContent = dots;
@@ -157,6 +170,37 @@ export class OffsetSlider {
     const letters = `${value} ${value === 1 ? "letter" : "letters"} before`;
     this.note.textContent =
       count === undefined ? `${letters} · counting…` : `${letters} · ${count.toLocaleString()} ${count === 1 ? "word" : "words"}`;
+  }
+
+  /** The spread bands, once every position is counted: until then the lines would move as
+   *  the counts come in, so none are drawn (the ruler keeps its height either way). */
+  private layoutBands({ byOffset, complete }: SliderState) {
+    const bands = complete ? spreadBands(byOffset) : null;
+    if (!bands) {
+      this.bands.replaceChildren();
+      this.ruler.replaceChildren();
+      return;
+    }
+    const first = this.rangeX + this.scale.edges[0] * this.range;
+    const x = bands.lines.map((p) => this.rangeX + this.scale.shareOf(p) * this.range);
+    const lines = x.map((at, i) => {
+      const line = document.createElement("i");
+      line.className = i === 1 || i === 2 ? "inner" : "outer";
+      line.style.left = `${at}px`;
+      return line;
+    });
+    const labels: HTMLElement[] = [];
+    bands.labels.forEach((text, i) => {
+      const from = Math.max(first, x[i]);
+      const to = x[i + 1];
+      if (to - from < LABEL_ROOM) return;
+      const label = document.createElement("span");
+      label.textContent = text;
+      label.style.left = `${(from + to) / 2}px`;
+      labels.push(label);
+    });
+    this.bands.replaceChildren(...lines);
+    this.ruler.replaceChildren(...labels);
   }
 }
 

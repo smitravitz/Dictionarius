@@ -762,9 +762,16 @@ a:focus-visible {
   font-variant-numeric: tabular-nums;
 }
 
+/* The bars, the spread bands behind them, and the ruler under them where the bands'
+   shares are labelled. */
+.slider-plot {
+  position: relative;
+}
+
 /* One bar per position, as tall as the words there; the chosen one in magenta. */
 .slider-window {
   position: relative;
+  z-index: 1; /* over the spread bands: a bar always wins */
   height: 2.75rem;
   overflow: hidden;
 }
@@ -800,6 +807,49 @@ a:focus-visible {
   width: 1.5px;
   background: var(--proof);
   opacity: 0.45;
+}
+
+/* Spread bands (spread-bands.ts): where the middle 68.3% and 95.4% of the words begin and
+   end. Dotted pencil, never solid, so the magenta seam stays the only "you are here";
+   the outer pair fainter and sparser than the inner. */
+.slider-bands {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.slider-bands > i {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  margin-left: -0.5px;
+  background-image: linear-gradient(to bottom, var(--pencil) 1px, transparent 1px);
+  background-size: 1px 3px;
+  opacity: 0.55;
+}
+
+.slider-bands > i.outer {
+  background-size: 1px 4px;
+  opacity: 0.3;
+}
+
+/* Always this tall, bands or none, so the slider never changes height. */
+.slider-ruler {
+  position: relative;
+  height: 0.875rem;
+}
+
+.slider-ruler > span {
+  position: absolute;
+  top: 1px;
+  transform: translateX(-50%);
+  color: var(--pencil);
+  font-size: 0.625rem;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+  line-height: 0.75rem;
+  white-space: nowrap;
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -159,6 +159,34 @@ test("holding a blank spot opens the scrubber; the screen's width spans every po
   await expect(page.locator("#entry")).toBeHidden(); // no word opened
 });
 
+test("spread bands mark where the middle 68.3% and 95.4% of the words lie, across the bars", async ({ page, isMobile }) => {
+  await open(page);
+  await page.locator("#q").fill("ate");
+  await counted(page);
+  const finger = await holdBlankSpot(page, isMobile);
+
+  const lines = page.locator(".slider-bands > i");
+  await expect(lines).toHaveCount(4);
+  expect(await lines.evaluateAll((all) => all.map((line) => line.className))).toStrictEqual(["outer", "inner", "inner", "outer"]);
+  const x = await lines.evaluateAll((all) => all.map((line) => line.getBoundingClientRect().x));
+  x.forEach((at, i) => i > 0 && expect(at).toBeGreaterThanOrEqual(x[i - 1])); // left to right
+
+  // Every line falls within the bars, never in the margins.
+  const bars = page.locator(".slider-track > i");
+  const first = (await bars.first().boundingBox())!;
+  const last = (await bars.last().boundingBox())!;
+  expect(x[0]).toBeGreaterThanOrEqual(first.x - 1);
+  expect(x[3]).toBeLessThanOrEqual(last.x + last.width + 3);
+
+  // The middle band is labelled under the bars, between its two lines.
+  const middle = page.locator(".slider-ruler > span", { hasText: "68.3%" });
+  await expect(middle).toBeVisible();
+  const label = (await middle.boundingBox())!;
+  expect(label.x).toBeGreaterThanOrEqual(x[1]);
+  expect(label.x + label.width).toBeLessThanOrEqual(x[2]);
+  await finger.lift();
+});
+
 test("a hold alone changes nothing; swiping up or down after it lets the slider go and scrolls the list", async ({
   page,
   isMobile,
