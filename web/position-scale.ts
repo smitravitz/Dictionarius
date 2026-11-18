@@ -24,6 +24,10 @@ export interface PositionScale {
   /** The position at share `x` of the range. Left of the bars is the first
    *  position, right of them the last. */
   at(x: number): number;
+  /** Where a point `p` positions in sits, as a share of the range: position n
+   *  spans n to n + 1, so 6.5 is halfway across 6's bar. Before the first bar
+   *  or past the last it stays at their ends. */
+  shareOf(p: number): number;
 }
 
 export function positionScale(positions: number): PositionScale {
@@ -45,6 +49,12 @@ export function positionScale(positions: number): PositionScale {
       let n = 0;
       while (n < positions - 1 && x >= edges[n + 1]) n++;
       return n;
+    },
+    shareOf(p: number) {
+      if (p <= 0) return edges[0];
+      if (p >= positions) return edges[positions];
+      const n = Math.floor(p);
+      return edges[n] + (p - n) * (edges[n + 1] - edges[n]);
     },
   };
 }

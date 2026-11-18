@@ -59,6 +59,18 @@ describe("positionScale", () => {
     expect(positionScale(11).at(0.75)).toBe(6);
   });
 
+  it("places a point partway through a bar in proportion across that bar", () => {
+    // Bar n spans n to n + 1: 6.5 is halfway across 6 (61.5-76%), 0.5 halfway across
+    // a short list's first bar (32-40%). Outside the bars it stays at their ends.
+    const scale = positionScale(26);
+    expect(scale.shareOf(6)).toBeCloseTo(0.615, 6);
+    expect(scale.shareOf(6.5)).toBeCloseTo(0.6875, 6);
+    expect(scale.shareOf(26)).toBeCloseTo(1, 6);
+    expect(scale.shareOf(30)).toBeCloseTo(1, 6);
+    expect(positionScale(4).shareOf(0.5)).toBeCloseTo(0.36, 6);
+    expect(positionScale(4).shareOf(-1)).toBeCloseTo(0.32, 6);
+  });
+
   it("handles one position and none", () => {
     expect(positionScale(1).edges.map((e) => +e.toFixed(2))).toEqual([0.46, 0.54]);
     expect(positionScale(1).at(0.9)).toBe(0);
