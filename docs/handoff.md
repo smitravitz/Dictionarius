@@ -3,7 +3,7 @@
 Read this first in a new chat, then `.claude/CLAUDE.md`. Update it at the end of any
 session that changes what's below (newest state only; history lives in git).
 
-_Last updated: 2026-11-16 (branch `tutorial-and-help-wording`: fragment wording, help sheet, wheels shown in the tour, no Install in Settings; unreleased), at v0.7.6, the first release with a Play app bundle (its run's `play-app-bundle`) and the store work (ADR-0010); in no store yet. Next: Google Play's internal test track._
+_Last updated: 2026-11-18 (branch `histogram-spread-bands`: dotted spread bands on the position slider's histogram, ADR-0011; unreleased), at v0.7.6, the first release with a Play app bundle (its run's `play-app-bundle`) and the store work (ADR-0010); in no store yet. Next: Google Play's internal test track._
 
 ## What it is
 

@@ -48,7 +48,9 @@ decision or module makes it load-bearing.
   room, puts 6 at about 75%, and squeezes positions 8 and up into the last 18%.
   Held from the right half of the screen (a right thumb), the thumb's direction
   flips: 0 at the right edge, more letters leftward. The histogram still reads
-  left to right.
+  left to right. **Spread bands** (`web/spread-bands.ts`): dotted lines behind the bars
+  where the middle 68.3% and 95.4% of the words begin and end, their shares labelled in a
+  slim ruler under the bars; drawn once every position is counted (ADR-0011).
 - **Scroller gestures** — what a press on the results means, decided in one
   place (`web/scroller-gestures.ts`): a **tap** opens a word (on a touch screen
   while typing, it only puts the keyboard away); a **hold** (380 ms) on a
